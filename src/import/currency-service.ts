@@ -14,20 +14,24 @@ interface RateCache {
 let cache: RateCache = {};
 
 // Load cache from localStorage
-try {
-  const saved = localStorage.getItem(CACHE_KEY);
-  if (saved) {
-    cache = JSON.parse(saved);
+if (typeof localStorage !== 'undefined') {
+  try {
+    const saved = localStorage.getItem(CACHE_KEY);
+    if (saved) {
+      cache = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load currency cache', e);
   }
-} catch (e) {
-  console.error('Failed to load currency cache', e);
 }
 
 function saveCache() {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch (e) {
-    console.error('Failed to save currency cache', e);
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch (e) {
+      console.error('Failed to save currency cache', e);
+    }
   }
 }
 
