@@ -190,6 +190,8 @@ import { Model347Engine } from '../src/fiscal/model347-engine.ts';
 import { InheritanceTaxEngine } from '../src/fiscal/inheritance-tax-engine.ts';
 import { runMonteCarloSimulation } from '../src/fiscal/monte-carlo-engine.ts';
 import { calculateMarginalTaxRate, generateYearEndOptimization } from '../src/fiscal/year-end-optimizer.ts';
+import { calculateEnergyEfficiencyDeduction } from '../src/fiscal/energy-efficiency-engine.ts';
+import { checkTaxPrescription } from '../src/fiscal/tax-prescription-engine.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -1326,6 +1328,76 @@ suite('22. Coalescència Matemàtica Segura i Cicle de Vida del Router (math.ts 
     });
 
     assert(typeof router.registerCleanup === 'function', 'El router ha de disposar del mètode registerCleanup');
+  });
+});
+
+// ── 23. SUITE 23: DETECTOR DE PRESCRIPCIÓ TRIBUTÀRIA LGT ────────────────────
+
+suite('23. Detector de Prescripció Tributària (Art. 66 LGT - tax-prescription-engine.ts)', () => {
+
+  test('23.1 Càlcul de prescripció de 4 anys per a IRPF i IVA', () => {
+    // Si la data de referència és l'any 2026:
+    // Exercici 2020 IRPF: termini fins 30/06/2021 + 4 anys = 30/06/2025 -> PRESCRIT
+    const status2020 = checkTaxPrescription(2020, 'IRPF', new Date(2026, 0, 1));
+    assert(status2020.isPrescribed === true, 'L\'exercici 2020 ha de constar com a prescrit el 2026');
+    assert(status2020.daysRemaining === 0, 'Els dies restants han de ser 0');
+
+    // Exercici 2024 IRPF: termini fins 30/06/2025 + 4 anys = 30/06/2029 -> NO PRESCRIT
+    const status2024 = checkTaxPrescription(2024, 'IRPF', new Date(2026, 0, 1));
+    assert(status2024.isPrescribed === false, 'L\'exercici 2024 no està prescrit');
+    assert(status2024.daysRemaining > 0, 'Hi ha dies restants de control d\'inspecció');
+  });
+});
+
+// ── 24. SUITE 24: DEDUCCIONS PER EFICIÈNCIA ENERGÈTICA ──────────────────────
+
+suite('24. Deduccions Estatals per Eficiència Energètica (energy-efficiency-engine.ts)', () => {
+
+  test('24.1 Modalitat 1: 20% fins a 5.000 € (Reducció 7% calefacció/refrigeració)', () => {
+    const res = calculateEnergyEfficiencyDeduction({
+      id: 'work1',
+      type: 'heating_cooling_20',
+      amountsPaid: 6000, // Supera el topall de 5.000 €
+      certificateBeforeDate: '2024-01-10',
+      certificateAfterDate: '2024-05-15',
+      reductionPercentageAchieved: 10, // Supera el 7% exigit
+    });
+
+    assert(res.meetsLegalRequirement === true, 'Compleix requisit legal del 7%');
+    assert(res.eligibleBase === 5000, 'Base màxima computable de 5.000 €');
+    assert(res.deductionAmount === 1000, 'Deducció del 20% sobre 5.000 € = 1.000 €');
+  });
+
+  test('24.2 Modalitat 2: 40% fins a 7.500 € (Reducció 30% energia primària no renovable)', () => {
+    const res = calculateEnergyEfficiencyDeduction({
+      id: 'work2',
+      type: 'non_renewable_energy_40',
+      amountsPaid: 8000,
+      subsidiesReceived: 1000, // Net: 7.000 €
+      certificateBeforeDate: '2024-02-01',
+      certificateAfterDate: '2024-06-01',
+      reductionPercentageAchieved: 35, // Supera el 30%
+    });
+
+    assert(res.meetsLegalRequirement === true, 'Compleix requisit del 30%');
+    assert(res.eligibleBase === 7000, 'Base neta computable de 7.000 €');
+    assert(res.deductionAmount === 2800, 'Deducció del 40% sobre 7.000 € = 2.800 €');
+  });
+
+  test('24.3 Modalitat 3: 60% en Edificis d\'Habitatges (màx 5.000 € anuals)', () => {
+    const res = calculateEnergyEfficiencyDeduction({
+      id: 'work3',
+      type: 'building_retrofit_60',
+      amountsPaid: 12000,
+      certificateBeforeDate: '2024-01-01',
+      certificateAfterDate: '2024-11-01',
+      reductionPercentageAchieved: 40,
+    });
+
+    assert(res.meetsLegalRequirement === true, 'Compleix requisit de rehabilitació');
+    assert(res.eligibleBase === 5000, 'Límit anual de 5.000 €');
+    assert(res.deductionAmount === 3000, 'Deducció del 60% = 3.000 €');
+    assert(res.pendingCarryover === 7000, 'Excés de 7.000 € pendent d\'arrossegar als 4 propers anys');
   });
 });
 
