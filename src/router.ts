@@ -10,6 +10,7 @@ class Router {
   private container: HTMLElement | null = null;
   private currentPath = '';
   private onNavigateCallbacks: Array<(path: string) => void> = [];
+  private cleanupCallbacks: Array<() => void> = [];
 
   /** Register a route. */
   register(route: Route): void {
@@ -21,6 +22,11 @@ class Router {
     for (const route of routes) {
       this.register(route);
     }
+  }
+
+  /** Register a cleanup callback executed when the current view is unmounted. */
+  registerCleanup(fn: () => void): void {
+    this.cleanupCallbacks.push(fn);
   }
 
   /** Set the DOM container for page rendering. */
@@ -82,6 +88,16 @@ class Router {
         this.navigate(firstRoute.path);
       }
       return;
+    }
+
+    // Execute all registered unmount cleanups from the previous view
+    while (this.cleanupCallbacks.length > 0) {
+      const cleanup = this.cleanupCallbacks.pop();
+      try {
+        cleanup?.();
+      } catch (e) {
+        console.warn('Router cleanup error:', e);
+      }
     }
 
     this.currentPath = hash;

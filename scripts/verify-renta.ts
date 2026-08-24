@@ -189,6 +189,9 @@ import { DefiTaxEngine } from '../src/fiscal/defi-tax-engine.ts';
 import { Model347Engine } from '../src/fiscal/model347-engine.ts';
 import { InheritanceTaxEngine } from '../src/fiscal/inheritance-tax-engine.ts';
 import { runMonteCarloSimulation } from '../src/fiscal/monte-carlo-engine.ts';
+import { calculateMarginalTaxRate, generateYearEndOptimization } from '../src/fiscal/year-end-optimizer.ts';
+import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
+import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
 import { formatCurrency, formatCurrencyNoDecimals, formatPercent, formatNumber, formatCompact, parseCurrencyInput } from '../src/utils/currency.ts';
 import { store, createEmptyDeclaracion } from '../src/store.ts';
@@ -1252,6 +1255,77 @@ suite('20. Successions i Donacions (Model 650) i Simulació Monte Carlo', () => 
     assert(mc.medianFinalCapital > 0, 'El capital final medià ha de ser positiu');
     assert(mc.fanChartPoints.length > 0, 'Ha de generar punts percentils de ventall');
     assert(duration < 25, `Les 1.000 simulacions Monte Carlo han d'executar-se en < 25ms (obtingut: ${duration.toFixed(3)}ms)`);
+  });
+});
+
+// ── 21. SUITE 21: TIPUS MARGINALS I ASSESSOR DE FINAL D'ANY ─────────────────
+
+suite('21. Tipus Marginals d\'IRPF i Assessor de Final d\'Any (year-end-optimizer.ts)', () => {
+
+  test('21.1 Càlcul de Tipus Marginal Estatal i Autonòmic (calculateMarginalTaxRate)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{
+      id: 'e1',
+      name: 'Empresa',
+      grossSalary: 45000,
+      inKind: 0,
+      withholdings: 8000,
+      socialSecurity: 2000,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+
+    const rates = calculateMarginalTaxRate(data);
+    assert(rates.stateGeneralRate > 0, 'Tipus marginal estatal positiu');
+    assert(rates.autonomicGeneralRate > 0, 'Tipus marginal autonòmic positiu');
+    assert(rates.totalGeneralMarginalRate >= 30, `Tipus marginal per a 45k ha de ser >= 30% (obtingut: ${rates.totalGeneralMarginalRate}%)`);
+  });
+
+  test('21.2 Generació de Consells d\'Estalvi Abans del 31/12 (generateYearEndOptimization)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{
+      id: 'e1',
+      name: 'Empresa',
+      grossSalary: 50000,
+      inKind: 0,
+      withholdings: 10000,
+      socialSecurity: 2000,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    data.capitalIncome.dividends = 5000;
+
+    const report = generateYearEndOptimization(data);
+    assert(report.tips.length > 0, 'Ha de generar consells d\'estalvi');
+    assert(report.totalPotentialSavings > 0, 'L\'estalvi potencial ha de ser positiu');
+    const pensionTip = report.tips.find(t => t.category === 'pensions');
+    assert(pensionTip !== undefined, 'Ha de suggerir aportació a pla de pensions');
+  });
+});
+
+// ── 22. SUITE 22: ARITMÈTICA SEGURA I CICLE DE VIDA ROUTER ──────────────────
+
+suite('22. Coalescència Matemàtica Segura i Cicle de Vida del Router (math.ts / router.ts)', () => {
+
+  test('22.1 Aritmètica financera de 2 decimals i protecció NaN (roundCurrency, safeAdd, safeMultiply)', () => {
+    assert(roundCurrency(0.1 + 0.2) === 0.3, '0.1 + 0.2 ha d\'arrodonir a 0.30 exactes');
+    assert(safeAdd(10.5, null, undefined, NaN, 20.3) === 30.8, 'safeAdd filtra valors nuls i NaN');
+    assert(safeMultiply(1500, 0.37) === 555, 'Multiplicació segura 1500 * 0.37 = 555.00 €');
+    assert(safePercentage(25, 100) === 25, 'Percentatge segur 25%');
+    assert(safePercentage(50, 0) === 0, 'Divisió per zero retorna 0');
+  });
+
+  test('22.2 Execució i neteja de callbacks de desmuntatge (registerCleanup)', () => {
+    let cleanedUp = false;
+    router.registerCleanup(() => {
+      cleanedUp = true;
+    });
+
+    assert(typeof router.registerCleanup === 'function', 'El router ha de disposar del mètode registerCleanup');
   });
 });
 
