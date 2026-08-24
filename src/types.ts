@@ -350,7 +350,7 @@ export interface Route {
   label: string;
   icon: string;
   section?: string;
-  render: () => HTMLElement;
+  render: () => HTMLElement | Promise<HTMLElement>;
 }
 
 /** Tema visual de l'aplicació */

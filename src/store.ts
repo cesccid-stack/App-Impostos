@@ -11,6 +11,10 @@ import { initializeEmptyIVAData, syncActivitiesToIVA, syncIVAToActivities, syncP
 import { calculateAllQuarters } from './fiscal/iva-engine.ts';
 import { getDemoProfilesData } from './fiscal/user-presets.ts';
 import { ALL_APP_MODULES, MODULE_PRESETS, getActiveModuleIdsForProfile } from './fiscal/modules-catalog.ts';
+import { createEmptyDeclaracion } from './fiscal/declaration-factory.ts';
+import { validateAndSanitizeDeclaration } from './fiscal/schema-validator.ts';
+
+export { createEmptyDeclaracion };
 
 const STORAGE_PREFIX = 'hacienda_';
 
@@ -30,117 +34,6 @@ const DEFAULT_PROFILES: UserProfile[] = [
   },
 ];
 
-/** Create a fresh, empty DeclaracionData for a given year. */
-export function createEmptyDeclaracion(year: number, profileId: string = 'profile_main'): DeclaracionData {
-  return {
-    year,
-    profileId,
-    personal: {
-      name: '',
-      nif: '',
-      age: 35,
-      disability: 0,
-      descendants: [],
-      ascendants: [],
-      community: 'CAT',
-      taxDeclarationType: 'individual',
-    },
-    workIncome: {
-      employers: [],
-      unionFees: 0,
-      otherDeductible: 0,
-      pensionContributions: 0,
-    },
-    capitalIncome: {
-      interests: 0,
-      dividends: 0,
-      foreignDividends: 0,
-      foreignTaxWithheld: 0,
-      insuranceGains: 0,
-      otherMobiliary: 0,
-      mobiliaryWithholdings: 0,
-      rentalIncome: 0,
-      rentalExpenses: 0,
-      imputedIncome: 0,
-      realEstateWithholdings: 0,
-    },
-    properties: [],
-    activities: {
-      income: 0,
-      expenses: 0,
-      withholdings: 0,
-      socialSecuritySelfEmployed: 0,
-      estimationType: 'direct_simplified',
-    },
-    gains: {
-      items: [],
-      totalWithholdings: 0,
-    },
-    deductions: {
-      housingDeduction: false,
-      housingAmountsPaid: 0,
-      donations: [],
-      maternityDeduction: false,
-      maternityMonths: 0,
-      maternityNurseryExpenses: 0,
-      pensionPlanContributions: 0,
-      companyPensionContributions: 0,
-      energyEfficiencyType: 'none',
-      energyEfficiencyAmount: 0,
-      otherDeductions: 0,
-      catalanRentalDeduction: false,
-      catalanRentalAmount: 0,
-      catalanRentalSituation: 'none',
-      catalanBirthAdoption: 0,
-      catalanStartupInvestment: 0,
-      catalanStartupIsResearchOrUniversity: false,
-      catalanWidowhood: false,
-      catalanWidowhoodWithDependents: false,
-      catalanAgaurMasterLoanInterests: 0,
-      catalanLanguageDonations: 0,
-      catalanBiomedicalDonations: 0,
-      catalanHomeRehabilitation: 0,
-    },
-    wealth: {
-      assets: [],
-      debts: [],
-      community: 'CAT',
-    },
-    foreignAssets: {
-      accounts: [],
-      securities: [],
-      realEstate: [],
-      crypto: [],
-    },
-    iva: initializeEmptyIVAData(),
-    quarterlyTaxes: {
-      mod130: [],
-      mod111: [],
-      mod115: [],
-    },
-    patrimonialTaxes: {
-      inheritance: [],
-      itpAjd: [],
-      plusvalia: [],
-    },
-    strategicAdvising: {
-      autonomoVsSL: [],
-      pensionRescues: [],
-    },
-    crypto: {
-      transactions: [],
-      capitalGains: [],
-      defiIncome: 0,
-    },
-    ocrBatches: [],
-    compliance: {
-      verifactuRecords: [],
-      officialBooks: [],
-      isVerifactuEnabled: true
-    }
-  };
-}
-
 /**
  * Singleton reactive store.
  */
@@ -151,6 +44,8 @@ class Store {
   private profiles: UserProfile[];
   private currentTheme: AppTheme;
   private listeners = new Set<StoreListener>();
+  private keyListeners = new Map<string, Set<(sectionData: any) => void>>();
+  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.currentTheme = this.loadTheme();
@@ -159,6 +54,10 @@ class Store {
     this.activeProfileId = this.loadActiveProfileId();
     this.currentYear = this.loadCurrentYear();
     this.data = this.load(this.activeProfileId, this.currentYear);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => this.flush());
+    }
   }
 
 
@@ -174,7 +73,7 @@ class Store {
 
   /** Switch to a different fiscal year. */
   setYear(year: FiscalYear): void {
-    this.save();
+    this.save(true);
     this.currentYear = year;
     this.data = this.load(this.activeProfileId, year);
     localStorage.setItem(`${STORAGE_PREFIX}current_year`, String(year));
@@ -201,7 +100,7 @@ class Store {
 
   setActiveProfile(profileId: string): void {
     if (profileId === this.activeProfileId) return;
-    this.save();
+    this.save(true);
     this.activeProfileId = profileId;
     localStorage.setItem(`${STORAGE_PREFIX}active_profile_id`, profileId);
     this.data = this.load(profileId, this.currentYear);
@@ -537,8 +436,9 @@ class Store {
         ...(value as unknown as Record<string, unknown>),
       };
     }
+    this.data = { ...this.data };
     this.save();
-    this.notify();
+    this.notify(section);
   }
 
   /** Replace an entire section. */
@@ -547,20 +447,38 @@ class Store {
     value: DeclaracionData[K],
   ): void {
     (this.data as unknown as Record<string, unknown>)[section as string] = value;
+    this.data = { ...this.data };
     this.save();
-    this.notify();
+    this.notify(section);
   }
 
-  /** Subscribe to changes. Returns unsubscribe function. */
+  /** Subscribe to all global changes. Returns unsubscribe function. */
   subscribe(listener: StoreListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
+  /** Subscribe to a specific declaration section for optimized granular updates. */
+  subscribeKey<K extends keyof DeclaracionData>(
+    key: K,
+    listener: (sectionData: DeclaracionData[K]) => void,
+  ): () => void {
+    const keyStr = key as string;
+    if (!this.keyListeners.has(keyStr)) {
+      this.keyListeners.set(keyStr, new Set());
+    }
+    const set = this.keyListeners.get(keyStr)!;
+    set.add(listener);
+    return () => {
+      set.delete(listener);
+      if (set.size === 0) this.keyListeners.delete(keyStr);
+    };
+  }
+
   /** Clear all data for current profile and year. */
   reset(): void {
     this.data = createEmptyDeclaracion(this.currentYear, this.activeProfileId);
-    this.save();
+    this.save(true);
     this.notify();
   }
 
@@ -585,7 +503,7 @@ class Store {
     this.currentYear = FISCAL_YEARS[FISCAL_YEARS.length - 1];
     this.data = createEmptyDeclaracion(this.currentYear, this.activeProfileId);
     this.saveProfiles();
-    this.save();
+    this.save(true);
     this.notify();
   }
 
@@ -636,10 +554,42 @@ class Store {
     }
   }
 
-  private save(): void {
+  /** Flush any pending debounced persistence to localStorage immediately. */
+  flush(): void {
+    if (this.saveTimeout !== null) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
     if (typeof localStorage === 'undefined') return;
-    const key = `${STORAGE_PREFIX}data_${this.activeProfileId}_${this.currentYear}`;
-    localStorage.setItem(key, JSON.stringify(this.data));
+    try {
+      const key = `${STORAGE_PREFIX}data_${this.activeProfileId}_${this.currentYear}`;
+      localStorage.setItem(key, JSON.stringify(this.data));
+    } catch (err) {
+      console.warn('Storage write failed or quota exceeded:', err);
+    }
+  }
+
+  private save(immediate = false): void {
+    if (immediate) {
+      this.flush();
+      return;
+    }
+
+    if (this.saveTimeout !== null) {
+      clearTimeout(this.saveTimeout);
+    }
+
+    this.saveTimeout = setTimeout(() => {
+      this.saveTimeout = null;
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const key = `${STORAGE_PREFIX}data_${this.activeProfileId}_${this.currentYear}`;
+          localStorage.setItem(key, JSON.stringify(this.data));
+        } catch (err) {
+          console.warn('Storage write failed or quota exceeded:', err);
+        }
+      }
+    }, 150);
   }
 
   private load(profileId: string, year: FiscalYear): DeclaracionData {
@@ -919,83 +869,28 @@ class Store {
     year: number,
     profileId: string,
   ): DeclaracionData {
-    const defaults = createEmptyDeclaracion(year, profileId);
-    const rawIva = data.iva;
-    const mergedIva: IVAData = rawIva ? {
-      ...defaults.iva!,
-      ...rawIva,
-      config: {
-        ...defaults.iva!.config,
-        ...rawIva.config,
-        prorrata: {
-          ...defaults.iva!.config.prorrata,
-          ...rawIva.config?.prorrata,
-        }
-      },
-      issuedInvoices: Array.isArray(rawIva.issuedInvoices) ? rawIva.issuedInvoices : [],
-      receivedInvoices: Array.isArray(rawIva.receivedInvoices) ? rawIva.receivedInvoices : [],
-      investmentAssets: Array.isArray(rawIva.investmentAssets) ? rawIva.investmentAssets : [],
-      quarters: {
-        ...defaults.iva!.quarters,
-        ...rawIva.quarters,
-      }
-    } : defaults.iva!;
-
-    return {
-      ...defaults,
-      ...data,
-      personal: { ...defaults.personal, ...data.personal },
-      workIncome: { ...defaults.workIncome, ...data.workIncome },
-      capitalIncome: { ...defaults.capitalIncome, ...data.capitalIncome },
-      activities: { ...defaults.activities, ...data.activities },
-      properties: (Array.isArray(data.properties) ? data.properties : Object.values(data.properties || {})).map((p: any) => ({
-        ...p,
-        inventory: Array.isArray(p?.inventory) ? p.inventory : Object.values(p?.inventory || {}),
-        improvements: Array.isArray(p?.improvements) ? p.improvements : Object.values(p?.improvements || {}),
-        furniture: Array.isArray(p?.furniture) ? p.furniture : Object.values(p?.furniture || {}),
-      })),
-      gains: {
-        ...defaults.gains,
-        ...data.gains,
-        items: Array.isArray(data.gains?.items) ? data.gains.items : Object.values(data.gains?.items || {}),
-      },
-      deductions: { ...defaults.deductions, ...data.deductions },
-      iva: mergedIva,
-      quarterlyTaxes: data.quarterlyTaxes ? {
-        mod130: Array.isArray(data.quarterlyTaxes.mod130) ? data.quarterlyTaxes.mod130 : defaults.quarterlyTaxes?.mod130 || [],
-        mod111: Array.isArray(data.quarterlyTaxes.mod111) ? data.quarterlyTaxes.mod111 : defaults.quarterlyTaxes?.mod111 || [],
-        mod115: Array.isArray(data.quarterlyTaxes.mod115) ? data.quarterlyTaxes.mod115 : defaults.quarterlyTaxes?.mod115 || [],
-        mod347: data.quarterlyTaxes.mod347 || defaults.quarterlyTaxes?.mod347
-      } : defaults.quarterlyTaxes,
-      patrimonialTaxes: data.patrimonialTaxes ? {
-        inheritance: Array.isArray(data.patrimonialTaxes.inheritance) ? data.patrimonialTaxes.inheritance : defaults.patrimonialTaxes?.inheritance || [],
-        itpAjd: Array.isArray(data.patrimonialTaxes.itpAjd) ? data.patrimonialTaxes.itpAjd : defaults.patrimonialTaxes?.itpAjd || [],
-        plusvalia: Array.isArray(data.patrimonialTaxes.plusvalia) ? data.patrimonialTaxes.plusvalia : defaults.patrimonialTaxes?.plusvalia || [],
-        solidarity718: data.patrimonialTaxes.solidarity718 || defaults.patrimonialTaxes?.solidarity718
-      } : defaults.patrimonialTaxes,
-      strategicAdvising: data.strategicAdvising ? {
-        autonomoVsSL: Array.isArray(data.strategicAdvising.autonomoVsSL) ? data.strategicAdvising.autonomoVsSL : defaults.strategicAdvising?.autonomoVsSL || [],
-        pensionRescues: Array.isArray(data.strategicAdvising.pensionRescues) ? data.strategicAdvising.pensionRescues : defaults.strategicAdvising?.pensionRescues || []
-      } : defaults.strategicAdvising,
-      crypto: data.crypto ? {
-        transactions: Array.isArray(data.crypto.transactions) ? data.crypto.transactions : defaults.crypto?.transactions || [],
-        capitalGains: Array.isArray(data.crypto.capitalGains) ? data.crypto.capitalGains : defaults.crypto?.capitalGains || [],
-        defiIncome: typeof data.crypto.defiIncome === 'number' ? data.crypto.defiIncome : defaults.crypto?.defiIncome || 0,
-        model721: data.crypto.model721 || defaults.crypto?.model721
-      } : defaults.crypto,
-      ocrBatches: Array.isArray(data.ocrBatches) ? data.ocrBatches : defaults.ocrBatches || [],
-      compliance: data.compliance ? {
-        verifactuRecords: Array.isArray(data.compliance.verifactuRecords) ? data.compliance.verifactuRecords : defaults.compliance?.verifactuRecords || [],
-        officialBooks: Array.isArray(data.compliance.officialBooks) ? data.compliance.officialBooks : defaults.compliance?.officialBooks || [],
-        isVerifactuEnabled: data.compliance.isVerifactuEnabled ?? defaults.compliance?.isVerifactuEnabled ?? true,
-        digitalCertificateId: data.compliance.digitalCertificateId || defaults.compliance?.digitalCertificateId
-      } : defaults.compliance,
-    };
+    return validateAndSanitizeDeclaration(data, year as FiscalYear, profileId);
   }
 
-  private notify(): void {
+  private notify(changedSection?: keyof DeclaracionData): void {
     for (const listener of this.listeners) {
       listener();
+    }
+    if (changedSection) {
+      const set = this.keyListeners.get(changedSection as string);
+      if (set) {
+        const sectionData = this.data[changedSection];
+        for (const listener of set) {
+          listener(sectionData);
+        }
+      }
+    } else {
+      for (const [key, set] of this.keyListeners.entries()) {
+        const sectionData = (this.data as unknown as Record<string, unknown>)[key];
+        for (const listener of set) {
+          listener(sectionData);
+        }
+      }
     }
   }
 }

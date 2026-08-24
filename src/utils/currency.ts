@@ -10,6 +10,13 @@ const currencyFormatter = new Intl.NumberFormat('es-ES', {
   maximumFractionDigits: 2,
 });
 
+const currencyNoDecimalsFormatter = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
 const percentFormatter = new Intl.NumberFormat('es-ES', {
   style: 'percent',
   minimumFractionDigits: 1,
@@ -23,21 +30,31 @@ const numberFormatter = new Intl.NumberFormat('es-ES', {
 
 /** Format a number as EUR currency string */
 export function formatCurrency(value: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,00 €';
   return currencyFormatter.format(value);
+}
+
+/** Format a number as EUR currency string without decimals for clean summary cards */
+export function formatCurrencyNoDecimals(value: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '0 €';
+  return currencyNoDecimalsFormatter.format(value);
 }
 
 /** Format a number as percentage (0.19 → "19,0 %") */
 export function formatPercent(value: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,0 %';
   return percentFormatter.format(value);
 }
 
 /** Format a number with 2 decimal places */
 export function formatNumber(value: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,00';
   return numberFormatter.format(value);
 }
 
 /** Format a number as a compact currency (e.g., 12.5k €) */
 export function formatCompact(value: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,00 €';
   const absValue = Math.abs(value);
   const sign = value < 0 ? '-' : '';
 
@@ -47,7 +64,7 @@ export function formatCompact(value: number): string {
   if (absValue >= 1_000) {
     return `${sign}${(absValue / 1_000).toFixed(1)}k €`;
   }
-  return formatCurrency(value);
+  return currencyFormatter.format(value);
 }
 
 /**
@@ -55,10 +72,11 @@ export function formatCompact(value: number): string {
  * Handles European formatting (1.234,56).
  */
 export function parseCurrencyInput(input: string): number {
+  if (!input || typeof input !== 'string') return 0;
   const cleaned = input
     .replace(/[€\s]/g, '')
     .replace(/\./g, '')
     .replace(',', '.');
   const value = parseFloat(cleaned);
-  return isNaN(value) ? 0 : value;
+  return Number.isFinite(value) && !Number.isNaN(value) ? value : 0;
 }

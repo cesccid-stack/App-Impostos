@@ -485,3 +485,19 @@ body {
 .mobile-menu-btn:hover {
   background: var(--bg-surface-hover);
 }
+
+/* ── High-Performance Rendering & GPU Acceleration ────────── */
+.modal-overlay,
+.modal-dialog,
+.toast-container,
+.toast,
+.command-palette-overlay,
+.command-palette {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.table-responsive {
+  contain: paint;
+}
+

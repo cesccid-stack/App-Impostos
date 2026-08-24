@@ -19,7 +19,6 @@ import { showToast } from '../components/toast.ts';
 import { getStatusMeta } from '../fiscal/user-presets.ts';
 import { openCommandPalette } from '../components/command-palette.ts';
 import { openToolManagerModal } from '../components/tool-manager-modal.ts';
-import { createSidebar } from '../components/navbar.ts';
 import { ALL_APP_MODULES } from '../fiscal/modules-catalog.ts';
 import type { DeclaracionData, FiscalResult, UserProfile } from '../types.ts';
 
@@ -972,7 +971,7 @@ export function renderDashboard(): HTMLElement {
     page.querySelector('#dash-btn-tool-manager')?.addEventListener('click', () => {
       openToolManagerModal(() => {
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       });
     });
 
@@ -1083,7 +1082,7 @@ export function renderDashboard(): HTMLElement {
             store.setActiveProfile(id);
             showToast(`Declarant canviat a: ${store.getActiveProfile().name}`, 'info');
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           }
         });
       });
@@ -1094,7 +1093,7 @@ export function renderDashboard(): HTMLElement {
       page.querySelector('#btn-open-full-tool-modal')?.addEventListener('click', () => {
         openToolManagerModal(() => {
           render();
-          document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+          window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
         });
       });
 
@@ -1104,7 +1103,7 @@ export function renderDashboard(): HTMLElement {
           if (id) {
             store.toggleModule(id);
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           }
         });
       });

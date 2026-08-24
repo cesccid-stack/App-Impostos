@@ -40,7 +40,18 @@ export function openModal(options: ModalOptions): {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
+  let isClosed = false;
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      close();
+    }
+  };
+
   const close = () => {
+    if (isClosed) return;
+    isClosed = true;
+    document.removeEventListener('keydown', onKeyDown);
     overlay.style.opacity = '0';
     setTimeout(() => {
       overlay.remove();
@@ -48,19 +59,11 @@ export function openModal(options: ModalOptions): {
     }, 150);
   };
 
+  document.addEventListener('keydown', onKeyDown);
   header.querySelector('.modal__close')!.addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });
-
-  // Escape key
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      close();
-      document.removeEventListener('keydown', onKeyDown);
-    }
-  };
-  document.addEventListener('keydown', onKeyDown);
 
   return { body, footer, close };
 }

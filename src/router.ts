@@ -39,6 +39,23 @@ class Router {
     window.location.hash = path;
   }
 
+  /**
+   * Predictive prefetch: trigger dynamic import in background on link hover.
+   */
+  prefetch(path: string): void {
+    const route = this.routes.get(path);
+    if (route && typeof route.render === 'function') {
+      try {
+        const res = route.render();
+        if (res instanceof Promise) {
+          res.catch(() => {}); // Silent catch for speculative prefetch
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+  }
+
   /** Get all registered routes. */
   getRoutes(): Route[] {
     return Array.from(this.routes.values());
@@ -54,7 +71,7 @@ class Router {
     this.onNavigateCallbacks.push(callback);
   }
 
-  private handleHashChange(): void {
+  private async handleHashChange(): Promise<void> {
     const hash = window.location.hash.slice(1) || '/';
     const route = this.routes.get(hash);
 
@@ -74,21 +91,46 @@ class Router {
       this.container.style.opacity = '0';
       this.container.style.transform = 'translateY(8px)';
 
-      setTimeout(() => {
+      try {
+        const renderResult = route.render();
+        const page = renderResult instanceof Promise ? await renderResult : renderResult;
+
+        // Check if user has navigated away while waiting for async load
+        if (this.currentPath !== hash) return;
+
         if (this.container) {
           this.container.innerHTML = '';
-          const page = route.render();
           this.container.appendChild(page);
 
-          // Animate in
+          // Update document title for SEO & Accessibility
+          if (typeof document !== 'undefined') {
+            document.title = `${route.label} — Hacienda Control Renda`;
+          }
+
+          // Scroll to top of viewport
+          window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+
+          // Animate in & manage focus for screen readers
           requestAnimationFrame(() => {
-            if (this.container) {
+            if (this.container && this.currentPath === hash) {
               this.container.style.opacity = '1';
               this.container.style.transform = 'translateY(0)';
+              this.container.tabIndex = -1;
+              this.container.focus({ preventScroll: true });
             }
           });
         }
-      }, 150);
+      } catch (err) {
+        console.error('Failed to render route:', hash, err);
+        if (this.container && this.currentPath === hash) {
+          this.container.innerHTML = `<div class="card" style="margin:24px; padding:24px; color:var(--color-error);">
+            <h3>Error carregant la pàgina</h3>
+            <p>${(err as Error)?.message || 'Error desconegut'}</p>
+          </div>`;
+          this.container.style.opacity = '1';
+          this.container.style.transform = 'translateY(0)';
+        }
+      }
     }
 
     for (const cb of this.onNavigateCallbacks) {

@@ -306,10 +306,22 @@ function computeMinimums(data: DeclaracionData): {
   };
 }
 
+const irpfCache = new WeakMap<DeclaracionData, FiscalResult>();
+
 /**
  * Main calculation: computes the full FiscalResult from input data.
+ * Memoized via WeakMap for sub-millisecond repeated lookups.
  */
-export function calculateIRPF(data: DeclaracionData): FiscalResult {
+export function calculateIRPF(data: DeclaracionData, bypassCache = false): FiscalResult {
+  if (!bypassCache && irpfCache.has(data)) {
+    return irpfCache.get(data)!;
+  }
+  const result = computeIRPFInternal(data);
+  irpfCache.set(data, result);
+  return result;
+}
+
+function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   // 1. Compute base imposable general
   const { netIncome: netWork, reduction: workReduction, foreignWorkExemptionApplied, irregularWorkReduction } =
     computeNetWorkIncome(data);

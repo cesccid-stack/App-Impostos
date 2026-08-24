@@ -73,7 +73,26 @@ export const ISGF_TAX_BRACKETS = [
   { upTo: Infinity, rate: 0.035 },
 ];
 
+const wealthTaxCache = new WeakMap<WealthTaxData, { baseKey: string; result: WealthTaxCalculationResult }>();
+
 export function calculateWealthTax(
+  wealthData: WealthTaxData,
+  irpfGeneralBase: number = 0,
+  irpfSavingsBase: number = 0,
+  irpfNetTax: number = 0
+): WealthTaxCalculationResult {
+  const baseKey = `${irpfGeneralBase}_${irpfSavingsBase}_${irpfNetTax}`;
+  const cached = wealthTaxCache.get(wealthData);
+  if (cached && cached.baseKey === baseKey) {
+    return cached.result;
+  }
+
+  const result = computeWealthTaxInternal(wealthData, irpfGeneralBase, irpfSavingsBase, irpfNetTax);
+  wealthTaxCache.set(wealthData, { baseKey, result });
+  return result;
+}
+
+function computeWealthTaxInternal(
   wealthData: WealthTaxData,
   irpfGeneralBase: number = 0,
   irpfSavingsBase: number = 0,

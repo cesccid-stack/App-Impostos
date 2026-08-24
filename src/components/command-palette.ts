@@ -12,7 +12,6 @@ import { showToast } from './toast.ts';
 import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { openComplianceModal } from './compliance-modal.ts';
 import { openToolManagerModal } from './tool-manager-modal.ts';
-import { createSidebar } from './navbar.ts';
 import type { AppTheme } from '../types.ts';
 
 export interface CommandItem {
@@ -181,9 +180,13 @@ export function openCommandPalette(): void {
     }
   });
 
-  // Live filter
+  // Live filter with fuzzy leading-zero normalization for AEAT caselles
   input.addEventListener('input', (e) => {
-    const q = (e.target as HTMLInputElement).value.toLowerCase().trim();
+    const rawQ = (e.target as HTMLInputElement).value.trim();
+    const q = rawQ.toLowerCase();
+    const strippedNum = rawQ.replace(/^0+/, '');
+    const paddedNum = rawQ.length > 0 && rawQ.length <= 4 && /^\d+$/.test(rawQ) ? rawQ.padStart(4, '0') : '';
+
     if (!q) {
       filteredItems = items;
     } else {
@@ -192,7 +195,14 @@ export function openCommandPalette(): void {
           item.title.toLowerCase().includes(q) ||
           (item.subtitle && item.subtitle.toLowerCase().includes(q)) ||
           item.category.toLowerCase().includes(q) ||
-          (item.keywords && item.keywords.some((k) => k.toLowerCase().includes(q)))
+          (paddedNum && item.title.includes(paddedNum)) ||
+          (item.keywords &&
+            item.keywords.some(
+              (k) =>
+                k.toLowerCase().includes(q) ||
+                (strippedNum && k.toLowerCase().includes(strippedNum)) ||
+                (paddedNum && k.toLowerCase().includes(paddedNum))
+            ))
         );
       });
     }
@@ -305,18 +315,23 @@ function scrollActiveIntoView(container: HTMLElement): void {
   }
 }
 
+function refreshSidebar(): void {
+  window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
+}
+
 function buildCommandItems(): CommandItem[] {
-  const items: CommandItem[] = [];
-  const data = store.getData();
-  const result = calculateIRPF(data);
+  const state = store.getData();
   const profiles = store.getProfiles();
   const activeProfile = store.getActiveProfile();
   const routes = router.getRoutes();
 
-  // 1. Configuració d'Eines & Mòduls
+  // Generem la llista de totes les comandes disponibles
+  const items: CommandItem[] = [];
+
+  // 1. Configuració d'Eines & Presets
   items.push(
     {
-      id: 'tool_config_modal',
+      id: 'tool_manager',
       category: 'Configuració d\'Eines',
       title: '⚙️ Obrir Configurador d\'Eines & Mòduls Actius',
       subtitle: 'Activa o desactiva eines a la carta per a ' + activeProfile.name,
@@ -325,7 +340,7 @@ function buildCommandItems(): CommandItem[] {
       keywords: ['eines', 'moduls', 'activar', 'configuracio', 'personalitzar', 'toolkit'],
       action: () => {
         openToolManagerModal(() => {
-          document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+          refreshSidebar();
           router.navigate(router.getCurrentPath());
         });
       },
@@ -341,7 +356,7 @@ function buildCommandItems(): CommandItem[] {
       action: () => {
         store.enableAllModules();
         showToast('Totes les eines activades!', 'success');
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        refreshSidebar();
         router.navigate(router.getCurrentPath());
       },
     },
@@ -356,7 +371,7 @@ function buildCommandItems(): CommandItem[] {
       action: () => {
         store.applyModulePreset('freelance_suite');
         showToast('Plantilla Autònom & IVA aplicada!', 'success');
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        refreshSidebar();
         router.navigate(router.getCurrentPath());
       },
     },
@@ -371,7 +386,7 @@ function buildCommandItems(): CommandItem[] {
       action: () => {
         store.applyModulePreset('investor_suite');
         showToast('Plantilla Inversor aplicada!', 'success');
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        refreshSidebar();
         router.navigate(router.getCurrentPath());
       },
     }
@@ -383,39 +398,40 @@ function buildCommandItems(): CommandItem[] {
       id: `route_${r.path}`,
       category: 'Pàgines & Mòduls',
       title: r.label,
-      subtitle: `Anar a ${r.path} (${r.section || 'Principal'})`,
-      icon: r.icon,
-      keywords: [r.label, r.path, r.section || ''],
+      subtitle: `Secció: ${r.section || 'General'} · Ruta: ${r.path}`,
+      icon: r.icon || '📄',
+      keywords: [r.label, r.section || '', r.path, 'anar', 'obrir', 'pagina', 'seccio'],
       action: () => router.navigate(r.path),
     });
   }
 
-  // 3. Caselles Oficials AEAT (Model 100 / 303)
-  const casellesList = [
-    { num: '0022', desc: 'Rendiment Net Reduït del Treball', val: (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) - (e.socialSecurity || 0), 0), path: '/treball' },
-    { num: '0156', desc: 'Rendiment Net Capital Immobiliari', val: (data.properties || []).reduce((s, p) => s + (p.grossRentalIncome || 0), 0), path: '/immobles' },
-    { num: '0235', desc: 'Rendiment Net Activitats Econòmiques', val: (data.activities?.income || 0) - (data.activities?.expenses || 0), path: '/activitats' },
-    { num: '0435', desc: 'Base Imposable General IRPF', val: result.generalBase, path: '/resultat' },
-    { num: '0460', desc: 'Base Imposable de l\'Estalvi', val: result.savingsBase, path: '/resultat' },
-    { num: '0500', desc: 'Base Liquidable General', val: result.liquidableGeneralBase, path: '/resultat' },
-    { num: '0511', desc: 'Mínim del Contribuent', val: 5550, path: '/personal' },
-    { num: '0520', desc: 'Total Mínim Personal i Familiar', val: result.totalMinimum, path: '/personal' },
-    { num: '0545', desc: 'Quota Íntegra Estatal General', val: result.generalTax / 2, path: '/resultat' },
-    { num: '0588', desc: 'Deducció Doble Imposició Internacional', val: result.foreignTaxCredit || 0, path: '/capital' },
-    { num: '0595', desc: 'Total Deduccions de la Quota', val: result.totalDeductions, path: '/deduccions' },
-    { num: '0609', desc: 'Pagaments a Compte i Retencions', val: result.totalWithholdings, path: '/resultat' },
-    { num: '0610', desc: 'Resultat Liquidatori de la Declaració', val: result.result, path: '/resultat' },
+  // 3. Caselles Principals AEAT
+  const irpf = calculateIRPF(state);
+  const caselles = [
+    { num: '0001', label: 'Retribucions dineràries del treball', val: state.workIncome.employers.reduce((s, e) => s + (e.grossSalary || 0), 0), path: '/treball' },
+    { num: '0019', label: 'Cotitzacions a la Seguretat Social', val: state.workIncome.employers.reduce((s, e) => s + (e.socialSecurity || 0), 0), path: '/treball' },
+    { num: '0027', label: 'Interessos de comptes i dipòsits', val: state.capitalIncome.interests || 0, path: '/capital' },
+    { num: '0029', label: 'Dividends i participació en beneficis', val: state.capitalIncome.dividends || 0, path: '/capital' },
+    { num: '0102', label: 'Ingressos d\'immobles en lloguer', val: state.properties.reduce((s, p) => s + (p.grossRentalIncome || 0), 0), path: '/immobles' },
+    { num: '0230', label: 'Ingressos d\'Activitats Econòmiques', val: state.activities.income || 0, path: '/activitats' },
+    { num: '0435', label: 'Base Imposable General', val: irpf.generalBase, path: '/resultat' },
+    { num: '0460', label: 'Base Imposable de l\'Estalvi', val: irpf.savingsBase, path: '/resultat' },
+    { num: '0519', label: 'Mínim Personal i Familiar Total', val: irpf.totalMinimum, path: '/personal' },
+    { num: '0545', label: 'Quota Líquida Total', val: irpf.netTax, path: '/resultat' },
+    { num: '0588', label: 'Deducció per Doble Imposició Internacional', val: irpf.foreignTaxCredit || 0, path: '/capital' },
+    { num: '0595', label: 'Retencions suportades del treball', val: state.workIncome.employers.reduce((s, e) => s + (e.withholdings || 0), 0), path: '/treball' },
+    { num: '0610', label: 'Resultat de la Declaració (a ingressar/tornar)', val: irpf.result, path: '/resultat' },
   ];
 
-  for (const c of casellesList) {
+  for (const c of caselles) {
     items.push({
       id: `casella_${c.num}`,
       category: 'Caselles AEAT',
-      title: `Casella ${c.num} — ${c.desc}`,
-      subtitle: `Valor actual: ${formatCurrency(c.val)} (Feu clic per anar a ${c.path} o copiar)`,
+      title: `Casella [${c.num}] — ${c.label}`,
+      subtitle: `Valor calculat: ${formatCurrency(c.val)}`,
       badge: formatCurrency(c.val),
-      icon: '🏛️',
-      keywords: ['casella', 'casilla', c.num, c.desc, 'aeat', 'renta web'],
+      icon: '🏷️',
+      keywords: [c.num, c.label, `casella ${c.num}`, 'aeat', 'model 100', 'irpf'],
       action: () => {
         navigator.clipboard?.writeText(String(c.val));
         showToast(`Valor de Casella ${c.num} (${formatCurrency(c.val)}) copiat al porta-retalls`, 'info');
@@ -438,7 +454,7 @@ function buildCommandItems(): CommandItem[] {
       action: () => {
         store.setActiveProfile(p.id);
         showToast(`S'ha canviat al declarant: ${p.name}`, 'success');
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        refreshSidebar();
         router.navigate(router.getCurrentPath());
       },
     });
@@ -449,15 +465,15 @@ function buildCommandItems(): CommandItem[] {
     {
       id: 'action_pdf',
       category: 'Eines & Accions',
-      title: 'Descarregar Model 100 en PDF Oficial',
-      subtitle: 'Genera el document complet de liquidació amb desglossament tributari',
-      badge: 'PDF',
-      icon: '🖨️',
-      keywords: ['pdf', 'descarregar', 'imprimir', 'model 100', 'informe'],
+      title: 'Descarregar Informe Oficial PDF Model 100',
+      subtitle: 'Genera document complet d\'auditoria amb liquidació, caselles i gràfics',
+      badge: 'PDF Oficial',
+      icon: '📄',
+      keywords: ['pdf', 'descarregar', 'informe', 'imprimir', 'exportar pdf', 'model 100'],
       action: () => {
         try {
-          generateModel100PDF(data, result);
-          showToast('Model 100 generat en PDF!', 'success');
+          generateModel100PDF(state, irpf);
+          showToast('Informe PDF generat correctament!', 'success');
         } catch {
           showToast('Error en generar el PDF', 'error');
         }
@@ -473,7 +489,7 @@ function buildCommandItems(): CommandItem[] {
       keywords: ['auditoria', 'compliance', 'validacio', 'errors', 'avisos'],
       action: () => {
         openComplianceModal(() => {
-          document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+          refreshSidebar();
           router.navigate(router.getCurrentPath());
         });
       },

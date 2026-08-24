@@ -228,8 +228,10 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
   return baseResult;
 }
 
+const propertyResultCache = new WeakMap<RentalProperty, { year: number; result: PropertyFiscalResult }>();
+
 /**
- * Calcula l'agregat de tots els immobles del contribuent.
+ * Calcula l'agregat de tots els immobles del contribuent amb un únic recorregut O(N).
  */
 export function calculateAllProperties(properties: RentalProperty[], fiscalYear: number = 2024): {
   results: PropertyFiscalResult[];
@@ -241,15 +243,35 @@ export function calculateAllProperties(properties: RentalProperty[], fiscalYear:
   totalNetReducedIncome: number;
   totalImputedIncome: number;
 } {
-  const results = properties.map(p => calculatePropertyFiscalResult(p, fiscalYear));
+  const results: PropertyFiscalResult[] = [];
+  let totalGrossIncome = 0;
+  let totalExpenses = 0;
+  let totalAmortization = 0;
+  let totalNetIncome = 0;
+  let totalReductions = 0;
+  let totalNetReducedIncome = 0;
+  let totalImputedIncome = 0;
 
-  const totalGrossIncome = results.reduce((s, r) => s + r.grossIncome, 0);
-  const totalExpenses = results.reduce((s, r) => s + r.totalExpenses, 0);
-  const totalAmortization = results.reduce((s, r) => s + r.totalAmortization, 0);
-  const totalNetIncome = results.reduce((s, r) => s + r.netIncome, 0);
-  const totalReductions = results.reduce((s, r) => s + r.reductionAmount, 0);
-  const totalNetReducedIncome = results.reduce((s, r) => s + r.netReducedIncome, 0);
-  const totalImputedIncome = results.reduce((s, r) => s + r.imputedIncomeForOwnUse, 0);
+  for (let i = 0; i < properties.length; i++) {
+    const p = properties[i];
+    const cached = propertyResultCache.get(p);
+    let r: PropertyFiscalResult;
+    if (cached && cached.year === fiscalYear) {
+      r = cached.result;
+    } else {
+      r = calculatePropertyFiscalResult(p, fiscalYear);
+      propertyResultCache.set(p, { year: fiscalYear, result: r });
+    }
+
+    results.push(r);
+    totalGrossIncome += r.grossIncome;
+    totalExpenses += r.totalExpenses;
+    totalAmortization += r.totalAmortization;
+    totalNetIncome += r.netIncome;
+    totalReductions += r.reductionAmount;
+    totalNetReducedIncome += r.netReducedIncome;
+    totalImputedIncome += r.imputedIncomeForOwnUse;
+  }
 
   return {
     results,

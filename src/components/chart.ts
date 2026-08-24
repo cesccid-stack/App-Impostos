@@ -4,6 +4,7 @@
  */
 
 import { formatCurrency } from '../utils/currency.ts';
+import { escapeHtml } from '../utils/dom.ts';
 
 /** Color palette for charts */
 const CHART_COLORS = [
@@ -39,7 +40,7 @@ export function createDonutChart(
   container.style.margin = '0 auto';
 
   const canvas = document.createElement('canvas');
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
   const size = opts.size ?? 280;
   canvas.width = size * dpr;
   canvas.height = size * dpr;
@@ -47,10 +48,15 @@ export function createDonutChart(
   canvas.style.height = `${size}px`;
   container.appendChild(canvas);
 
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return container;
   ctx.scale(dpr, dpr);
 
-  const total = items.reduce((sum, item) => sum + Math.abs(item.value), 0);
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    total += Math.abs(items[i].value);
+  }
+
   if (total === 0) {
     // Draw empty state
     ctx.beginPath();
@@ -59,25 +65,26 @@ export function createDonutChart(
     ctx.lineWidth = size * 0.18;
     ctx.stroke();
   } else {
+    // Draw donut slices
     const cx = size / 2;
     const cy = size / 2;
     const radius = size * 0.38;
     const lineWidth = size * 0.18;
+
     let startAngle = -Math.PI / 2;
 
     items.forEach((item, i) => {
       if (Math.abs(item.value) === 0) return;
       const sliceAngle = (Math.abs(item.value) / total) * Math.PI * 2;
-      const color = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
+      const endAngle = startAngle + sliceAngle;
 
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
-      ctx.strokeStyle = color;
+      ctx.arc(cx, cy, radius, startAngle, endAngle);
+      ctx.strokeStyle = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
       ctx.lineWidth = lineWidth;
-      ctx.lineCap = 'butt';
       ctx.stroke();
 
-      startAngle += sliceAngle;
+      startAngle = endAngle;
     });
   }
 
@@ -85,7 +92,6 @@ export function createDonutChart(
   if (opts.centerValue) {
     const cx = size / 2;
     const cy = size / 2;
-
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -106,17 +112,20 @@ export function createDonutChart(
   legend.style.justifyContent = 'center';
   legend.style.marginTop = '16px';
 
-  items.forEach((item, i) => {
-    if (Math.abs(item.value) === 0) return;
+  const legendFrag = document.createDocumentFragment();
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (Math.abs(item.value) === 0) continue;
     const color = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
     const el = document.createElement('div');
     el.className = 'chart-legend__item';
     el.innerHTML = `
       <span class="chart-legend__dot" style="background:${color}"></span>
-      <span>${item.label}</span>
+      <span>${escapeHtml(item.label)}</span>
     `;
-    legend.appendChild(el);
-  });
+    legendFrag.appendChild(el);
+  }
+  legend.appendChild(legendFrag);
 
   const wrapper = document.createElement('div');
   wrapper.appendChild(container);
@@ -137,9 +146,16 @@ export function createBarChart(
   container.style.gap = '12px';
   container.style.maxWidth = `${opts.maxWidth ?? 600}px`;
 
-  const maxValue = Math.max(...items.map((i) => Math.abs(i.value)), 1);
+  let maxValue = 1;
+  for (let i = 0; i < items.length; i++) {
+    const v = Math.abs(items[i].value);
+    if (v > maxValue) maxValue = v;
+  }
 
-  items.forEach((item, i) => {
+  const frag = document.createDocumentFragment();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.alignItems = 'center';
@@ -178,9 +194,10 @@ export function createBarChart(
       row.appendChild(val);
     }
 
-    container.appendChild(row);
-  });
+    frag.appendChild(row);
+  }
 
+  container.appendChild(frag);
   return container;
 }
 
@@ -190,21 +207,28 @@ export function createBarChart(
 export function createStackedBar(
   items: ChartDataItem[],
 ): HTMLElement {
-  const total = items.reduce((s, i) => s + Math.abs(i.value), 0);
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    total += Math.abs(items[i].value);
+  }
+
   const container = document.createElement('div');
   container.style.cssText =
     'display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--bg-input);';
 
   if (total > 0) {
-    items.forEach((item, i) => {
-      if (Math.abs(item.value) === 0) return;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (Math.abs(item.value) === 0) continue;
       const pct = (Math.abs(item.value) / total) * 100;
       const seg = document.createElement('div');
       const color = item.color ?? CHART_COLORS[i % CHART_COLORS.length];
       seg.style.cssText = `width:${pct}%;background:${color};transition:width 600ms ease;`;
       seg.title = `${item.label}: ${pct.toFixed(1)}%`;
-      container.appendChild(seg);
-    });
+      frag.appendChild(seg);
+    }
+    container.appendChild(frag);
   }
 
   return container;

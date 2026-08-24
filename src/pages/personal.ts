@@ -7,7 +7,6 @@ import { store } from '../store.ts';
 import { createField, createFormRow, createFormSection } from '../components/form-field.ts';
 import { showToast } from '../components/toast.ts';
 import { openToolManagerModal } from '../components/tool-manager-modal.ts';
-import { createSidebar } from '../components/navbar.ts';
 import { ALL_APP_MODULES, getActiveModuleIdsForProfile } from '../fiscal/modules-catalog.ts';
 
 export function renderPersonal(): HTMLElement {
@@ -33,7 +32,7 @@ export function renderPersonal(): HTMLElement {
 
   page.querySelector('#btn-personal-open-tools')?.addEventListener('click', () => {
     openToolManagerModal(() => {
-      document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+      window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       page.replaceWith(renderPersonal());
     });
   });

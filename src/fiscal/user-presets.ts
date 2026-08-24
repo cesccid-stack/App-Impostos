@@ -4,7 +4,7 @@
  */
 
 import type { UserProfile, UserType, ProfileStatus, DeclaracionData } from '../types.ts';
-import { createEmptyDeclaracion } from '../store.ts';
+import { createEmptyDeclaracion } from './declaration-factory.ts';
 
 export interface UserTypeMeta {
   type: UserType;

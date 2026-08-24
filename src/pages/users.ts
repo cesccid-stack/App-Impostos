@@ -5,7 +5,6 @@
  */
 
 import { store } from '../store.ts';
-import { createSidebar } from '../components/navbar.ts';
 import { getStatusMeta } from '../fiscal/user-presets.ts';
 import { calculateIRPF } from '../fiscal/irpf.ts';
 import { formatCurrency } from '../utils/currency.ts';
@@ -416,14 +415,14 @@ export function renderUsersPage(): HTMLElement {
     page.querySelector('#btn-open-global-tools')?.addEventListener('click', () => {
       openToolManagerModal(() => {
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       });
     });
 
     page.querySelector('#btn-bottom-open-tool-manager')?.addEventListener('click', () => {
       openToolManagerModal(() => {
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       });
     });
 
@@ -435,7 +434,7 @@ export function renderUsersPage(): HTMLElement {
           store.setActiveProfile(id);
           openToolManagerModal(() => {
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           });
         }
       });
@@ -445,7 +444,7 @@ export function renderUsersPage(): HTMLElement {
     page.querySelector('#btn-create-new-profile')?.addEventListener('click', () => {
       openProfileModal(null, () => {
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       });
     });
 
@@ -455,7 +454,7 @@ export function renderUsersPage(): HTMLElement {
         store.clearAllApplicationData();
         showToast('Aplicació reiniciada: totes les dades han estat esborrades', 'info');
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       }
     });
 
@@ -465,7 +464,7 @@ export function renderUsersPage(): HTMLElement {
         store.loadDemoProfiles();
         showToast('Declarants de demostració carregats amb èxit', 'success');
         render();
-        document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+        window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
       }
     });
 
@@ -484,7 +483,7 @@ export function renderUsersPage(): HTMLElement {
             const imported = store.importSingleProfile(content);
             showToast(`Declarant "${imported.name}" importat correctament`, 'success');
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           } catch (err: any) {
             showToast(err.message || 'Error en importar el fitxer', 'error');
           }
@@ -502,7 +501,7 @@ export function renderUsersPage(): HTMLElement {
           store.setActiveProfile(id);
           showToast(`Declarant actiu: ${store.getActiveProfile().name}`, 'info');
           render();
-          document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+          window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
         }
       });
     });
@@ -516,7 +515,7 @@ export function renderUsersPage(): HTMLElement {
           if (prof) {
             openProfileModal(prof, () => {
               render();
-              document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+              window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
             });
           }
         }
@@ -534,7 +533,7 @@ export function renderUsersPage(): HTMLElement {
             store.duplicateProfile(id, newName.trim());
             showToast(`Declarant copiat: "${newName}"`, 'success');
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           }
         }
       });
@@ -573,7 +572,7 @@ export function renderUsersPage(): HTMLElement {
             store.deleteProfile(id);
             showToast('Declarant eliminat', 'success');
             render();
-            document.getElementById('app-sidebar')?.replaceWith(createSidebar());
+            window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
           }
         }
       });

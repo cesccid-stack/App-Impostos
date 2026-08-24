@@ -29,28 +29,48 @@ export interface FiscalAdvisorAudit {
   adviceList: FiscalAdviceItem[];
 }
 
+const advisorCache = new WeakMap<DeclaracionData, FiscalAdvisorAudit>();
+
 /**
  * Executa l'auditoria fiscal completa sobre les dades actuals.
+ * Memoitzat per a màxima eficiència en temps real.
  */
 export function auditTaxReturn(data: DeclaracionData, currentResult: FiscalResult): FiscalAdvisorAudit {
+  if (advisorCache.has(data)) {
+    return advisorCache.get(data)!;
+  }
+  const audit = computeAuditTaxReturnInternal(data, currentResult);
+  advisorCache.set(data, audit);
+  return audit;
+}
+
+function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: FiscalResult): FiscalAdvisorAudit {
   const adviceList: FiscalAdviceItem[] = [];
 
-  // 1. Càlcul del Tipus Marginal General
-  // Simulem afegir 100€ a la base general
-  const simDataGeneral = JSON.parse(JSON.stringify(data)) as DeclaracionData;
-  if (!simDataGeneral.workIncome.employers || simDataGeneral.workIncome.employers.length === 0) {
-    simDataGeneral.workIncome.employers = [{
-      id: 'sim', name: 'Sim', grossSalary: 100, inKind: 0, withholdings: 0, socialSecurity: 0, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
-    }];
-  } else {
-    simDataGeneral.workIncome.employers[0].grossSalary += 100;
-  }
+  // 1. Càlcul del Tipus Marginal General (Simulació ràpida amb shallow clone)
+  const currentEmployers = data.workIncome?.employers || [];
+  const simEmployers = currentEmployers.length === 0
+    ? [{ id: 'sim', name: 'Sim', grossSalary: 100, inKind: 0, withholdings: 0, socialSecurity: 0, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }]
+    : currentEmployers.map((emp, i) => i === 0 ? { ...emp, grossSalary: (emp.grossSalary || 0) + 100 } : emp);
+
+  const simDataGeneral: DeclaracionData = {
+    ...data,
+    workIncome: {
+      ...data.workIncome,
+      employers: simEmployers,
+    },
+  };
   const simResultGeneral = calculateIRPF(simDataGeneral);
   const marginalGeneralRate = Math.max(0, Math.round(((simResultGeneral.netTax - currentResult.netTax) / 100) * 1000) / 10);
 
-  // 2. Càlcul del Tipus Marginal de l'Estalvi
-  const simDataSavings = JSON.parse(JSON.stringify(data)) as DeclaracionData;
-  simDataSavings.capitalIncome.interests = (simDataSavings.capitalIncome.interests || 0) + 100;
+  // 2. Càlcul del Tipus Marginal de l'Estalvi (Shallow clone ràpid)
+  const simDataSavings: DeclaracionData = {
+    ...data,
+    capitalIncome: {
+      ...data.capitalIncome,
+      interests: (data.capitalIncome?.interests || 0) + 100,
+    },
+  };
   const simResultSavings = calculateIRPF(simDataSavings);
   const marginalSavingsRate = Math.max(0, Math.round(((simResultSavings.netTax - currentResult.netTax) / 100) * 1000) / 10);
 
@@ -63,8 +83,13 @@ export function auditTaxReturn(data: DeclaracionData, currentResult: FiscalResul
   const remainingPensionLimit = Math.max(0, PENSION_PLAN_LIMIT - currentPension);
 
   if (remainingPensionLimit > 0 && currentResult.liquidableGeneralBase > 0) {
-    const simPensionData = JSON.parse(JSON.stringify(data)) as DeclaracionData;
-    simPensionData.deductions.pensionPlanContributions = (simPensionData.deductions.pensionPlanContributions || 0) + remainingPensionLimit;
+    const simPensionData: DeclaracionData = {
+      ...data,
+      deductions: {
+        ...data.deductions,
+        pensionPlanContributions: (data.deductions?.pensionPlanContributions || 0) + remainingPensionLimit,
+      },
+    };
     const simPensionRes = calculateIRPF(simPensionData);
     const pensionSavings = Math.max(0, currentResult.netTax - simPensionRes.netTax);
 

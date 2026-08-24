@@ -10,6 +10,7 @@ import { calculateModel390Annual } from '../fiscal/iva-engine.ts';
 import { initializeEmptyIVAData } from '../fiscal/iva-integration.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
+import { escapeHtml } from '../utils/dom.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
 
 export interface CasellaItem {
@@ -162,18 +163,18 @@ export function renderCasellesPage(): HTMLElement {
                   <tr style="${isNonZero ? 'background:rgba(99,102,241,0.03);' : ''}">
                     <td>
                       <span class="badge ${isNonZero ? 'badge--primary' : 'badge--secondary'}" style="font-family:var(--font-mono); font-weight:700; font-size:0.8rem;">
-                        [${c.boxNumber}]
+                        [${escapeHtml(c.boxNumber)}]
                       </span>
                     </td>
                     <td>
-                      <span class="badge badge--info" style="font-size:0.7rem;">M.${c.model}</span>
+                      <span class="badge badge--info" style="font-size:0.7rem;">M.${escapeHtml(c.model)}</span>
                     </td>
                     <td>
-                      <div style="font-weight:600; font-size:var(--text-sm); color:var(--text-primary);">${c.title}</div>
-                      <div style="font-size:0.75rem; color:var(--text-muted);">${c.category} ${c.notes ? `• ${c.notes}` : ''}</div>
+                      <div style="font-weight:600; font-size:var(--text-sm); color:var(--text-primary);">${escapeHtml(c.title)}</div>
+                      <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(c.category)} ${c.notes ? `• ${escapeHtml(c.notes)}` : ''}</div>
                     </td>
                     <td>
-                      <span style="font-size:0.75rem; color:var(--text-secondary); font-family:var(--font-mono);">${c.legalBasis}</span>
+                      <span style="font-size:0.75rem; color:var(--text-secondary); font-family:var(--font-mono);">${escapeHtml(c.legalBasis)}</span>
                     </td>
                     <td style="text-align:right; font-family:var(--font-mono); font-weight:${isNonZero ? '700' : '400'}; color:${isNonZero ? 'var(--text-primary)' : 'var(--text-muted)'}; font-size:var(--text-sm);">
                       ${formatCurrency(c.computedValue)}
@@ -182,7 +183,7 @@ export function renderCasellesPage(): HTMLElement {
                       <div style="display:inline-flex; gap:4px;">
                         <button
                           class="btn btn--secondary btn--sm btn-copy-single-box"
-                          data-box="${c.boxNumber}"
+                          data-box="${escapeHtml(c.boxNumber)}"
                           data-val="${c.computedValue}"
                           title="Copiar valor exactat al portapapers"
                           style="padding:4px 8px; font-size:0.75rem;"
@@ -190,7 +191,7 @@ export function renderCasellesPage(): HTMLElement {
                           📋 Copiar
                         </button>
                         <a
-                          href="#${c.routePath}"
+                          href="#${escapeHtml(c.routePath)}"
                           class="btn btn--ghost btn--sm"
                           title="Editar dades d'aquest apartat"
                           style="padding:4px 8px; font-size:0.75rem;"
@@ -214,7 +215,7 @@ export function renderCasellesPage(): HTMLElement {
       </div>
     `;
 
-    // Listeners
+    // Listeners with event delegation
     page.querySelector('#caselles-search-input')?.addEventListener('input', (e) => {
       searchQuery = (e.target as HTMLInputElement).value;
       render();
@@ -232,16 +233,17 @@ export function renderCasellesPage(): HTMLElement {
       render();
     });
 
-    // Copy single box
-    page.querySelectorAll('.btn-copy-single-box').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const box = btn.getAttribute('data-box');
-        const val = btn.getAttribute('data-val');
+    // Delegated copy single box handler
+    page.querySelector('#caselles-table')?.addEventListener('click', (e) => {
+      const copyBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.btn-copy-single-box');
+      if (copyBtn) {
+        const box = copyBtn.getAttribute('data-box');
+        const val = copyBtn.getAttribute('data-val');
         if (box && val !== null) {
           navigator.clipboard?.writeText(val);
           showToast(`Casella [${box}] valor (${formatCurrency(parseFloat(val))}) copiat!`, 'success');
         }
-      });
+      }
     });
 
     // Copy 0610

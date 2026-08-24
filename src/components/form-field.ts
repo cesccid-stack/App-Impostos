@@ -69,6 +69,10 @@ export function createField(config: FieldConfig): HTMLElement {
       input.placeholder = config.placeholder;
     }
 
+    if (config.hint) {
+      input.setAttribute('aria-describedby', `${config.id}-hint`);
+    }
+
     if (config.onChange) {
       const cb = config.onChange;
       input.addEventListener('input', () => cb(input.value));
@@ -90,6 +94,7 @@ export function createField(config: FieldConfig): HTMLElement {
   if (config.hint) {
     const hint = document.createElement('span');
     hint.className = 'form-hint';
+    hint.id = `${config.id}-hint`;
     hint.textContent = config.hint;
     group.appendChild(hint);
   }

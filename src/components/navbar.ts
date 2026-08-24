@@ -234,6 +234,14 @@ export function createSidebar(): HTMLElement {
     }
   });
 
+  // Predictive prefetching on link hover
+  nav.addEventListener('pointerenter', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('.nav-item');
+    if (target?.dataset.path) {
+      router.prefetch(target.dataset.path);
+    }
+  }, true);
+
   // Year selector
   const yearSelect = sidebar.querySelector<HTMLSelectElement>('#year-select')!;
   yearSelect.addEventListener('change', () => {
@@ -324,3 +332,11 @@ function groupRoutesBySection(routes: Route[]): Map<string, Route[]> {
   }
   return map;
 }
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('app:refresh-sidebar', () => {
+    const existing = document.getElementById('app-sidebar');
+    if (existing) existing.replaceWith(createSidebar());
+  });
+}
+

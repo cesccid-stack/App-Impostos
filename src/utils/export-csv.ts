@@ -95,7 +95,7 @@ export function generateCSV(data: DeclaracionData, result: FiscalResult): string
     }
   }
 
-  return lines.map((row) => row.map(escapeCSV).join(';')).join('\n');
+  return '\uFEFF' + lines.map((row) => row.map(escapeCSV).join(';')).join('\n');
 }
 
 function fmt(n: number): string {

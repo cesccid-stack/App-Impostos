@@ -16,6 +16,7 @@ import { createField, createFormRow, createFormSection } from '../components/for
 import { openModal } from '../components/modal.ts';
 import { showToast } from '../components/toast.ts';
 import { formatCurrency } from '../utils/currency.ts';
+import { escapeHtml } from '../utils/dom.ts';
 import { 
   autoParseBrokerCSV, 
   syncTradesToStore, 
@@ -342,14 +343,14 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
       <div class="item-row__content" style="display:grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 1.5fr; gap:var(--space-sm); align-items:center;">
         <div class="item-row__field">
           <span class="item-row__field-label">Tipus</span>
-          <span class="item-row__field-value" style="font-weight:600;">${typeLabels[item.type] ?? item.type}</span>
+          <span class="item-row__field-value" style="font-weight:600;">${escapeHtml(typeLabels[item.type] ?? item.type)}</span>
         </div>
         <div class="item-row__field">
           <span class="item-row__field-label">Descripció & Dates</span>
           <span class="item-row__field-value">
-            <strong>${item.description || '—'}</strong><br>
+            <strong>${escapeHtml(item.description || '—')}</strong><br>
             <span style="font-size:0.7rem; color:var(--text-muted);">
-              Compra: ${item.acquisitionDate || '—'} $\rightarrow$ Venda: ${item.transferDate || '—'}
+              Compra: ${escapeHtml(item.acquisitionDate || '—')} $\rightarrow$ Venda: ${escapeHtml(item.transferDate || '—')}
             </span>
           </span>
         </div>
@@ -366,29 +367,34 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
           <span class="item-row__field-value ${netTaxable >= 0 ? 'text-success' : 'text-error'}" style="font-weight:700;">
             ${netTaxable >= 0 ? '+' : ''}${formatCurrency(netTaxable)}
             ${washSaleBadge ? `<br>${washSaleBadge}` : ''}
-            ${exemptionNote ? `<br><span style="font-size:0.7rem; color:var(--color-success); font-weight:600;">${exemptionNote}</span>` : ''}
+            ${exemptionNote ? `<br><span style="font-size:0.7rem; color:var(--color-success); font-weight:600;">${escapeHtml(exemptionNote)}</span>` : ''}
           </span>
         </div>
       </div>
       <div class="item-row__actions" style="margin-left:var(--space-md);">
-        <button class="btn btn--ghost btn--sm btn--icon" data-delete="${item.id}" title="Eliminar">🗑</button>
+        <button class="btn btn--ghost btn--sm btn--icon" data-delete="${escapeHtml(item.id)}" title="Eliminar">🗑</button>
       </div>
     `;
 
-    row.querySelector(`[data-delete="${item.id}"]`)!.addEventListener('click', () => {
-      const gains = store.getData().gains;
-      const newItems = gains.items.filter((i) => i.id !== item.id);
-      store.setSection('gains', { ...gains, items: newItems });
-      if (page) {
-        page.replaceWith(renderGains());
-      } else {
-        renderItemsList(container, newItems);
-      }
-      showToast('Operació eliminada', 'success');
-    });
-
     list.appendChild(row);
   }
+
+  // Delegated delete handler
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-delete]');
+    if (!btn) return;
+    const deleteId = btn.getAttribute('data-delete');
+    if (!deleteId) return;
+    const gains = store.getData().gains;
+    const newItems = (gains?.items || []).filter((i) => i.id !== deleteId);
+    store.setSection('gains', { ...gains, items: newItems });
+    if (page) {
+      page.replaceWith(renderGains());
+    } else {
+      renderItemsList(container, newItems);
+    }
+    showToast('Operació eliminada', 'success');
+  });
 
   container.appendChild(list);
 }

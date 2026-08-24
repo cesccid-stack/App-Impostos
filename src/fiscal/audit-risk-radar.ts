@@ -23,10 +23,22 @@ export interface AuditRiskReport {
   documentaryChecklist: { documentName: string; section: string; status: 'required' | 'recommended' }[];
 }
 
+const riskCache = new WeakMap<DeclaracionData, AuditRiskReport>();
+
 /**
  * Analitza exhaustivament les dades de la declaració i calcula el risc d'inspecció de l'AEAT.
+ * Memoitzat per a optimització de rendiment en Dashboard i Resum.
  */
 export function evaluateAuditRisk(data: DeclaracionData, result: FiscalResult): AuditRiskReport {
+  if (riskCache.has(data)) {
+    return riskCache.get(data)!;
+  }
+  const report = computeAuditRiskInternal(data, result);
+  riskCache.set(data, report);
+  return report;
+}
+
+function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): AuditRiskReport {
   const alerts: AuditRiskAlert[] = [];
   const checklist: AuditRiskReport['documentaryChecklist'] = [];
 

@@ -65,17 +65,20 @@ export function calculateSavingsCompensation(
   let priorMobiliaryCompensated = 0;
   const remainingPriorMobiliaryLosses: PriorLossItem[] = [];
 
-  // Ordenar per any més antic primer (FIFO tributari)
-  const sortedPriorMob = [...pendingPriorMobiliary].sort((a, b) => a.year - b.year);
-  for (const item of sortedPriorMob) {
-    if (availableMobForPrior > 0 && item.amount > 0) {
-      const comp = Math.min(availableMobForPrior, item.amount);
-      priorMobiliaryCompensated += comp;
-      availableMobForPrior -= comp;
-      const rem = item.amount - comp;
-      if (rem > 0) remainingPriorMobiliaryLosses.push({ year: item.year, amount: rem });
-    } else {
-      if (item.amount > 0) remainingPriorMobiliaryLosses.push({ ...item });
+  if (pendingPriorMobiliary.length > 0) {
+    // Ordenar per any més antic primer (FIFO tributari)
+    const sortedPriorMob = [...pendingPriorMobiliary].sort((a, b) => a.year - b.year);
+    for (let i = 0; i < sortedPriorMob.length; i++) {
+      const item = sortedPriorMob[i];
+      if (availableMobForPrior > 0 && item.amount > 0) {
+        const comp = Math.min(availableMobForPrior, item.amount);
+        priorMobiliaryCompensated += comp;
+        availableMobForPrior -= comp;
+        const rem = item.amount - comp;
+        if (rem > 0) remainingPriorMobiliaryLosses.push({ year: item.year, amount: rem });
+      } else if (item.amount > 0) {
+        remainingPriorMobiliaryLosses.push({ ...item });
+      }
     }
   }
 
@@ -84,16 +87,19 @@ export function calculateSavingsCompensation(
   let priorGainsCompensated = 0;
   const remainingPriorGainsLosses: PriorLossItem[] = [];
 
-  const sortedPriorGains = [...pendingPriorGains].sort((a, b) => a.year - b.year);
-  for (const item of sortedPriorGains) {
-    if (availableGainsForPrior > 0 && item.amount > 0) {
-      const comp = Math.min(availableGainsForPrior, item.amount);
-      priorGainsCompensated += comp;
-      availableGainsForPrior -= comp;
-      const rem = item.amount - comp;
-      if (rem > 0) remainingPriorGainsLosses.push({ year: item.year, amount: rem });
-    } else {
-      if (item.amount > 0) remainingPriorGainsLosses.push({ ...item });
+  if (pendingPriorGains.length > 0) {
+    const sortedPriorGains = [...pendingPriorGains].sort((a, b) => a.year - b.year);
+    for (let i = 0; i < sortedPriorGains.length; i++) {
+      const item = sortedPriorGains[i];
+      if (availableGainsForPrior > 0 && item.amount > 0) {
+        const comp = Math.min(availableGainsForPrior, item.amount);
+        priorGainsCompensated += comp;
+        availableGainsForPrior -= comp;
+        const rem = item.amount - comp;
+        if (rem > 0) remainingPriorGainsLosses.push({ year: item.year, amount: rem });
+      } else if (item.amount > 0) {
+        remainingPriorGainsLosses.push({ ...item });
+      }
     }
   }
 

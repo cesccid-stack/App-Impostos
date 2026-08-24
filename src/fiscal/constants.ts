@@ -176,7 +176,7 @@ export const SIMPLIFIED_EXPENSES_MAX = 2_000;
 
 /* ── Comunitats autònomes ──────────────────────────────────── */
 
-export const AUTONOMOUS_COMMUNITIES: readonly { code: string; name: string }[] = [
+export const AUTONOMOUS_COMMUNITIES: readonly { code: string; name: string }[] = Object.freeze([
   { code: 'CAT', name: 'Catalunya' },
   { code: 'AND', name: 'Andalucía' },
   { code: 'ARA', name: 'Aragón' },
@@ -196,8 +196,13 @@ export const AUTONOMOUS_COMMUNITIES: readonly { code: string; name: string }[] =
   { code: 'VAL', name: 'Comunitat Valenciana' },
   { code: 'CEU', name: 'Ceuta' },
   { code: 'MEL', name: 'Melilla' },
-];
+]);
+
+/** O(1) map for autonomous community name resolution */
+export const COMMUNITY_NAME_MAP: ReadonlyMap<string, string> = new Map(
+  AUTONOMOUS_COMMUNITIES.map(c => [c.code, c.name])
+);
 
 /** Available fiscal years */
-export const FISCAL_YEARS = [2024, 2025, 2026] as const;
+export const FISCAL_YEARS = Object.freeze([2024, 2025, 2026] as const);
 export type FiscalYear = (typeof FISCAL_YEARS)[number];
