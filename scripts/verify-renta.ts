@@ -201,6 +201,7 @@ import { auditAndDecoupleVehicleExpenses, isExclusiveVehicleActivity } from '../
 import { calculateProrrataComparison } from '../src/fiscal/iva-engine.ts';
 import { explainTaxReturn } from '../src/fiscal/tax-explainer-engine.ts';
 import { createTaxJourneyVisualizer } from '../src/components/tax-journey-visualizer.ts';
+import { createInternalBreakdownDashboards } from '../src/components/internal-breakdown-dashboards.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -1867,6 +1868,34 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
     assert(visualizer !== null && visualizer !== undefined, 'El visualitzador ha de retornar un element DOM');
     assert(visualizer.className.includes('tax-journey-container'), 'Classe del contenidor correcta');
     assert(visualizer.innerHTML.includes('Cuadro de Mando Visual'), 'Títol del quadre de comandament present');
+  });
+
+  test('31.3 Renderització dels Quadres Interns de Desglossament Avançat', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.properties = [{
+      id: 'prop-1',
+      name: 'Pis Carrer Aragó',
+      cadastralReference: '1234567AB1234C0001XY',
+      address: 'Carrer Aragó 100',
+      ownershipPercentage: 100,
+      usageType: 'habitual',
+      contractDate: '2023-01-01',
+      tenantNIFs: ['44444444A'],
+      grossRentalIncome: 12000,
+      totalCadastralValue: 150000,
+      constructionCadastralValue: 90000,
+      acquisitionCost: 200000,
+      ibi: 600,
+      communityFees: 800,
+      mortgageInterests: 1200,
+      repairExpenses: 400,
+      insurance: 300,
+      reductionType: 'general_50',
+    } as any];
+    const dashboards = createInternalBreakdownDashboards(data);
+    assert(dashboards !== null && dashboards !== undefined, 'El panell ha de retornar un element DOM');
+    assert(dashboards.className.includes('internal-breakdowns-container'), 'Contenidor de quadres interns correcte');
+    assert(dashboards.innerHTML.includes('Quadres Interns de Desglossament'), 'Títol de quadres interns present');
   });
 });
 

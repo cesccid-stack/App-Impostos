@@ -16,6 +16,7 @@ import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { showToast } from '../components/toast.ts';
 import { calculateComplementaryIRPF } from '../fiscal/complementary-engine.ts';
 import { createTaxJourneyVisualizer } from '../components/tax-journey-visualizer.ts';
+import { createInternalBreakdownDashboards } from '../components/internal-breakdown-dashboards.ts';
 import { ModelReconciliationEngine } from '../fiscal/model-reconciliation-engine.ts';
 import type { IRPFComplementaryReason } from '../types.ts';
 
@@ -390,6 +391,9 @@ export function renderResult(): HTMLElement {
           <div class="card__subtitle">Base general: ${formatCurrency(result.liquidableGeneralBase)}</div>
         </div>
       </div>
+
+      <!-- Quadres Interns de Desglossament Avançat & Matrius de Càlcul -->
+      <div id="result-internal-breakdowns-mount" style="margin-top:var(--space-lg);"></div>
     `;
 
     // Gràfic de trams
@@ -500,6 +504,13 @@ export function renderResult(): HTMLElement {
     if (journeyMount) {
       journeyMount.innerHTML = '';
       journeyMount.appendChild(createTaxJourneyVisualizer(data, result));
+    }
+
+    // Mount Internal Breakdown Dashboards
+    const breakdownsMount = page.querySelector('#result-internal-breakdowns-mount');
+    if (breakdownsMount) {
+      breakdownsMount.innerHTML = '';
+      breakdownsMount.appendChild(createInternalBreakdownDashboards(data, result));
     }
   }
 
