@@ -720,6 +720,50 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
     assert(mod720 !== undefined, 'Ha de detectar obligació de presentar el Model 720');
     assert(mod721 !== undefined, 'Ha de detectar obligació de presentar el Model 721');
   });
+
+  test('6.5 Incompatibilitat de reducció en arrendaments turístics (DGT V1187-24)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.properties = [{
+      id: 'prop-tourist-1',
+      name: 'Apartament Turístic Costa Brava',
+      usageType: 'tourist',
+      reductionType: 'general_50',
+      grossRentalIncome: 15000,
+    } as any];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const touristIssue = compliance.issues.find(i => i.id.includes('prop-tourist-invalid-reduction'));
+
+    assert(touristIssue !== undefined, 'Ha de detectar reducció del 50% indeguda en lloguer turístic');
+  });
+
+  test('6.6 Detecció d\'excés de deducció de subministraments de teletreball (Art. 30.2.5a.b LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.activities = { income: 30000, expenses: 5000, withholdings: 4500, socialSecuritySelfEmployed: 3600, estimationType: 'direct_simplified' };
+    data.iva = {
+      ...initializeEmptyIVAData(),
+      receivedInvoices: [
+        { id: 'rec-util-1', invoiceNumber: 'F100', date: '2024-03-01', quarter: '1T', supplierName: 'Endesa', supplierNif: 'A12345678', concept: 'Electricitat llar despatx', taxableBase: 500, vatRate: 21, vatAmount: 105, totalInvoice: 605, deductiblePercentage: 100, deductibleVatAmount: 105 } as any
+      ]
+    };
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const utilIssue = compliance.issues.find(i => i.id === 'act-home-office-utilities-overdeducted');
+
+    assert(utilIssue !== undefined, 'Ha de detectar despesa de subministraments deduïda al 100% en lloc del 30% legal');
+  });
+
+  test('6.7 Sostre legal de despeses de guarderia en deducció per maternitat (1.000 €)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.descendants = [{ id: 'd1', name: 'Bebè', birthYear: 2023, age: 1, disability: 0 }];
+    data.deductions.maternityDeduction = true;
+    data.deductions.maternityNurseryExpenses = 1800;
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const nurseryIssue = compliance.issues.find(i => i.id === 'ded-nursery-expenses-capped');
+
+    assert(nurseryIssue !== undefined, 'Ha de detectar despeses de guarderia superiors a 1.000 €');
+  });
 });
 
 // ── 7. SUITE 7: MOTOR D'IVA MODEL 303 & MODEL 390 ───────────────────────────

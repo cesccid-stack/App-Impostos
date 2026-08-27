@@ -1134,6 +1134,84 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // GRUP 11: ARRENDAMENTS TURÍSTICS I TEMPORALS (CRITERIS DGT V1187-24 & MODEL 179)
+  // ═══════════════════════════════════════════════════════════════════════════
+  for (const p of properties) {
+    if ((p.usageType === 'tourist' || p.usageType === 'temporary') && p.reductionType && p.reductionType !== 'none') {
+      issues.push({
+        id: `prop-tourist-invalid-reduction-${p.id}`,
+        module: 'properties',
+        severity: 'critical',
+        title: `Reducció d'habitatge habitual aplicada indegudament a immoble ${p.usageType === 'tourist' ? 'turístic' : 'temporal'}`,
+        message: `Els arrendaments turístics o d'ús temporal no constitueixen habitatge permanent del llogater i estan expressament exclosos de les reduccions del 50%-90% de la Llei 12/2023.`,
+        legalReference: 'Art. 23.2 Llei de l\'IRPF i Consulta Vinculant DGT V1187-24',
+        autoFixable: true,
+        autoFixLabel: 'Eliminar reducció de lloguer temporal/turístic',
+        autoFixKey: `fix_remove_tourist_reduction_${p.id}`,
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GRUP 12: TELETREBALL I SUBMINISTRAMENTS D'HABITATGE D'AUTÒNOMS (ART. 30.2.5a.b LIRPF)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const utilityInvoices = (iva.receivedInvoices || []).filter(i => {
+    const c = (i.concept || '').toLowerCase();
+    return c.includes('electricitat') || c.includes('llum') || c.includes('aigua') || c.includes('gas') || c.includes('fibra') || c.includes('internet');
+  });
+  if (utilityInvoices.length > 0 && act.income > 0) {
+    const fullDeductedUtilities = utilityInvoices.filter(i => (i.deductiblePercentage || 100) > 30);
+    if (fullDeductedUtilities.length > 0) {
+      issues.push({
+        id: 'act-home-office-utilities-overdeducted',
+        module: 'activities',
+        severity: 'warning',
+        title: `${fullDeductedUtilities.length} factura/es de subministraments de llar deduïdes per sobre del límit legal del 30%`,
+        message: `Segons l'Art. 30.2.5a.b LIRPF, les despeses de subministraments (llum, aigua, gas, internet) de l'habitatge habitual afectat a l'activitat només són deduïbles al 30% de la proporció entre els metres quadrats afectes i la superfície total. Deduir el 100% genera sanció tributària.`,
+        legalReference: 'Art. 30.2.5a.b Llei de l\'IRPF (Llei 6/2017 de Reformes Urgents del Treball Autònom)',
+        autoFixable: true,
+        autoFixLabel: 'Ajustar subministraments a la regla del 30% d\'afectació',
+        autoFixKey: 'fix_adjust_home_utilities_30',
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GRUP 13: DESPESES DE GUARDERIA I CRIANÇA (ART. 81 LIRPF & STC 8/1/2024)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (deductions.maternityDeduction && deductions.maternityNurseryExpenses > 1000) {
+    issues.push({
+      id: 'ded-nursery-expenses-capped',
+      module: 'general',
+      severity: 'warning',
+      title: `Despeses de guarderia (${formatCurrency(deductions.maternityNurseryExpenses)}) superen el sostre màxim de 1.000 €`,
+      message: `L'increment de la deducció per maternitat per despeses de custòdia en guarderies o centres d'educació infantil autoritzats té un límit màxim de 1.000 € anuals per fill.`,
+      legalReference: 'Art. 81.2 Llei de l\'IRPF i Sentència del Tribunal Suprem 8/1/2024',
+      autoFixable: true,
+      autoFixLabel: 'Ajustar despeses de guarderia a 1.000 €',
+      autoFixKey: 'fix_cap_nursery_expenses',
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GRUP 14: IMPOST SOBRE EL PATRIMONI (MODEL 714) & LÍMIT CONJUNT 60% (ART. 31 LIP)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (data.wealth && data.wealth.assets && data.wealth.assets.length > 0) {
+    const hasPrimaryResidenceOver300k = (data.wealth.assets || []).some(a => a.isPrimaryResidence && (a.grossValue || 0) > 300000);
+    if (hasPrimaryResidenceOver300k) {
+      issues.push({
+        id: 'wealth-primary-residence-exemption-cap',
+        module: 'wealth',
+        severity: 'info',
+        title: 'Exempció d\'habitatge habitual a Patrimoni limitada a 300.000 €',
+        message: `L'Art. 4.Nou LIP estableix una exempció màxima de 300.000 € per al valor de l'habitatge habitual. L'excés computa com a patrimoni net subjecte a gravamen.`,
+        legalReference: 'Art. 4.Nou Llei 19/1991 de l\'Impost sobre el Patrimoni',
+        autoFixable: false,
+      });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // CÀLCUL DE LA PUNTUACIÓ DE CONFORMITAT FISCAL (0-100%)
   // ═══════════════════════════════════════════════════════════════════════════
   const criticalCount = issues.filter(i => i.severity === 'critical').length;
@@ -1343,6 +1421,26 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
       return { success: true, message: 'Base de deducció per eficiència energètica ajustada al màxim legal de 7.500 €.' };
     }
 
+    case 'fix_cap_nursery_expenses': {
+      store.update('deductions', { maternityNurseryExpenses: 1000 });
+      return { success: true, message: 'Despeses de guarderia ajustades al límit màxim de 1.000 € anuals.' };
+    }
+
+    case 'fix_adjust_home_utilities_30': {
+      const iva = store.getIVA();
+      let adjusted = 0;
+      for (const inv of iva.receivedInvoices) {
+        const c = (inv.concept || '').toLowerCase();
+        if (c.includes('electricitat') || c.includes('llum') || c.includes('aigua') || c.includes('gas') || c.includes('fibra') || c.includes('internet')) {
+          inv.deductiblePercentage = 30;
+          inv.deductibleVatAmount = Math.round((inv.vatAmount || 0) * 0.30 * 100) / 100;
+          adjusted++;
+        }
+      }
+      store.updateIVA({ receivedInvoices: iva.receivedInvoices });
+      return { success: true, message: `${adjusted} factura/es de subministraments ajustades al 30% d'afectació legal (Art. 30.2.5a.b LIRPF).` };
+    }
+
     case 'fix_reconcile_all_models': {
       const currentData = store.getData();
       const reconciled = ModelReconciliationEngine.executeMasterReconciliation(currentData);
@@ -1354,7 +1452,18 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
       return { success: true, message: 'Cuadre Automàtic Integral executat: 100% de models tributaris sincronitzats i quadrats.' };
     }
 
-    default:
+    default: {
+      if (fixKey.startsWith('fix_remove_tourist_reduction_')) {
+        const propId = fixKey.replace('fix_remove_tourist_reduction_', '');
+        const props = store.getData().properties || [];
+        const target = props.find(p => p.id === propId);
+        if (target) {
+          target.reductionType = 'none';
+          store.setSection('properties', props);
+          return { success: true, message: `Reducció eliminada de l'immoble ${target.name || propId} per tractar-se d'ús turístic/temporal.` };
+        }
+      }
       return { success: false, message: 'Acció d\'auto-correcció no reconeguda.' };
+    }
   }
 }
