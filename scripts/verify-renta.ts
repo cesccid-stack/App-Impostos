@@ -671,6 +671,55 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
     assert(risk !== null && typeof risk.overallRiskScore === 'number', 'El radar de risc ha de retornar un overallRiskScore numèric');
     assert(compliance.issues.length > 0, 'L\'auto-validador ha de detectar incoherències');
   });
+
+  test('6.2 Detecció d\'incompatibilitats d\'edat en descendents (> 25 anys) i ascendents (< 65 anys)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.descendants = [
+      { id: 'd1', name: 'Fill Gran', birthYear: 1995, age: 29, disability: 0 }
+    ];
+    data.personal.ascendants = [
+      { id: 'a1', name: 'Pare Jove', birthYear: 1968, age: 56, disability: 0, liveTogether: true, annualIncome: 0 }
+    ];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const descIssue = compliance.issues.find(i => i.id === 'personal-descendant-age-ineligible');
+    const ascIssue = compliance.issues.find(i => i.id === 'personal-ascendant-age-ineligible');
+
+    assert(descIssue !== undefined, 'Ha de detectar descendent > 25 anys sense discapacitat');
+    assert(ascIssue !== undefined, 'Ha de detectar ascendent < 65 anys sense discapacitat');
+  });
+
+  test('6.3 Comprovació i Auto-fix dels límits legals de plans de pensions (Art. 52 LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.deductions.pensionPlanContributions = 3000;
+    data.deductions.companyPensionContributions = 12000;
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const indIssue = compliance.issues.find(i => i.id === 'ded-pension-individual-cap');
+    const empIssue = compliance.issues.find(i => i.id === 'ded-pension-company-cap');
+    const totIssue = compliance.issues.find(i => i.id === 'ded-pension-total-cap');
+
+    assert(indIssue !== undefined, 'Ha de detectar excés de pla individual (> 1.500 €)');
+    assert(empIssue !== undefined, 'Ha de detectar excés de pla d\'empresa (> 8.500 €)');
+    assert(totIssue !== undefined, 'Ha de detectar excés de pla conjunt (> 10.000 €)');
+  });
+
+  test('6.4 Detecció d\'obligació de Models 720 i 721 per a béns a l\'estranger (> 50.000 €)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.foreignAssets = {
+      accounts: [{ id: 'a1', bankName: 'Revolut', countryCode: 'LT', ibanOrNumber: 'LT123', balanceYearEnd: 65000, averageBalanceQ4: 60000 }],
+      securities: [],
+      realEstate: [],
+      crypto: [{ id: 'c1', exchangeName: 'Binance', cryptoSymbol: 'BTC', units: 1, valueYearEndEUR: 55000 }],
+    };
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const mod720 = compliance.issues.find(i => i.id === 'foreign-model-720-mandatory');
+    const mod721 = compliance.issues.find(i => i.id === 'foreign-model-721-mandatory');
+
+    assert(mod720 !== undefined, 'Ha de detectar obligació de presentar el Model 720');
+    assert(mod721 !== undefined, 'Ha de detectar obligació de presentar el Model 721');
+  });
 });
 
 // ── 7. SUITE 7: MOTOR D'IVA MODEL 303 & MODEL 390 ───────────────────────────

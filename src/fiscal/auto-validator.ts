@@ -581,6 +581,34 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     });
   }
 
+  // 6.3 Incompatibilitat d'Edat en Descendents (> 25 anys sense discapacitat >= 33%)
+  const ineligibleDescendants = (personal.descendants || []).filter(d => d.age > 25 && (d.disability || 0) < 33);
+  if (ineligibleDescendants.length > 0) {
+    issues.push({
+      id: 'personal-descendant-age-ineligible',
+      module: 'general',
+      severity: 'critical',
+      title: `${ineligibleDescendants.length} descendent(s) major(s) de 25 anys sense dret al mínim familiar`,
+      message: `Segons l'Art. 58 LIRPF, els fills majors de 25 anys no donen dret al mínim per descendents llevat que tinguin un grau de discapacitat reconegut >= 33%.`,
+      legalReference: 'Art. 58 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: false,
+    });
+  }
+
+  // 6.4 Incompatibilitat d'Edat en Ascendents (< 65 anys sense discapacitat >= 33%)
+  const ineligibleAscendants = (personal.ascendants || []).filter(a => a.age < 65 && (a.disability || 0) < 33);
+  if (ineligibleAscendants.length > 0) {
+    issues.push({
+      id: 'personal-ascendant-age-ineligible',
+      module: 'general',
+      severity: 'critical',
+      title: `${ineligibleAscendants.length} ascendent(s) menor(s) de 65 anys sense dret al mínim familiar`,
+      message: `Segons l'Art. 59 LIRPF, els pares o avis han de tenir 65 anys o més o un grau de discapacitat >= 33% per donar dret al mínim per ascendents.`,
+      legalReference: 'Art. 59 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: false,
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 7: DEDUCCIONS ESTATALS I AUTONÒMIQUES DE CATALUNYA (LLEI 31/2002)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -607,7 +635,7 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
       module: 'general',
       severity: 'critical',
       title: 'Incompatibilitat d\'edat en la deducció de lloguer a Catalunya (> 32 anys)',
-      message: `Per aplicar la deducció del 10% per lloguer a Catalunya, cal tenir 32 anys o menys a data 31/12, llevat que es trobi en situació d'atur $\ge 183$ dies, discapacitat $\ge 65\%$ o família nombrosa.`,
+      message: `Per aplicar la deducció del 10% per lloguer a Catalunya, cal tenir 32 anys o menys a data 31/12, llevat que es trobi en situació d'atur >= 183 dies, discapacitat >= 65% o família nombrosa.`,
       legalReference: 'Art. 1 de la Llei 31/2002 de la Comunitat Autònoma de Catalunya',
       autoFixable: true,
       autoFixLabel: 'Desactivar deducció de lloguer autonòmica no aplicable',
@@ -627,6 +655,64 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
       autoFixable: true,
       autoFixLabel: 'Desactivar deducció per maternitat',
       autoFixKey: 'fix_disable_maternity_deduction',
+    });
+  }
+
+  // 7.4 Límit Legal a Plans de Pensions (1.500 € individual / 8.500 € empresa / 10.000 € conjunt / Art. 52 LIRPF)
+  const pensionInd = deductions.pensionPlanContributions || 0;
+  const pensionEmp = deductions.companyPensionContributions || 0;
+  if (pensionInd > 1500) {
+    issues.push({
+      id: 'ded-pension-individual-cap',
+      module: 'general',
+      severity: 'warning',
+      title: `Aportació a pla de pensions individual (${formatCurrency(pensionInd)}) supera el límit d'1.500 €`,
+      message: `El límit màxim d'aportació individual amb dret a reducció a la base imposable és d'1.500 € anuals.`,
+      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: true,
+      autoFixLabel: 'Ajustar pla individual a 1.500 €',
+      autoFixKey: 'fix_cap_pension_individual',
+    });
+  }
+  if (pensionEmp > 8500) {
+    issues.push({
+      id: 'ded-pension-company-cap',
+      module: 'general',
+      severity: 'warning',
+      title: `Aportació empresarial a pla d'ocupació (${formatCurrency(pensionEmp)}) supera el límit de 8.500 €`,
+      message: `El límit legal d'aportació empresarial és de 8.500 € anuals.`,
+      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: true,
+      autoFixLabel: 'Ajustar pla d\'empresa a 8.500 €',
+      autoFixKey: 'fix_cap_pension_company',
+    });
+  }
+  if (pensionInd + pensionEmp > 10000) {
+    issues.push({
+      id: 'ded-pension-total-cap',
+      module: 'general',
+      severity: 'critical',
+      title: `Aportació conjunta a plans de pensions (${formatCurrency(pensionInd + pensionEmp)}) supera el límit global de 10.000 €`,
+      message: `El sostre màxim absolut de reducció conjunta per plans individuals i d'empresa és de 10.000 € anuals.`,
+      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: true,
+      autoFixLabel: 'Ajustar el total de plans a 10.000 €',
+      autoFixKey: 'fix_cap_pension_total',
+    });
+  }
+
+  // 7.5 Deducció per Eficiència Energètica (RD-Llei 19/2021)
+  if (deductions.energyEfficiencyType && deductions.energyEfficiencyType !== 'none' && (deductions.energyEfficiencyAmount || 0) > 7500) {
+    issues.push({
+      id: 'ded-energy-efficiency-excess-cap',
+      module: 'general',
+      severity: 'warning',
+      title: `Base d'eficiència energètica (${formatCurrency(deductions.energyEfficiencyAmount || 0)}) supera el límit legal màxim`,
+      message: `La base màxima de deducció és de 5.000 € (modalitat 1 i 3) o 7.500 € (modalitat 2 amb reducció del 30% d'energia no renovable).`,
+      legalReference: 'Disposició Addicional 50a LIRPF (RD-Llei 19/2021)',
+      autoFixable: true,
+      autoFixLabel: 'Ajustar la base d\'eficiència energètica a 7.500 €',
+      autoFixKey: 'fix_cap_energy_deduction',
     });
   }
 
@@ -996,6 +1082,40 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // GRUP 9: BÉNS A L'ESTRANGER & CRIPTOACTIUS (MODELS 720 / 721)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // 9.1 Obligació de Declaració de Béns a l'Estranger (Model 720 - Llindar 50.000 €)
+  const foreignAccounts = (data.foreignAssets?.accounts || []).reduce((s, a) => s + (a.balanceYearEnd || 0), 0);
+  const foreignSecurities = (data.foreignAssets?.securities || []).reduce((s, a) => s + (a.totalValueYearEnd || 0), 0);
+  const foreignRealEstate = (data.foreignAssets?.realEstate || []).reduce((s, a) => s + (a.acquisitionCostEUR || 0), 0);
+  if (foreignAccounts > 50000 || foreignSecurities > 50000 || foreignRealEstate > 50000) {
+    issues.push({
+      id: 'foreign-model-720-mandatory',
+      module: 'general',
+      severity: 'info',
+      title: 'Obligació de presentació del Model 720 (Béns i Drets a l\'Estranger > 50.000 €)',
+      message: `Com que el valor conjunt d'algun dels blocs (comptes, valors o immobles) supera els 50.000 €, estàs obligat a presentar el Model 720 informatiu abans del 31 de març.`,
+      legalReference: 'Disposició Addicional 18a LGT i Art. 42 bis del RGAT',
+      autoFixable: false,
+    });
+  }
+
+  // 9.2 Obligació de Declaració de Criptoactius a l'Estranger (Model 721 - Llindar 50.000 €)
+  const foreignCrypto = (data.foreignAssets?.crypto || []).reduce((s, c) => s + (c.valueYearEndEUR || 0), 0);
+  if (foreignCrypto > 50000) {
+    issues.push({
+      id: 'foreign-model-721-mandatory',
+      module: 'general',
+      severity: 'info',
+      title: 'Obligació de presentació del Model 721 (Criptomonedes en Custodis no Residents > 50.000 €)',
+      message: `El saldo de monedes virtuals situades a l'estranger supera els 50.000 €. És preceptiu presentar el Model 721 abans del 31 de març.`,
+      legalReference: 'Art. 42 quater del RGAT (Ordre HFP/886/2023)',
+      autoFixable: false,
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 10: CONCILIACIÓ I CUADRE INTER-MODEL (AEAT)
   // ═══════════════════════════════════════════════════════════════════════════
   const reconReport = ModelReconciliationEngine.auditAndCheckDiscrepancies(data);
@@ -1201,6 +1321,26 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
     case 'fix_disable_maternity_deduction': {
       store.update('deductions', { maternityDeduction: false });
       return { success: true, message: 'Deducció per maternitat desactivada en no haver-hi descendents menors de 3 anys.' };
+    }
+
+    case 'fix_cap_pension_individual': {
+      store.update('deductions', { pensionPlanContributions: 1500 });
+      return { success: true, message: 'Aportació individual a pla de pensions ajustada al límit d\'1.500 €.' };
+    }
+
+    case 'fix_cap_pension_company': {
+      store.update('deductions', { companyPensionContributions: 8500 });
+      return { success: true, message: 'Aportació empresarial a pla d\'ocupació ajustada al límit de 8.500 €.' };
+    }
+
+    case 'fix_cap_pension_total': {
+      store.update('deductions', { pensionPlanContributions: 1500, companyPensionContributions: 8500 });
+      return { success: true, message: 'Plans de pensions ajustats al límit conjunt de 10.000 € (1.500 € ind + 8.500 € empresa).' };
+    }
+
+    case 'fix_cap_energy_deduction': {
+      store.update('deductions', { energyEfficiencyAmount: 7500 });
+      return { success: true, message: 'Base de deducció per eficiència energètica ajustada al màxim legal de 7.500 €.' };
     }
 
     case 'fix_reconcile_all_models': {
