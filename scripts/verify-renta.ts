@@ -764,6 +764,49 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
     assert(nurseryIssue !== undefined, 'Ha de detectar despeses de guarderia superiors a 1.000 €');
   });
+
+  test('6.8 Validació de cadastre (20 caràcters) i detecció de referència cadastral invàlida', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.properties = [{
+      id: 'p-bad-cadastre',
+      name: 'Local',
+      cadastralReference: '123456789', // massa curta
+      grossRentalIncome: 5000,
+    } as any];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const cadIssue = compliance.issues.find(i => i.id === 'prop-invalid-cadastral-reference');
+
+    assert(cadIssue !== undefined, 'Ha de detectar referència cadastral invàlida (< 20 caràcters)');
+  });
+
+  test('6.9 Detecció de prescripció de pèrdues de la bossa de 4 anys (> 4 anys / Art. 49 LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.lossCarryovers = {
+      pendingGeneralLosses: [],
+      pendingMobiliaryLosses: [],
+      pendingCapitalLosses: [
+        { year: 2018, amount: 2500 } // Prescrita (> 4 anys)
+      ]
+    };
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const prescIssue = compliance.issues.find(i => i.id === 'gains-loss-carryover-expired');
+
+    assert(prescIssue !== undefined, 'Ha de detectar pèrdua de 2018 caducada/prescrita el 2024');
+  });
+
+  test('6.10 Detecció d\'incompatibilitat per límit de renda en deducció de lloguer a Catalunya (> 20.000 €)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 35000, inKind: 0, withholdings: 6000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.personal.age = 28;
+    data.deductions.catalanRentalDeduction = true;
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const incCapIssue = compliance.issues.find(i => i.id === 'ded-catalan-rental-income-cap-exceeded');
+
+    assert(incCapIssue !== undefined, 'Ha de detectar superació del límit de 20.000 € de renda a Catalunya');
+  });
 });
 
 // ── 7. SUITE 7: MOTOR D'IVA MODEL 303 & MODEL 390 ───────────────────────────

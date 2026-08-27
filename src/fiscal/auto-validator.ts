@@ -123,6 +123,16 @@ export function isValidSpanishTaxId(taxId: string): boolean {
 }
 
 /**
+ * Valida el format i estructura d'una Referència Cadastral espanyola (20 caràcters alfanumèrics).
+ */
+export function isValidCadastralReference(ref: string): boolean {
+  if (!ref) return false;
+  const clean = ref.trim().toUpperCase().replace(/[\s-]/g, '');
+  if (clean.length !== 20) return false;
+  return /^[0-9A-Z]{20}$/.test(clean);
+}
+
+/**
  * Executa totes les comprovacions automàtiques sobre la declaració activa (IRPF & IVA).
  */
 export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationReport {
@@ -381,6 +391,20 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     }
   }
 
+  // 3.7 Validació de Format de Referència Cadastral (20 caràcters / Llei del Cadastre)
+  const invalidCadastreProps = properties.filter(p => p.cadastralReference && !isValidCadastralReference(p.cadastralReference));
+  if (invalidCadastreProps.length > 0) {
+    issues.push({
+      id: 'prop-invalid-cadastral-reference',
+      module: 'properties',
+      severity: 'warning',
+      title: `${invalidCadastreProps.length} immoble/s amb referència cadastral de format no reglamentari`,
+      message: `Les referències cadastrals com ${invalidCadastreProps.slice(0, 2).map(p => p.cadastralReference).join(', ')} no tenen l'estructura oficial de 20 caràcters alfanumèrics requerida per la seu electrònica de l'AEAT.`,
+      legalReference: 'Reial Decret Legislatiu 1/2004 (Text Refós de la Llei del Cadastre Immobiliari)',
+      autoFixable: false,
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 4: ACTIVITATS ECONÒMIQUES & AUTÒNOMS (ARTS. 27-32 LIRPF)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -549,6 +573,33 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     });
   }
 
+  // 5.3 Validació de Prescripció de la Bossa de Pèrdues de 4 Anys (Art. 49 LIRPF & Art. 66 LGT)
+  const lossCarryovers = data.lossCarryovers;
+  if (lossCarryovers) {
+    const expiredLosses: number[] = [];
+    [
+      ...(lossCarryovers.pendingGeneralLosses || []),
+      ...(lossCarryovers.pendingMobiliaryLosses || []),
+      ...(lossCarryovers.pendingCapitalLosses || [])
+    ].forEach(item => {
+      if (item.year && (year - item.year) > 4 && item.amount > 0) {
+        expiredLosses.push(item.year);
+      }
+    });
+
+    if (expiredLosses.length > 0) {
+      issues.push({
+        id: 'gains-loss-carryover-expired',
+        module: 'general',
+        severity: 'critical',
+        title: 'Pèrdues patrimonials pendents prescrites (> 4 exercicis anteriors)',
+        message: `S'han detectat pèrdues registrades d'exercicis anteriors al ${year - 4} (anys ${Array.from(new Set(expiredLosses)).join(', ')}). L'Art. 49 LIRPF limita estrictament la compensació als 4 exercicis immediatament posteriors. Les pèrdues anteriors estan caducades i prescrites.`,
+        legalReference: 'Art. 49 Llei de l\'IRPF i Art. 66 de la Llei General Tributària (LGT)',
+        autoFixable: false,
+      });
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 6: MÍNIMS PERSONALS, FAMILIARS I DISCAPACITAT (ARTS. 56-61 LIRPF)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -641,6 +692,26 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
       autoFixLabel: 'Desactivar deducció de lloguer autonòmica no aplicable',
       autoFixKey: 'fix_disable_catalan_rental_deduction',
     });
+  }
+
+  // 7.2.b Deducció de Lloguer a Catalunya: Límit de Renda (20.000 € individual / 30.000 € conjunta / Llei 31/2002)
+  if (deductions.catalanRentalDeduction && data.workIncome) {
+    const totalGrossIncome = (data.workIncome.employers || []).reduce((s, e) => s + e.grossSalary, 0) + (data.activities?.income || 0);
+    const isJoint = personal.taxDeclarationType === 'joint';
+    const incomeCap = isJoint ? 30000 : 20000;
+    if (totalGrossIncome > incomeCap) {
+      issues.push({
+        id: 'ded-catalan-rental-income-cap-exceeded',
+        module: 'general',
+        severity: 'critical',
+        title: `Límit de renda superat per a la deducció de lloguer a Catalunya (>${formatCurrency(incomeCap)})`,
+        message: `La Llei 31/2002 exigeix que la base imposable total no superi els 20.000 € en tributació individual o 30.000 € en tributació conjunta. Els teus ingressos superen el llindar màxim permès.`,
+        legalReference: 'Art. 1.2 de la Llei 31/2002 de la Comunitat Autònoma de Catalunya',
+        autoFixable: true,
+        autoFixLabel: 'Desactivar deducció de lloguer per superar límit de renda',
+        autoFixKey: 'fix_disable_catalan_rental_deduction',
+      });
+    }
   }
 
   // 7.3 Deducció per Maternitat (1.200 € / Art. 81 LIRPF)
