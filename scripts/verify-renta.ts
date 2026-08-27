@@ -199,6 +199,8 @@ import { generateTaxDefenseDossier } from '../src/fiscal/audit-dossier-generator
 import { Model115And180Engine } from '../src/fiscal/model115-180-engine.ts';
 import { auditAndDecoupleVehicleExpenses, isExclusiveVehicleActivity } from '../src/fiscal/vehicle-deduction-engine.ts';
 import { calculateProrrataComparison } from '../src/fiscal/iva-engine.ts';
+import { explainTaxReturn } from '../src/fiscal/tax-explainer-engine.ts';
+import { createTaxJourneyVisualizer } from '../src/components/tax-journey-visualizer.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -1807,6 +1809,64 @@ suite('30. Muralles de Blindatge i Rigor Tributari (LIVA & LIRPF)', () => {
     assert(presc2024.isPrescribed === false, 'Exercici 2024 encara està en termini de revisió');
     assert(presc2024.prescriptionDate === '2029-06-30', 'Data exacta 30/06/2029');
     assert(presc2024.daysRemaining > 0, 'Compte enrere actiu');
+  });
+});
+
+// ── 31. SUITE 31: QUADRE DE COMANDAMENT DIDÀCTIC & VIATGE FISCAL ────────────
+
+suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
+
+  test('31.1 Desglossament didàctic integral d\'una renda multi-origen complexa', () => {
+    const data = createEmptyDeclaracion(2024);
+    // Treball amb 2 pagadors
+    data.workIncome.employers = [
+      { id: 'e1', name: 'Empresa Principal', nif: 'A11111111', grossSalary: 45000, inKind: 0, withholdings: 8000, socialSecurity: 2800, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
+      { id: 'e2', name: 'Segon Pagador', nif: 'B22222222', grossSalary: 8000, inKind: 0, withholdings: 800, socialSecurity: 500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
+    ];
+    // Immoble llogat
+    data.properties = [{
+      id: 'prop-1',
+      name: 'Pis Carrer Aragó',
+      cadastralReference: '1234567AB1234C0001XY',
+      address: 'Carrer Aragó 100',
+      ownershipPercentage: 100,
+      usageType: 'habitual',
+      contractDate: '2023-01-01',
+      tenantNIFs: ['44444444A'],
+      grossRentalIncome: 12000,
+      totalCadastralValue: 150000,
+      constructionCadastralValue: 90000,
+      acquisitionCost: 200000,
+      ibi: 600,
+      communityFees: 800,
+      mortgageInterests: 1200,
+      repairExpenses: 400,
+      insurance: 300,
+      reductionType: 'general_50',
+    } as any];
+    // Plans de pensions i donacions
+    data.deductions.pensionPlanContributions = 1500;
+    data.deductions.donations = [{ id: 'don-1', entity: 'Creu Roja', amount: 250, recurring: true, priority: false }];
+
+    const report = explainTaxReturn(data);
+
+    assert(report.totalGrossIncome === 65000, `Total ingressos bruts 65.000 € (obtingut: ${report.totalGrossIncome})`);
+    assert(report.flowSteps.length >= 8, `El viatge fiscal ha de contenir almenys 8 passos (obtingut: ${report.flowSteps.length})`);
+    assert(report.plainLanguageSummary.length >= 3, 'Ha de contenir un resum didàctic en llenguatge planer');
+    assert(report.keyDrivers.length > 0, 'Ha d\'identificar motors clau (pluralitat de pagadors, amortització, plans)');
+    assert(report.generalBracketBreakdown.length === 6, 'Desglossament de 6 trams de l\'escala general');
+    assert(report.marginalRateGeneral >= 37, `Tipus marginal estimat adequat (obtingut: ${report.marginalRateGeneral}%)`);
+  });
+
+  test('31.2 Renderització del component visual Tax Journey Visualizer', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [
+      { id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 30000, inKind: 0, withholdings: 4500, socialSecurity: 1900, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }
+    ];
+    const visualizer = createTaxJourneyVisualizer(data);
+    assert(visualizer !== null && visualizer !== undefined, 'El visualitzador ha de retornar un element DOM');
+    assert(visualizer.className.includes('tax-journey-container'), 'Classe del contenidor correcta');
+    assert(visualizer.innerHTML.includes('Cuadro de Mando Visual'), 'Títol del quadre de comandament present');
   });
 });
 

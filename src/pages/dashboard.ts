@@ -21,6 +21,7 @@ import { openCommandPalette } from '../components/command-palette.ts';
 import { openToolManagerModal } from '../components/tool-manager-modal.ts';
 import { ALL_APP_MODULES } from '../fiscal/modules-catalog.ts';
 import { checkTaxPrescription } from '../fiscal/tax-prescription-engine.ts';
+import { createTaxJourneyVisualizer } from '../components/tax-journey-visualizer.ts';
 import type { DeclaracionData, FiscalResult, UserProfile } from '../types.ts';
 
 interface DashboardContext {
@@ -49,7 +50,7 @@ export function renderDashboard(): HTMLElement {
   const page = document.createElement('div');
   page.className = 'page-container';
 
-  let activeTab: 'global' | 'charts' | 'whatif' | 'consolidation' | 'tools' = 'global';
+  let activeTab: 'global' | 'journey' | 'charts' | 'whatif' | 'consolidation' | 'tools' = 'global';
 
   // What-If Simulator state (deltas)
   let simSalaryDelta = 0;
@@ -162,6 +163,9 @@ export function renderDashboard(): HTMLElement {
         <button class="tab-btn ${activeTab === 'global' ? 'active' : ''}" data-tab="global" style="padding:8px 16px; border:none; background:transparent; color:${activeTab === 'global' ? 'var(--color-primary)' : 'var(--text-secondary)'}; font-weight:${activeTab === 'global' ? '700' : '500'}; font-size:0.85rem; cursor:pointer; border-bottom:2px solid ${activeTab === 'global' ? 'var(--color-primary)' : 'transparent'}; white-space:nowrap;">
           🌟 Visió Global & KPIs Claus
         </button>
+        <button class="tab-btn ${activeTab === 'journey' ? 'active' : ''}" data-tab="journey" style="padding:8px 16px; border:none; background:transparent; color:${activeTab === 'journey' ? 'var(--color-primary)' : 'var(--text-secondary)'}; font-weight:${activeTab === 'journey' ? '700' : '500'}; font-size:0.85rem; cursor:pointer; border-bottom:2px solid ${activeTab === 'journey' ? 'var(--color-primary)' : 'transparent'}; white-space:nowrap;">
+          🧭 Cuadro de Mando Didàctic & Viatge Fiscal
+        </button>
         <button class="tab-btn ${activeTab === 'charts' ? 'active' : ''}" data-tab="charts" style="padding:8px 16px; border:none; background:transparent; color:${activeTab === 'charts' ? 'var(--color-primary)' : 'var(--text-secondary)'}; font-weight:${activeTab === 'charts' ? '700' : '500'}; font-size:0.85rem; cursor:pointer; border-bottom:2px solid ${activeTab === 'charts' ? 'var(--color-primary)' : 'transparent'}; white-space:nowrap;">
           📊 Flux de Renda & Gràfics
         </button>
@@ -257,6 +261,8 @@ export function renderDashboard(): HTMLElement {
   function renderTabContent(tab: typeof activeTab, ctx: DashboardContext) {
     if (tab === 'global') {
       return renderGlobalKpiGrid(ctx);
+    } else if (tab === 'journey') {
+      return `<div id="tax-journey-mount"></div>`;
     } else if (tab === 'charts') {
       return renderChartsView(ctx);
     } else if (tab === 'whatif') {
@@ -280,6 +286,25 @@ export function renderDashboard(): HTMLElement {
     const showWealth = enabledModuleIds.includes('wealth_tax') || enabledModuleIds.includes('foreign_assets');
 
     return `
+      <!-- Banner Didàctic d'Alt Impacte: Per què aquest resultat? -->
+      <div class="card" style="margin-bottom:var(--space-xl); background:linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04)); border:1px solid var(--border-accent); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-md); padding:var(--space-md) var(--space-lg);">
+        <div style="display:flex; align-items:center; gap:var(--space-md);">
+          <span style="font-size:2rem;">🧭</span>
+          <div>
+            <div style="font-weight:800; font-size:1rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+              <span>Explicador Didàctic de la Renda: Entén la teva declaració en detall</span>
+              <span class="badge badge--success">Nou</span>
+            </div>
+            <p style="margin:2px 0 0 0; font-size:0.8rem; color:var(--text-secondary);">
+              Descobreix la cascada pas a pas de 10 nivells, l'escala de trams progressius i els motors clau que afecten la teva liquidació.
+            </p>
+          </div>
+        </div>
+        <button class="btn btn--primary btn--sm" id="btn-open-journey-tab" style="font-weight:700;">
+          Obrir Cuadro de Mando Visual ➡️
+        </button>
+      </div>
+
       <!-- Matriu d'Indicadors Claus (Executive KPI Matrix) -->
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl);">
         
@@ -1034,6 +1059,20 @@ export function renderDashboard(): HTMLElement {
         render();
       });
     });
+
+    page.querySelector('#btn-open-journey-tab')?.addEventListener('click', () => {
+      activeTab = 'journey';
+      render();
+    });
+
+    // Mount Tax Journey Visualizer if activeTab === 'journey'
+    if (activeTab === 'journey') {
+      const mount = page.querySelector('#tax-journey-mount');
+      if (mount) {
+        mount.innerHTML = '';
+        mount.appendChild(createTaxJourneyVisualizer(store.getData(), calculateIRPF(store.getData())));
+      }
+    }
 
     // Charts rendering if activeTab === 'charts'
     if (activeTab === 'charts') {

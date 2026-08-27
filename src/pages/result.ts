@@ -15,6 +15,7 @@ import { createStackedBar } from '../components/chart.ts';
 import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { showToast } from '../components/toast.ts';
 import { calculateComplementaryIRPF } from '../fiscal/complementary-engine.ts';
+import { createTaxJourneyVisualizer } from '../components/tax-journey-visualizer.ts';
 import type { IRPFComplementaryReason } from '../types.ts';
 
 export function renderResult(): HTMLElement {
@@ -197,6 +198,9 @@ export function renderResult(): HTMLElement {
           </div>
         </div>
       ` : ''}
+
+      <!-- Explicador Didàctic & Cuadro de Mando Visual de la Renta -->
+      <div id="result-tax-journey-mount" style="margin-top:var(--space-lg);"></div>
 
       <!-- Radar de risc d'inspecció AEAT -->
       <div class="card" style="margin-top:var(--space-lg); border:2px solid ${auditRisk.riskLevel === 'high' ? 'var(--color-error)' : auditRisk.riskLevel === 'medium' ? 'var(--color-warning)' : 'var(--color-success)'};">
@@ -409,6 +413,13 @@ export function renderResult(): HTMLElement {
       store.updateComplementary({ monthsLate: parseInt(target.value, 10) || 0 });
       render();
     });
+
+    // Mount Tax Journey Visualizer
+    const journeyMount = page.querySelector('#result-tax-journey-mount');
+    if (journeyMount) {
+      journeyMount.innerHTML = '';
+      journeyMount.appendChild(createTaxJourneyVisualizer(data, result));
+    }
   }
 
   render();
