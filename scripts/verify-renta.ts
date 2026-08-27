@@ -192,6 +192,13 @@ import { runMonteCarloSimulation } from '../src/fiscal/monte-carlo-engine.ts';
 import { calculateMarginalTaxRate, generateYearEndOptimization } from '../src/fiscal/year-end-optimizer.ts';
 import { calculateEnergyEfficiencyDeduction } from '../src/fiscal/energy-efficiency-engine.ts';
 import { checkTaxPrescription } from '../src/fiscal/tax-prescription-engine.ts';
+import { exactAdd, exactSub, exactMultiply, exactDivide, applyTaxBracketsExact, calculateInvoiceLineTaxExact, eurosToCents, centsToEuros } from '../src/utils/exact-math.ts';
+import { createChainedInvoiceRecord, verifyInvoiceChainIntegrity } from '../src/fiscal/verifactu-engine.ts';
+import { getAutonomicBrackets, AUTONOMIC_COMMUNITIES_REGISTRY } from '../src/fiscal/autonomic-tax-scales.ts';
+import { generateTaxDefenseDossier } from '../src/fiscal/audit-dossier-generator.ts';
+import { Model115And180Engine } from '../src/fiscal/model115-180-engine.ts';
+import { auditAndDecoupleVehicleExpenses, isExclusiveVehicleActivity } from '../src/fiscal/vehicle-deduction-engine.ts';
+import { calculateProrrataComparison } from '../src/fiscal/iva-engine.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -1398,6 +1405,408 @@ suite('24. Deduccions Estatals per Eficiència Energètica (energy-efficiency-en
     assert(res.eligibleBase === 5000, 'Límit anual de 5.000 €');
     assert(res.deductionAmount === 3000, 'Deducció del 60% = 3.000 €');
     assert(res.pendingCarryover === 7000, 'Excés de 7.000 € pendent d\'arrossegar als 4 propers anys');
+  });
+});
+
+suite('25. Motor d\'Aritmètica Decimal Financera i Arrodoniments AEAT (exact-math.ts)', () => {
+  test('25.1 Eliminació d\'errors de coma flotant en sumes i restes iteratives', () => {
+    // 0.1 + 0.2 en IEEE-754 dóna 0.30000000000000004
+    const sum = exactAdd(0.1, 0.2);
+    assert(sum === 0.3, 'Suma exacta sense drift decimal');
+
+    const multiSum = exactAdd(10.15, 20.25, 30.35, 40.45);
+    assert(multiSum === 101.20, 'Suma acumulada exacta = 101.20 €');
+
+    const sub = exactSub(100.55, 0.55);
+    assert(sub === 100.00, 'Resta exacta = 100.00 €');
+  });
+
+  test('25.2 Multiplicació i Divisió exacta d\'impostos i tipus impositius', () => {
+    // Base 123.45 € amb IVA 21% -> 123.45 * 0.21 = 25.9245 -> arrodonit oficialment a 25.92 €
+    const iva = exactMultiply(123.45, 0.21);
+    assert(iva === 25.92, 'Quota d\'IVA de 123.45 € al 21% és exactament 25.92 €');
+
+    // Desglossament de línia amb base, IVA i recàrrec d'equivalència (5.2%)
+    const line = calculateInvoiceLineTaxExact(1000, 0.21, 0.052);
+    assert(line.base === 1000, 'Base de 1.000 €');
+    assert(line.ivaAmount === 210, 'IVA de 210 €');
+    assert(line.reqAmount === 52, 'Recàrrec de 52 €');
+    assert(line.total === 1262, 'Total línia = 1.262 €');
+  });
+
+  test('25.3 Aplicació progressiva exacta d\'escales de gravamen', () => {
+    const brackets = [
+      { upTo: 10000, rate: 0.10 },
+      { upTo: 20000, rate: 0.20 },
+      { upTo: Infinity, rate: 0.30 },
+    ];
+    // Base 25.000 € -> 10k * 10% (1.000) + 10k * 20% (2.000) + 5k * 30% (1.500) = 4.500 €
+    const result = applyTaxBracketsExact(25000, brackets);
+    assert(result.totalTax === 4500, 'Quota total en escala de 25.000 € = 4.500 €');
+    assert(result.brackets.length === 3, '3 trams computats exactament');
+  });
+});
+
+suite('26. Compliment Veri*Factu i Integritat Criptogràfica (verifactu-engine.ts)', () => {
+  test('26.1 Generació i verificació de cadena de factures inalterable (Art. 201 bis LGT)', async () => {
+    const inv1 = await createChainedInvoiceRecord({
+      id: 'inv-1',
+      invoiceNumber: 'FAC-2024-001',
+      issueDate: '2024-01-15',
+      issuerNif: 'B12345678',
+      baseAmount: 1000,
+      taxRate: 0.21,
+      taxAmount: 210,
+      totalAmount: 1210,
+    }, '');
+
+    assert(inv1.previousRecordHash === '', 'Primer registre sense hash anterior');
+    assert(inv1.currentRecordHash.length > 0, 'Hash SHA-256 generat');
+
+    const inv2 = await createChainedInvoiceRecord({
+      id: 'inv-2',
+      invoiceNumber: 'FAC-2024-002',
+      issueDate: '2024-01-20',
+      issuerNif: 'B12345678',
+      baseAmount: 2000,
+      taxRate: 0.21,
+      taxAmount: 420,
+      totalAmount: 2420,
+    }, inv1.currentRecordHash);
+
+    assert(inv2.previousRecordHash === inv1.currentRecordHash, 'Encadenament correcte');
+
+    const verification = await verifyInvoiceChainIntegrity([inv1, inv2]);
+    assert(verification.isValid === true, 'Cadena de registres 100% íntegra');
+    assert(verification.totalRecords === 2, '2 registres validats');
+  });
+
+  test('26.2 Detecció immediata de manipulació o alteració de factures', async () => {
+    const inv1 = await createChainedInvoiceRecord({
+      id: 'inv-1',
+      invoiceNumber: 'FAC-2024-001',
+      issueDate: '2024-01-15',
+      issuerNif: 'B12345678',
+      baseAmount: 1000,
+      taxRate: 0.21,
+      taxAmount: 210,
+      totalAmount: 1210,
+    }, '');
+
+    // Simulem alteració fraudulenta de l'import després de signar
+    const fraudulentInv1 = { ...inv1, totalAmount: 800 };
+
+    const verification = await verifyInvoiceChainIntegrity([fraudulentInv1]);
+    assert(verification.isValid === false, 'Detecta el frau per discrepància de hash');
+  });
+});
+
+suite('27. Escales de Gravamen Autonòmiques Multi-CCAA (autonomic-tax-scales.ts)', () => {
+  test('27.1 Diferenciació fiscal entre Catalunya, Madrid i Andalusia', () => {
+    const catBrackets = getAutonomicBrackets('catalunya');
+    const madBrackets = getAutonomicBrackets('madrid');
+    const andBrackets = getAutonomicBrackets('andalucia');
+
+    assert(catBrackets.length === 9, 'Catalunya té 9 trams');
+    assert(madBrackets.length === 5, 'Madrid té 5 trams');
+    assert(andBrackets.length === 5, 'Andalusia té 5 trams');
+
+    // Comprovació amb el motor d'IRPF
+    const baseDecl = createEmptyDeclaracion(2024, 'profile_main');
+    baseDecl.workIncome = {
+      grossSalary: 60000,
+      socialSecurity: 2000,
+      withholdings: 12000,
+      exempt7p: 0,
+      irregularIncome: 0,
+      pensionContributions: 0,
+      unionFees: 0,
+      legalDefense: 0,
+      mobilityMove: false,
+      activeDisabilityWorker: false,
+      employers: [{ id: '1', name: 'Empresa', grossSalary: 60000, withholdings: 12000, socialSecurity: 2000 }],
+    };
+
+    baseDecl.personal = {
+      ...baseDecl.personal,
+      autonomousCommunity: 'madrid',
+    };
+    const resultMadrid = calculateIRPF(baseDecl, true);
+
+    baseDecl.personal = {
+      ...baseDecl.personal,
+      autonomousCommunity: 'catalunya',
+    };
+    const resultCatalunya = calculateIRPF(baseDecl, true);
+
+    assert(resultMadrid.autonomicGeneralTax < resultCatalunya.autonomicGeneralTax, 'La quota autonòmica de Madrid és inferior a la de Catalunya');
+  });
+});
+
+suite('28. Generador de Dossier de Defensa Tributària davant Requeriments AEAT (audit-dossier-generator.ts)', () => {
+  test('28.1 Generació de dossier amb justificacions legals i calendari de prescripció', () => {
+    const decl = createEmptyDeclaracion(2024, 'profile_main');
+    decl.personal = {
+      ...decl.personal,
+      nif: '12345678Z',
+      name: 'Joan García',
+    };
+    decl.workIncome = {
+      ...decl.workIncome,
+      foreignWorkExemption7p: 10000,
+      employers: [{
+        id: '1',
+        name: 'Empresa SL',
+        grossSalary: 45000,
+        withholdings: 8000,
+        socialSecurity: 2300,
+        inKind: 0,
+        dietsIncome: 0,
+        dietsDays: 0,
+        mileageIncome: 0,
+        mileageKm: 0,
+      }],
+    };
+    decl.deductions = {
+      ...decl.deductions,
+      donations: [{ id: 'd1', entity: 'Fundació Recerca', amount: 300, recurring: true, priority: false }],
+    };
+
+    const dossier = generateTaxDefenseDossier(decl);
+
+    assert(dossier.fiscalYear === 2024, 'Exercici 2024');
+    assert(dossier.prescriptionDeadline === '30/06/2029', 'Prescriu el 30/06/2029 (4 anys LGT)');
+    assert(dossier.taxpayerNif === '12345678Z', 'NIF assignat');
+    assert(dossier.boxJustifications.length >= 3, 'Justificacions generades per treball, 7.p i donatius');
+    assert(dossier.requiredDocumentationChecklist.length > 0, 'Checklist documental generat');
+    assert(dossier.defenseArguments.length > 0, 'Arguments jurídics inclosos');
+  });
+});
+
+suite('29. Motor de Retencions d\'Arrendaments Urbans: Model 115 i Model 180 (model115-180-engine.ts)', () => {
+  const dummyLeases = [
+    {
+      id: 'lease_local_1',
+      landlordNif: 'A12345678',
+      landlordName: 'Inmobiliaria Central SA',
+      cadastralReference: '1234567AB1234C0001XY',
+      address: 'Passeig de Gràcia 50, Principal',
+      postalCode: '08007',
+      municipality: 'Barcelona',
+      provinceCode: '08',
+      propertySituation: '1' as const,
+      monthlyRent: 2000,
+      withholdingRate: 0.19,
+      isExempt: false,
+    },
+    {
+      id: 'lease_office_2',
+      landlordNif: 'B87654321',
+      landlordName: 'Patrimonis Urbans SL',
+      cadastralReference: '9876543CD9876E0002ZW',
+      address: 'Gran Via 120, 3r 2a',
+      postalCode: '08015',
+      municipality: 'Barcelona',
+      provinceCode: '08',
+      propertySituation: '1' as const,
+      monthlyRent: 1500,
+      withholdingRate: 0.19,
+      isExempt: false,
+    },
+    {
+      id: 'lease_exempt_traster',
+      landlordNif: 'C99999999',
+      landlordName: 'Trasters del Vallès SL',
+      cadastralReference: '1111111XX1111X0003AA',
+      address: 'Carrer Indústria 5',
+      postalCode: '08201',
+      municipality: 'Sabadell',
+      provinceCode: '08',
+      propertySituation: '1' as const,
+      monthlyRent: 50, // 600 € anuals -> Exempt per no superar 900 €
+      withholdingRate: 0.19,
+      isExempt: false,
+    },
+  ];
+
+  test('29.1 Avaluació d\'obligació i càlcul trimestral Model 115 (19% sobre bases de lloguer)', () => {
+    const audit = Model115And180Engine.auditModel115Obligation(dummyLeases);
+    assert(audit.isObligated === true, 'Hi ha obligació de presentar el Model 115');
+    assert(audit.activeLeaseCount === 2, '2 contractes subjectes a retenció');
+    assert(audit.exemptLeaseCount === 1, '1 contracte exempt per < 900 € anuals');
+
+    // Càlcul 1T: Renda computable trimestral: (2.000 + 1.500) * 3 = 10.500 €
+    // Retenció 19%: 10.500 * 0.19 = 1.995 €
+    const mod115_1T = Model115And180Engine.calculateModel115Quarterly('1T', 2024, dummyLeases);
+    assert(mod115_1T.recipientsCount === 2, '2 arrendadors perceptors');
+    assert(mod115_1T.baseTotal === 10500, 'Base trimestral computable de 10.500 €');
+    assert(mod115_1T.withholdingsTotal === 1995, 'Retencions trimestrals al 19% = 1.995 €');
+    assert(mod115_1T.totalToPay === 1995, 'Total a ingressar = 1.995 €');
+  });
+
+  test('29.2 Generació del Resum Anual Model 180 amb dades cadastrals i perceptors', () => {
+    const quarters = Model115And180Engine.calculateModel115AllQuarters(2024, dummyLeases);
+    assert(quarters.length === 4, '4 trimestres generats');
+
+    const mod180 = Model115And180Engine.generateModel180Annual(2024, dummyLeases, quarters);
+    assert(mod180.year === 2024, 'Exercici 2024');
+    assert(mod180.totalRecipientsCount === 2, '2 perceptors anuals');
+    // Base anual: (2.000 * 12) + (1.500 * 12) = 24.000 + 18.000 = 42.000 €
+    assert(mod180.totalBaseAnnual === 42000, 'Base anual total de 42.000 €');
+    // Retencions anuals: 42.000 * 0.19 = 7.980 €
+    assert(mod180.totalWithholdingsAnnual === 7980, 'Retencions anuals = 7.980 €');
+    assert(mod180.perceptors.length === 2, '2 registres desglossats per arrendador i cadastre');
+    assert(mod180.reconciliationWith115Status === 'perfect', 'Estat de conciliació 115 vs 180 perfecte');
+  });
+
+  test('29.3 Conciliació Creuada 115 vs 180 i detecció de desquadraments', () => {
+    const quarters = Model115And180Engine.calculateModel115AllQuarters(2024, dummyLeases);
+    const mod180 = Model115And180Engine.generateModel180Annual(2024, dummyLeases, quarters);
+
+    const checkPerfect = Model115And180Engine.reconcileModel115vs180(quarters, mod180);
+    assert(checkPerfect.isReconciled === true, 'Models 115 (1T-4T) i 180 quadren al cèntim');
+    assert(checkPerfect.withholdingDifference === 0, 'Diferència 0 €');
+
+    // Simulem desquadrament intencionat per error humà en un trimestre
+    const corruptedQuarters = [...quarters];
+    corruptedQuarters[3] = { ...corruptedQuarters[3], withholdingsTotal: corruptedQuarters[3].withholdingsTotal - 100 };
+
+    const checkCorrupted = Model115And180Engine.reconcileModel115vs180(corruptedQuarters, mod180);
+    assert(checkCorrupted.isReconciled === false, 'Detecta el desquadrament de 100 €');
+    assert(checkCorrupted.withholdingDifference === 100, 'Diferència exacta de 100 €');
+    assert(checkCorrupted.errorDetails !== undefined, 'Detall del motiu de l’error generat');
+  });
+
+  test('29.4 Conciliació de retencions suportades pel propietari amb la Renda (Model 100 Casella 0597)', () => {
+    const quarters = Model115And180Engine.calculateModel115AllQuarters(2024, dummyLeases);
+    const mod180 = Model115And180Engine.generateModel180Annual(2024, dummyLeases, quarters);
+
+    const landlordDecl = createEmptyDeclaracion(2024, 'profile_main');
+    landlordDecl.capitalIncome = {
+      ...landlordDecl.capitalIncome,
+      realEstateWithholdings: 7980, // Coincideix amb el Model 180
+    };
+
+    const reconciliation = Model115And180Engine.reconcileModel180vsLandlordDeclaracion(mod180, landlordDecl);
+    assert(reconciliation.isMatching === true, 'Retencions suportades a la Renda coincideixen amb el Model 180');
+    assert(reconciliation.difference === 0, 'Diferència 0 €');
+  });
+});
+
+suite('30. Muralles de Blindatge i Rigor Tributari (LIVA & LIRPF)', () => {
+  test('30.1 Desacoblament de vehicles turisme: 50% IVA vs 0% IRPF (Art. 95 LIVA vs Art. 22 RIRPF)', () => {
+    const dummyVehicleExpenses = [
+      { id: 'v1', concept: 'Combustible Repsol', totalAmount: 121, vatAmount: 21, expenseType: 'fuel' as const },
+      { id: 'v2', concept: 'Rènting Turisme', totalAmount: 484, vatAmount: 84, expenseType: 'renting_leasing' as const },
+    ];
+
+    // Autònom consultor (epígraf 763) -> Vehicle no exclusiu
+    const auditGeneral = auditAndDecoupleVehicleExpenses(dummyVehicleExpenses, '763');
+    assert(auditGeneral.isDecoupled === true, 'Aplica desacoblament automàtic');
+    assert(auditGeneral.vatDeductionRate === 50, 'Dedueix el 50% de quota d\'IVA (52,50 €)');
+    assert(auditGeneral.vatDeductibleAmount === 52.5, '50% d\'IVA = 52,50 €');
+    assert(auditGeneral.irpfDeductionRate === 0, '0% deducció a l\'IRPF per protegir de sanció');
+    assert(auditGeneral.irpfDeductibleAmount === 0, '0 € deduïts a l\'IRPF');
+    assert(auditGeneral.potentialTaxFineAvoided > 0, 'Estalvi de sanció estimat positiu');
+  });
+
+  test('30.2 Reconeixement d\'activitats de transport i agents comercials (100% deduïble en IVA i IRPF)', () => {
+    const dummyVehicleExpenses = [
+      { id: 'v1', concept: 'Gasoil Furgoneta', totalAmount: 121, vatAmount: 21, expenseType: 'fuel' as const },
+    ];
+
+    // Transport de mercaderies (epígraf 722)
+    assert(isExclusiveVehicleActivity('722') === true, 'Epígraf 722 és transport');
+    const auditTransport = auditAndDecoupleVehicleExpenses(dummyVehicleExpenses, '722');
+    assert(auditTransport.isDecoupled === false, 'No desacobla: 100% deduïble');
+    assert(auditTransport.vatDeductibleAmount === 21, '100% IVA deduïble (21 €)');
+    assert(auditTransport.irpfDeductibleAmount === 100, '100 € de base deduïble a l\'IRPF');
+  });
+
+  test('30.3 Comparativa Prorrata General vs Especial i obligatorietat del 10% (Art. 103 LIVA)', () => {
+    const dummyIVAData: IVAData = {
+      config: {
+        regime: 'general',
+        settlementFrequency: 'quarterly',
+        isREDEME: false,
+        hasProrrata: true,
+        prorrata: {
+          type: 'general',
+          provisionalPercentage: 80,
+          definitivePercentage: 80,
+          isRegulatedAutomatically: true,
+          totalOperationsWithDeduction: 80000,
+          totalOperationsVolume: 100000,
+        },
+        initialPendingCarryover: 0,
+      },
+      issuedInvoices: [],
+      receivedInvoices: [
+        // Despesa directa sense dret a deduir (lloguer habitatge) amb molt d'IVA
+        {
+          id: 'rec_1',
+          number: 'F-001',
+          supplierNif: 'B12345678',
+          supplierName: 'Manteniment Pisos',
+          date: '2024-03-01',
+          category: 'property_expense',
+          concept: 'Manteniment Lloguer Habitatge',
+          notes: 'exempt_expense',
+          taxableBase: 10000,
+          vatRate: 21,
+          vatAmount: 2100,
+          totalInvoice: 12100,
+          isDeductible: true,
+          deductionPercentage: 100,
+          isInvestmentAsset: false,
+        },
+        // Despesa directa amb dret a deduir
+        {
+          id: 'rec_2',
+          number: 'F-002',
+          supplierNif: 'B87654321',
+          supplierName: 'Subministraments Activitat',
+          date: '2024-03-05',
+          category: 'activity_expense',
+          concept: 'Subministraments Activitat',
+          taxableBase: 1000,
+          vatRate: 21,
+          vatAmount: 210,
+          totalInvoice: 1210,
+          isDeductible: true,
+          deductionPercentage: 100,
+          isInvestmentAsset: false,
+        },
+      ],
+      investmentAssets: [],
+      quarters: {
+        '1T': {} as any,
+        '2T': {} as any,
+        '3T': {} as any,
+        '4T': {} as any,
+      },
+    };
+
+    const comparison = calculateProrrataComparison(dummyIVAData, 80);
+    // Prorrata General (80% de 2.310 €) = 1.848 €
+    // Prorrata Especial = 210 € + 0 € = 210 €
+    // Desviació: (1.848 - 210) / 210 = 780% > 10%
+    assert(comparison.isSpecialProrrataMandatoryByLaw === true, 'Prorrata Especial obligatòria per superar el 10%');
+    assert(comparison.recommendedRegime === 'special', 'Recomana Prorrata Especial');
+    assert(comparison.warningMessage !== undefined, 'Missatge d\'advertència generat');
+  });
+
+  test('30.4 Radar de prescripció de 4 anys (Art. 66 LGT) amb dates exactes de blindatge', () => {
+    // Renda 2020 (declarada el 30/06/2021) -> Prescriu el 30/06/2025
+    const presc2020 = checkTaxPrescription(2020, 'IRPF', new Date('2026-01-01'));
+    assert(presc2020.isPrescribed === true, 'Exercici 2020 ja ha prescrit completament');
+    assert(presc2020.daysRemaining === 0, '0 dies restants');
+
+    // Renda 2024 (declarada el 30/06/2025) -> Prescriu el 30/06/2029
+    const presc2024 = checkTaxPrescription(2024, 'IRPF', new Date('2026-01-01'));
+    assert(presc2024.isPrescribed === false, 'Exercici 2024 encara està en termini de revisió');
+    assert(presc2024.prescriptionDate === '2029-06-30', 'Data exacta 30/06/2029');
+    assert(presc2024.daysRemaining > 0, 'Compte enrere actiu');
   });
 });
 

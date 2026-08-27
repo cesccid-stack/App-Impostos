@@ -201,6 +201,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
     reductionAmount,
     netReducedIncome,
     imputedIncomeForOwnUse,
+    withholding19: p.usageType === 'commercial' ? (grossIncome * 0.19) : 0,
   };
 
   // Càlcul de rendibilitats financeres

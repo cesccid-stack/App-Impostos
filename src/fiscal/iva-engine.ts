@@ -429,6 +429,9 @@ export function calculateModel390Annual(
   const definitiveProrrata = ivaData.config?.prorrata?.definitivePercentage ?? 100;
   const discrepancyAmount = Math.abs((sumOfQuarterDevengado - sumOfQuarterDeducible) - (quarters['1T'].diferencia + quarters['2T'].diferencia + quarters['3T'].diferencia + quarters['4T'].diferencia));
 
+  // Auditoria comparativa Prorrata General vs Especial (Art. 103.Dos.1r LIVA)
+  const prorrataComparison = calculateProrrataComparison(ivaData, definitiveProrrata);
+
   return {
     year,
     totalDevengado: sumOfQuarterDevengado,
@@ -442,12 +445,81 @@ export function calculateModel390Annual(
     definitiveProrrata,
     totalAnnualResult,
     accumulatedPendingCarryover: finalPendingCarryover,
+    prorrataComparison,
     quartersReconciliation: {
       sumOfQuarterDevengado,
       sumOfQuarterDeducible,
       isBalanced: discrepancyAmount < 0.05,
       discrepancyAmount,
     }
+  };
+}
+
+/**
+ * Avalua si la Prorrata Especial és legalment obligatòria segons l'Art. 103.Dos.1r LIVA
+ * (si la deducció amb Prorrata General supera en més d'un 10% la que resultaria d'aplicar la Prorrata Especial).
+ */
+export function calculateProrrataComparison(
+  ivaData: IVAData,
+  generalProrrataPercentage: number
+): {
+  generalDeductionAmount: number;
+  specialDeductionAmount: number;
+  differenceAmount: number;
+  divergencePercentage: number;
+  isSpecialProrrataMandatoryByLaw: boolean;
+  recommendedRegime: 'general' | 'special';
+  warningMessage?: string;
+} {
+  const receivedInvoices = ivaData.receivedInvoices || [];
+  let totalInputVat = 0;
+  let directWithRightVat = 0;
+  let directWithoutRightVat = 0;
+  let commonVat = 0;
+
+  for (const inv of receivedInvoices) {
+    const vat = inv.vatAmount || 0;
+    totalInputVat += vat;
+
+    if (inv.notes?.includes('exempt') || inv.concept?.toLowerCase().includes('lloguer habitatge')) {
+      directWithoutRightVat += vat;
+    } else if (inv.category === 'activity_expense' || inv.category === 'activity_supplies') {
+      directWithRightVat += vat;
+    } else {
+      // Despeses comunes o generals
+      commonVat += vat;
+    }
+  }
+
+  // 1. Deducció amb Prorrata General (Art. 104 LIVA)
+  const generalDeductionAmount = totalInputVat * (generalProrrataPercentage / 100);
+
+  // 2. Deducció amb Prorrata Especial (Art. 106 LIVA)
+  const specialDeductionAmount = directWithRightVat + (commonVat * (generalProrrataPercentage / 100));
+
+  // 3. Comparativa de desviació
+  const differenceAmount = generalDeductionAmount - specialDeductionAmount;
+  let divergencePercentage = 0;
+  if (specialDeductionAmount > 0) {
+    divergencePercentage = ((generalDeductionAmount - specialDeductionAmount) / specialDeductionAmount) * 100;
+  }
+
+  const isSpecialProrrataMandatoryByLaw = divergencePercentage >= 10.0;
+  const recommendedRegime = isSpecialProrrataMandatoryByLaw ? 'special' : (generalDeductionAmount >= specialDeductionAmount ? 'general' : 'special');
+
+  let warningMessage: string | undefined;
+  if (isSpecialProrrataMandatoryByLaw) {
+    warningMessage = `Alerta Art. 103.Dos.1r LIVA: La deducció amb Prorrata General (${generalDeductionAmount.toFixed(2)} €) supera en un ${divergencePercentage.toFixed(1)}% (més del 10% legal) la Prorrata Especial (${specialDeductionAmount.toFixed(2)} €). L'aplicació de la Prorrata Especial és OBLIGATÒRIA per llei sota risc de sanció del 50%.`;
+  }
+
+  return {
+    generalDeductionAmount: parseFloat(generalDeductionAmount.toFixed(2)),
+    specialDeductionAmount: parseFloat(specialDeductionAmount.toFixed(2)),
+    differenceAmount: parseFloat(differenceAmount.toFixed(2)),
+    divergencePercentage: parseFloat(divergencePercentage.toFixed(2)),
+    isSpecialProrrataMandatoryByLaw,
+    recommendedRegime,
+    warningMessage,
   };
 }
 

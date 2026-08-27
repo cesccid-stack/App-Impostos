@@ -18,6 +18,7 @@ import { calculateModel390Annual } from './iva-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { store } from '../store.ts';
 import { ModelReconciliationEngine } from './model-reconciliation-engine.ts';
+import { isExclusiveVehicleActivity } from './vehicle-deduction-engine.ts';
 
 export type ValidationSeverity = 'critical' | 'warning' | 'info';
 
@@ -358,6 +359,28 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     });
   }
 
+  // 3.6 Retencions d'Arrendaments Comercials (Models 115/180) vs Casella 0598
+  const commercialPropsWithhold = properties.filter(p => p.usageType === 'commercial' && (p.grossRentalIncome || 0) > 0);
+  if (commercialPropsWithhold.length > 0) {
+    const totalCommercialRent = commercialPropsWithhold.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
+    const expected19Withholding = totalCommercialRent * 0.19;
+    const currentWithholding = data.capitalIncome?.realEstateWithholdings || 0;
+
+    if (Math.abs(expected19Withholding - currentWithholding) > 1.0) {
+      issues.push({
+        id: 'prop-commercial-withholdings-mismatch',
+        module: 'properties',
+        severity: 'warning',
+        title: 'Retencions de Lloguer Comercial (Model 180) no imputades a la Renda',
+        message: `Tens ${commercialPropsWithhold.length} immoble/s comercial/s amb ingressos de ${formatCurrency(totalCommercialRent)}. Els llogaters estan obligats a ingressar ${formatCurrency(expected19Withholding)} al Model 115/180. Aquest import ha de constar a la Casella 0598 per a minorar el teu IRPF.`,
+        legalReference: 'Art. 75.2.a i Art. 100 del Reglament de l\'IRPF (RD 439/2007)',
+        autoFixable: true,
+        autoFixLabel: `Imputar ${formatCurrency(expected19Withholding)} a la Casella 0598`,
+        autoFixKey: 'fix_sync_commercial_withholdings_180',
+      });
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 4: ACTIVITATS ECONÒMIQUES & AUTÒNOMS (ARTS. 27-32 LIRPF)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -470,6 +493,25 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
         autoFixable: false,
       });
     }
+  }
+
+  // 4.7 Desacoblament de Vehicles: IVA (50%) vs IRPF (0%) (Art. 95 LIVA vs Art. 22 RIRPF)
+  const vehicleInvoices = (iva.receivedInvoices || []).filter(i => {
+    const c = (i.concept || '').toLowerCase();
+    return c.includes('combustible') || c.includes('benzina') || c.includes('gasoil') || c.includes('peatge') || c.includes('reparacio vehicle') || c.includes('renting vehicle') || c.includes('assegurança vehicle');
+  });
+
+  if (vehicleInvoices.length > 0 && !isExclusiveVehicleActivity(act.iae)) {
+    const totalVehicleExpense = vehicleInvoices.reduce((s, i) => s + (i.totalInvoice || 0), 0);
+    issues.push({
+      id: 'act-vehicle-decoupling-alert',
+      module: 'activities',
+      severity: 'info',
+      title: 'Desacoblament de despeses de vehicle aplicat (IVA 50% vs IRPF 0%)',
+      message: `S'han detectat ${vehicleInvoices.length} despesa/es de vehicle (${formatCurrency(totalVehicleExpense)}). Per l'epígraf IAE declarat, l'IVA suportat es dedueix al 50% (Art. 95 LIVA) però la despesa a l'IRPF és del 0% per no ser un vehicle d'ús 100% exclusiu (Art. 22 RIRPF), evitant sancions de l'Art. 191 LGT.`,
+      legalReference: 'Art. 95.Tres Llei de l\'IVA vs Art. 22 Reglament de l\'IRPF',
+      autoFixable: false,
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1119,6 +1161,19 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
     case 'fix_sync_properties_iva': {
       const res = store.syncIVAFromProperties();
       return { success: true, message: `Immobles sincronitzats: +${res.addedCommercialRentals} factures de locals (21% + 19% retenció) generades.` };
+    }
+
+    case 'fix_sync_commercial_withholdings_180': {
+      const curData = store.getData();
+      const commercialProps = (curData.properties || []).filter(p => p.usageType === 'commercial');
+      const totalCommercialRent = commercialProps.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
+      const expected19 = totalCommercialRent * 0.19;
+
+      store.update('capitalIncome', {
+        ...curData.capitalIncome,
+        realEstateWithholdings: expected19,
+      });
+      return { success: true, message: `S'han imputat ${formatCurrency(expected19)} de retencions a la Casella 0598 procedents del Model 180.` };
     }
 
     case 'fix_cap_7p_exemption': {

@@ -116,6 +116,8 @@ export interface PersonalData {
   descendants: Descendant[];
   ascendants: Ascendant[];
   community: string; // Autonomous community code (CAT per defecte)
+  autonomousCommunity?: string; // Codi normalitzat CCAA (madrid, catalunya, andalucia, etc.)
+  fiscalYear?: number;
   taxDeclarationType?: 'individual' | 'joint' | 'single_parent'; // Tipus de tributació
 }
 
@@ -198,6 +200,7 @@ export interface ActivitiesData {
   withholdings: number;
   socialSecuritySelfEmployed: number;
   estimationType: 'direct_simplified' | 'direct_normal';
+  iae?: string; // Codi d'epígraf IAE (ex: 763, 511, 722)
 }
 
 /** Guanys i pèrdues patrimonials */

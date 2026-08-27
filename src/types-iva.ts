@@ -211,6 +211,17 @@ export interface Model303QuarterResult {
   paymentType: 'ingressar' | 'compensar' | 'tornar' | 'zero';
 }
 
+/** Auditoria comparativa entre Prorrata General i Especial (Art. 103 LIVA) */
+export interface ProrrataComparisonAudit {
+  generalDeductionAmount: number;
+  specialDeductionAmount: number;
+  differenceAmount: number;
+  divergencePercentage: number; // ((General - Especial) / Especial) * 100
+  isSpecialProrrataMandatoryByLaw: boolean; // True si > 10% per mandat de l'Art. 103.Dos.1r LIVA
+  recommendedRegime: 'general' | 'special';
+  warningMessage?: string;
+}
+
 /** Resum Anual del Model 390 */
 export interface Model390AnnualSummary {
   year: number;
@@ -225,6 +236,7 @@ export interface Model390AnnualSummary {
   definitiveProrrata: number;
   totalAnnualResult: number;
   accumulatedPendingCarryover: number;
+  prorrataComparison?: ProrrataComparisonAudit;
   quartersReconciliation: {
     sumOfQuarterDevengado: number;
     sumOfQuarterDeducible: number;

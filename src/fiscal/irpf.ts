@@ -8,7 +8,6 @@
 import type { DeclaracionData, FiscalResult, GainItem } from '../types.ts';
 import {
   STATE_GENERAL_TAX_BRACKETS,
-  CATALAN_GENERAL_TAX_BRACKETS,
   STATE_SAVINGS_TAX_BRACKETS,
   AUTONOMIC_SAVINGS_TAX_BRACKETS,
   PERSONAL_MINIMUM,
@@ -33,6 +32,7 @@ import {
   SIMPLIFIED_EXPENSES_MAX,
   type TaxBracket,
 } from './constants.ts';
+import { getAutonomicBrackets } from './autonomic-tax-scales.ts';
 import { computeDeductions } from './deductions.ts';
 import { computeCatalanDeductions } from './deductions-cat.ts';
 import { calculateAllProperties } from './real-estate-engine.ts';
@@ -368,8 +368,9 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   const minimums = computeMinimums(data);
 
   // 5. Tax calculation (State + Autonomic)
+  const autonomicBrackets = getAutonomicBrackets(data.personal?.autonomousCommunity || 'catalunya');
   const stateGeneralTax = applyBrackets(liquidableGeneralBase, STATE_GENERAL_TAX_BRACKETS);
-  const autonomicGeneralTax = applyBrackets(liquidableGeneralBase, CATALAN_GENERAL_TAX_BRACKETS);
+  const autonomicGeneralTax = applyBrackets(liquidableGeneralBase, autonomicBrackets);
   const generalTax = stateGeneralTax + autonomicGeneralTax;
 
   const stateSavingsTax = applyBrackets(liquidableSavingsBase, STATE_SAVINGS_TAX_BRACKETS);
@@ -377,7 +378,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   const savingsTax = stateSavingsTax + autonomicSavingsTax;
 
   const stateMinimumTaxCredit = applyBrackets(minimums.totalMinimum, STATE_GENERAL_TAX_BRACKETS);
-  const autonomicMinimumTaxCredit = applyBrackets(minimums.totalMinimum, CATALAN_GENERAL_TAX_BRACKETS);
+  const autonomicMinimumTaxCredit = applyBrackets(minimums.totalMinimum, autonomicBrackets);
   const minimumTaxCredit = stateMinimumTaxCredit + autonomicMinimumTaxCredit;
 
   const grossTax = Math.max(0, generalTax + savingsTax - minimumTaxCredit);

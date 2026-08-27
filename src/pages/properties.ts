@@ -35,7 +35,9 @@ import { generateAEATAnnexA, generateAEATAmortizationBook, exportPropertiesInven
 import { lookupCadastreReference } from '../utils/cadastre-service.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
+import { Model115And180Engine } from '../fiscal/model115-180-engine.ts';
 import type { RentalProperty, PropertyInventoryItem, RentalReductionType, AssetDisposalReason } from '../types-properties.ts';
+import type { Model115LeaseInput } from '../types-quarterly.ts';
 
 export function renderProperties(): HTMLElement {
   const page = document.createElement('div');
@@ -264,6 +266,91 @@ export function renderProperties(): HTMLElement {
     </details>
   `;
   page.appendChild(coefBanner);
+
+  // Secció de Vinculació amb Models 115 i 180 (Retencions Arrendaments Comercials)
+  const commercialProps = properties.filter(p => p.usageType === 'commercial');
+  const totalCommercialRent = commercialProps.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
+  const expectedWithholdings19 = totalCommercialRent * 0.19;
+  const currentDeclaredWithholding = data.capitalIncome?.realEstateWithholdings || 0;
+
+  const withholdingsSection = document.createElement('div');
+  withholdingsSection.className = 'card';
+  withholdingsSection.style.marginBottom = 'var(--space-xl)';
+  withholdingsSection.style.border = '1px solid var(--color-warning-border, rgba(245, 158, 11, 0.3))';
+  withholdingsSection.style.background = 'var(--bg-surface-elevated)';
+
+  withholdingsSection.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
+      <div>
+        <div style="display: flex; align-items: center; gap: var(--space-sm);">
+          <span style="font-size: 1.3rem;">🏢</span>
+          <h3 style="margin: 0; font-size: 1rem; color: var(--color-warning, #f59e0b);">
+            Control de Retencions d'Arrendaments Comercials (Models 115 / 180 AEAT)
+          </h3>
+          <span class="badge ${commercialProps.length > 0 ? 'badge--warning' : 'badge--neutral'}">
+            ${commercialProps.length} Immobles Comercials / Locals
+          </span>
+        </div>
+        <p style="margin: var(--space-xs) 0 0 0; font-size: var(--text-xs); color: var(--text-muted); max-width: 750px;">
+          Els llogaters de locals i oficines estan obligats a ingressar el <strong>19% de retenció</strong> mitjançant el <strong>Model 115 (trimestral)</strong> i el <strong>Model 180 (resum anual)</strong>. Aquestes retencions s'imputen directament a favor teu a la <strong>Casella 0598 de la Renda</strong>.
+        </p>
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--space-lg);">
+        <div style="text-align: right;">
+          <div style="font-size: var(--text-xs); color: var(--text-muted);">Retenció Teòrica 19% (${commercialProps.length} locals):</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--color-warning, #f59e0b);">${formatCurrency(expectedWithholdings19)}</div>
+          <div style="font-size: 0.75rem; color: ${Math.abs(expectedWithholdings19 - currentDeclaredWithholding) < 0.01 ? 'var(--color-success)' : 'var(--color-error)'};">
+            ${Math.abs(expectedWithholdings19 - currentDeclaredWithholding) < 0.01 ? '✓ Sincronitzat a Casella 0598' : `⚠️ Desquadrament: ${formatCurrency(currentDeclaredWithholding)} declarat`}
+          </div>
+        </div>
+        <button class="btn btn--secondary btn--sm" id="sync-withholdings-btn" style="white-space: nowrap;">
+          ⚡ Sincronitzar amb Models 115/180 i Casella 0598
+        </button>
+      </div>
+    </div>
+  `;
+
+  withholdingsSection.querySelector('#sync-withholdings-btn')?.addEventListener('click', () => {
+    // 1. Sincronitzem a capitalIncome.realEstateWithholdings
+    const updatedData = store.getData();
+    store.update('capitalIncome', {
+      ...updatedData.capitalIncome,
+      realEstateWithholdings: expectedWithholdings19,
+    });
+
+    // 2. Generem/Actualitzem la conciliació als models trimestrals
+    const leaseInputs: Model115LeaseInput[] = commercialProps.map((p, idx) => ({
+      id: p.id || `commercial_lease_${idx}`,
+      landlordNif: updatedData.personal?.nif || 'B12345678',
+      landlordName: updatedData.personal?.name || 'Propietari Arrendador',
+      cadastralReference: p.cadastralReference || '00000000000000000000',
+      address: p.address || 'Local Comercial 1',
+      postalCode: '08001',
+      municipality: 'Barcelona',
+      provinceCode: '08',
+      propertySituation: '1',
+      monthlyRent: (p.grossRentalIncome || 0) / 12,
+      withholdingRate: 0.19,
+      isExempt: false,
+    }));
+
+    const mod115_quarters = Model115And180Engine.calculateModel115AllQuarters(updatedData.year || 2024, leaseInputs);
+    const mod180_annual = Model115And180Engine.generateModel180Annual(updatedData.year || 2024, leaseInputs, mod115_quarters);
+
+    store.update('quarterlyTaxes', {
+      ...(updatedData.quarterlyTaxes || { mod130: [], mod111: [] }),
+      mod115: mod115_quarters,
+      mod180: mod180_annual,
+    });
+
+    showToast(`S'han sincronitzat ${formatCurrency(expectedWithholdings19)} de retencions a la Casella 0598 i generat el Model 180`, 'success');
+    
+    // Re-render
+    const newPage = renderProperties();
+    page.replaceWith(newPage);
+  });
+
+  page.appendChild(withholdingsSection);
 
   // Llista d'Immobles
   const listContainer = document.createElement('div');

@@ -190,6 +190,9 @@ export interface PropertyFiscalResult {
   // Imputació de rendes si és ús mixt (Art. 85 LIRPF)
   imputedIncomeForOwnUse: number;       // Imputació proporcional als dies d'ús propi
 
+  // Retencions practicades pel llogater (Model 115 / Model 180 - Casella 0597)
+  withholding19?: number;
+
   // Mètriques financeres calculades
   metrics?: PropertyFinancialMetrics;
 }

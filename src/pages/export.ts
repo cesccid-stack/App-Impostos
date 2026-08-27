@@ -9,6 +9,7 @@ import { calculateAllProperties } from '../fiscal/real-estate-engine.ts';
 import { showToast } from '../components/toast.ts';
 import { generateCSV } from '../utils/export-csv.ts';
 import { generateAEATAnnexF2, generateAEATAnnexA } from '../utils/aeat-export.ts';
+import { generateTaxDefenseDossier } from '../fiscal/audit-dossier-generator.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
 
 export function renderExport(): HTMLElement {
@@ -24,6 +25,25 @@ export function renderExport(): HTMLElement {
 
   const grid = document.createElement('div');
   grid.className = 'export-grid stagger';
+
+  // Dossier de Defensa Tributària davant Requeriments AEAT
+  const defenseDossierCard = createExportCard({
+    icon: '🛡️',
+    title: 'Dossier de Defensa AEAT (Art. 34 LGT)',
+    description: 'Genera l\'informe d\'acreditació jurídica casella a casella amb la referència legal (LIRPF/DGT), inventari de justificants requerits i data de prescripció de 4 anys.',
+    onClick: () => {
+      try {
+        const data = store.getData();
+        const dossier = generateTaxDefenseDossier(data);
+        const json = JSON.stringify(dossier, null, 2);
+        downloadFile(json, `dossier_defensa_aeat_${dossier.taxpayerNif}_${data.year}.json`, 'application/json');
+        showToast('Dossier de Defensa Tributària descarregat correctament', 'success');
+      } catch (e) {
+        showToast('Error en generar el Dossier de Defensa', 'error');
+      }
+    },
+  });
+  grid.appendChild(defenseDossierCard);
 
   // Renta Web Guide
   const rentaWebCard = createExportCard({
@@ -313,8 +333,20 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
   }
 
   guide += `\n=== RETENCIONS I PAGAMENTS A COMPTE ===\n`;
-  guide += `[Casilla 0596] Retencions del treball: ${totalWithholdings.toFixed(2)} €\n`;
-  if (data.capitalIncome.mobiliaryWithholdings > 0) guide += `[Casilla 0597] Retencions de capital mobiliari: ${data.capitalIncome.mobiliaryWithholdings.toFixed(2)} €\n`;
+  guide += `[Casilla 0596] Retencions del treball (Model 190): ${totalWithholdings.toFixed(2)} €\n`;
+  if (data.capitalIncome.mobiliaryWithholdings > 0) {
+    guide += `[Casilla 0597] Retencions del capital mobiliari (Dividends/Interessos - Model 193/196): ${data.capitalIncome.mobiliaryWithholdings.toFixed(2)} €\n`;
+  }
+  if (data.capitalIncome.realEstateWithholdings > 0) {
+    guide += `[Casilla 0598] Retencions sobre arrendaments d'immobles urbans (Lloguers comercials / Model 180): ${data.capitalIncome.realEstateWithholdings.toFixed(2)} €\n`;
+  }
+  if (data.activities?.withholdings > 0) {
+    guide += `[Casilla 0599] Retencions d'activitats econòmiques (Model 111/190): ${data.activities.withholdings.toFixed(2)} €\n`;
+  }
+  const sum130 = (data.quarterlyTaxes?.mod130 || []).reduce((s, q) => s + (q.netTax > 0 ? q.netTax : 0), 0);
+  if (sum130 > 0) {
+    guide += `[Casilla 0600] Pagaments fraccionats d'activitats econòmiques (Model 130 1T-4T): ${sum130.toFixed(2)} €\n`;
+  }
   
   guide += `\n=== DEDUCCIONS AUTONÒMIQUES (CATALUNYA) ===\n`;
   if (data.deductions.catalanRentalDeduction) {

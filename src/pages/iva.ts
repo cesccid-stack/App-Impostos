@@ -1151,6 +1151,33 @@ export function renderIVA(): HTMLElement {
             </div>
           </div>
         </div>
+
+        <!-- Comparativa de Prorrata General vs Especial (Art. 103 LIVA) -->
+        ${model390.prorrataComparison ? `
+          <div style="background:var(--bg-surface-elevated); border:1px solid ${model390.prorrataComparison.isSpecialProrrataMandatoryByLaw ? 'var(--color-error)' : 'var(--border-default)'}; border-radius:var(--radius-md); padding:var(--space-md); margin-bottom:var(--space-lg);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); margin-bottom:var(--space-sm);">
+              <div style="font-weight:700; font-size:var(--text-sm); display:flex; align-items:center; gap:6px;">
+                <span>⚖️ Blindatge de Prorrata: General vs Especial (Art. 103.Dos.1r LIVA)</span>
+              </div>
+              <span class="badge ${model390.prorrataComparison.isSpecialProrrataMandatoryByLaw ? 'badge--error' : 'badge--success'}">
+                ${model390.prorrataComparison.isSpecialProrrataMandatoryByLaw ? '⚠️ Prorrata Especial OBLIGATÒRIA (>10%)' : '✓ Modalitat Correcta'}
+              </span>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:var(--space-sm); font-size:var(--text-xs); margin-bottom:var(--space-xs);">
+              <div>Deducció Prorrata General: <strong>${formatCurrency(model390.prorrataComparison.generalDeductionAmount)}</strong></div>
+              <div>Deducció Prorrata Especial: <strong>${formatCurrency(model390.prorrataComparison.specialDeductionAmount)}</strong></div>
+              <div>Desviació: <strong class="${model390.prorrataComparison.isSpecialProrrataMandatoryByLaw ? 'text-error' : 'text-primary'}">${model390.prorrataComparison.divergencePercentage}%</strong></div>
+              <div>Règim Recomanat: <strong>${model390.prorrataComparison.recommendedRegime === 'special' ? 'Prorrata Especial' : 'Prorrata General'}</strong></div>
+            </div>
+
+            ${model390.prorrataComparison.warningMessage ? `
+              <div style="margin-top:var(--space-xs); padding:var(--space-xs) var(--space-sm); background:rgba(239, 68, 68, 0.1); border-left:3px solid var(--color-error); font-size:var(--text-xs); color:var(--color-error); border-radius:4px;">
+                ${model390.prorrataComparison.warningMessage}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
       </div>
 
       <!-- Targeta Model 349 -->

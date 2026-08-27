@@ -20,6 +20,7 @@ import { getStatusMeta } from '../fiscal/user-presets.ts';
 import { openCommandPalette } from '../components/command-palette.ts';
 import { openToolManagerModal } from '../components/tool-manager-modal.ts';
 import { ALL_APP_MODULES } from '../fiscal/modules-catalog.ts';
+import { checkTaxPrescription } from '../fiscal/tax-prescription-engine.ts';
 import type { DeclaracionData, FiscalResult, UserProfile } from '../types.ts';
 
 interface DashboardContext {
@@ -452,6 +453,44 @@ export function renderDashboard(): HTMLElement {
           </div>
         </div>
 
+      </div>
+
+      <!-- Blindatge Tributari & Radar de Prescripció de 4 Anys (Art. 66 a 70 LGT) -->
+      <div class="card" style="margin-bottom:var(--space-xl); border:1px solid var(--border-default); background:var(--bg-surface-elevated);">
+        <div class="card__header" style="margin-bottom:var(--space-md);">
+          <div class="card__title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-xs);">
+            <div style="display:flex; align-items:center; gap:var(--space-xs);">
+              <span>⏳</span>
+              <span>Blindatge Tributari & Radar de Prescripció (Art. 66 a 70 LGT)</span>
+            </div>
+            <span class="badge badge--primary">Termini Legal: 4 Anys</span>
+          </div>
+          <p class="card__subtitle" style="margin:0;">
+            El dret de l'Administració per determinar el deute tributari i imposar sancions prescriu als <strong>4 anys</strong> comptats des de l'endemà de la fi del termini reglamentari de presentació.
+          </p>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:var(--space-sm);">
+          ${[ctx.currentYear, ctx.currentYear - 1, ctx.currentYear - 2, ctx.currentYear - 3, ctx.currentYear - 4].map(yr => {
+            const irpfPresc = checkTaxPrescription(yr, 'IRPF');
+            return `
+              <div style="padding:10px 12px; background:var(--bg-surface); border-radius:var(--radius-md); border:1px solid ${irpfPresc.isPrescribed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'};">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-weight:700; font-size:var(--text-sm);">Exercici ${yr}</span>
+                  <span class="badge ${irpfPresc.isPrescribed ? 'badge--success' : 'badge--warning'}" style="font-size:0.65rem;">
+                    ${irpfPresc.isPrescribed ? '🛡️ Prescrit' : '🔎 Obert'}
+                  </span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-secondary);">
+                  ${irpfPresc.isPrescribed ? `Blindat des del ${irpfPresc.prescriptionDate}` : `Prescriu el <strong>${irpfPresc.prescriptionDate}</strong>`}
+                </div>
+                <div style="font-size:0.7rem; color:${irpfPresc.isPrescribed ? 'var(--color-success)' : 'var(--color-warning)'}; margin-top:2px; font-weight:600;">
+                  ${irpfPresc.isPrescribed ? 'Immunitat fiscal consolidada' : `Compte enrere: ${irpfPresc.daysRemaining} dies`}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
       </div>
 
       <!-- Checklist de Conformitat Oficial AEAT -->
