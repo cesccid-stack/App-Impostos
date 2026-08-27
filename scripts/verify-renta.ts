@@ -202,6 +202,8 @@ import { calculateProrrataComparison } from '../src/fiscal/iva-engine.ts';
 import { explainTaxReturn } from '../src/fiscal/tax-explainer-engine.ts';
 import { createTaxJourneyVisualizer } from '../src/components/tax-journey-visualizer.ts';
 import { createInternalBreakdownDashboards } from '../src/components/internal-breakdown-dashboards.ts';
+import { analyzePortfolioFinances, analyzePropertyFinances } from '../src/fiscal/real-estate-analytics-engine.ts';
+import { createRealEstateDashboard } from '../src/components/real-estate-dashboard.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -1896,6 +1898,98 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
     assert(dashboards !== null && dashboards !== undefined, 'El panell ha de retornar un element DOM');
     assert(dashboards.className.includes('internal-breakdowns-container'), 'Contenidor de quadres interns correcte');
     assert(dashboards.innerHTML.includes('Quadres Interns de Desglossament'), 'Títol de quadres interns present');
+  });
+});
+
+// ── 32. SUITE 32: QUADRE DE COMANDAMENT & RENDIBILITAT IMMOBILIÀRIA ─────────
+
+suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () => {
+
+  test('32.1 Mètriques financeres de rendibilitat, NOI, cash flow i escut fiscal 3%', () => {
+    const property = {
+      id: 'prop-test-1',
+      name: 'Àtic Rambla Catalunya',
+      cadastralReference: '99887766AB1234C0001XY',
+      address: 'Rambla Catalunya 50',
+      ownershipPercentage: 100,
+      usageType: 'habitual',
+      contractDate: '2023-01-01',
+      tenantNIFs: ['55555555Z'],
+      grossRentalIncome: 18000,
+      totalCadastralValue: 250000,
+      constructionCadastralValue: 150000,
+      acquisitionCost: 300000,
+      ibi: 900,
+      communityFees: 1200,
+      mortgageInterests: 2400,
+      repairExpenses: 600,
+      insurance: 400,
+      reductionType: 'general_50',
+    } as any;
+
+    const report = analyzePropertyFinances(property, 2024);
+
+    assert(report.propertyMetrics.grossIncome === 18000, 'Ingressos bruts 18.000 €');
+    assert(report.propertyMetrics.operatingExpenses === 3100, `OpEx 3.100 € (obtingut: ${report.propertyMetrics.operatingExpenses})`);
+    assert(report.propertyMetrics.netOperatingIncome === 14900, `NOI 14.900 € (obtingut: ${report.propertyMetrics.netOperatingIncome})`);
+    assert(report.propertyMetrics.grossYieldPercent === 6.0, `Yield Brut 6,0% (obtingut: ${report.propertyMetrics.grossYieldPercent}%)`);
+    assert(report.propertyMetrics.netYieldPercent > 4.5, `Yield Net > 4.5% (obtingut: ${report.propertyMetrics.netYieldPercent}%)`);
+    assert(report.propertyMetrics.totalAmortization === 5400, `Amortització 3% de 180.000 € = 5.400 € (obtingut: ${report.propertyMetrics.totalAmortization})`);
+    assert(report.propertyMetrics.taxShieldSavings > 1900, `Escut fiscal > 1.900 € (obtingut: ${report.propertyMetrics.taxShieldSavings})`);
+    assert(report.fiveYearProjection.length === 5, 'Projecció multianual a 5 anys generada');
+  });
+
+  test('32.2 Anàlisi de cartera global i rànquing d\'eficiència', () => {
+    const properties = [
+      {
+        id: 'p1',
+        name: 'Pis Eixample',
+        acquisitionCost: 200000,
+        grossRentalIncome: 14000,
+        totalCadastralValue: 120000,
+        constructionCadastralValue: 80000,
+        ibi: 500,
+        communityFees: 600,
+        repairExpenses: 200,
+        mortgageInterests: 1000,
+        insurance: 250,
+        usageType: 'habitual',
+        reductionType: 'general_50',
+      } as any,
+      {
+        id: 'p2',
+        name: 'Local Comercial Gràcia',
+        acquisitionCost: 150000,
+        grossRentalIncome: 15000,
+        totalCadastralValue: 100000,
+        constructionCadastralValue: 60000,
+        ibi: 600,
+        communityFees: 400,
+        repairExpenses: 300,
+        mortgageInterests: 0,
+        insurance: 300,
+        usageType: 'commercial',
+        reductionType: 'none',
+      } as any,
+    ];
+
+    const portfolio = analyzePortfolioFinances(properties, 2024);
+
+    assert(portfolio.totalProperties === 2, '2 immobles a la cartera');
+    assert(portfolio.totalGrossIncome === 29000, `Ingressos bruts totals 29.000 € (obtingut: ${portfolio.totalGrossIncome})`);
+    assert(portfolio.propertiesRanked.length === 2, '2 immobles al rànquing');
+    assert(portfolio.propertiesRanked[0].propertyId === 'p2', 'El local comercial té un yield superior');
+    assert(portfolio.portfolioFiveYearProjection.length === 5, 'Projecció agregada de cartera a 5 anys generada');
+  });
+
+  test('32.3 Renderització del component visual RealEstateDashboard', () => {
+    const properties = [
+      { id: 'p1', name: 'Pis Test', acquisitionCost: 200000, grossRentalIncome: 12000, totalCadastralValue: 100000, constructionCadastralValue: 70000, usageType: 'habitual' } as any
+    ];
+    const dashboard = createRealEstateDashboard(properties, 2024);
+    assert(dashboard !== null && dashboard !== undefined, 'El component ha de retornar un element DOM');
+    assert(dashboard.className.includes('real-estate-dashboard-container'), 'Classe del contenidor correcta');
+    assert(dashboard.innerHTML.includes('Quadre de Comandament de Rendibilitat'), 'Títol del quadre present');
   });
 });
 

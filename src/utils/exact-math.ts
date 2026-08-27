@@ -226,3 +226,12 @@ export function calculateInvoiceLineTaxExact(
     total,
   };
 }
+
+/**
+ * Arrodoneix un número amb N decimals segons el criteri estàndard.
+ */
+export function round2(val: number, decimals: number = 2): number {
+  if (!Number.isFinite(val) || Number.isNaN(val)) return 0;
+  const factor = Math.pow(10, decimals);
+  return Math.round(val * factor) / factor;
+}

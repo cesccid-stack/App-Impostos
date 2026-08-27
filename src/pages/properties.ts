@@ -35,6 +35,7 @@ import { generateAEATAnnexA, generateAEATAmortizationBook, exportPropertiesInven
 import { lookupCadastreReference } from '../utils/cadastre-service.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
+import { createRealEstateDashboard } from '../components/real-estate-dashboard.ts';
 import { Model115And180Engine } from '../fiscal/model115-180-engine.ts';
 import type { RentalProperty, PropertyInventoryItem, RentalReductionType, AssetDisposalReason } from '../types-properties.ts';
 import type { Model115LeaseInput } from '../types-quarterly.ts';
@@ -227,6 +228,9 @@ export function renderProperties(): HTMLElement {
     </div>
   `;
   page.appendChild(statsRow);
+
+  // Quadre de Comandament de Rendibilitat & Tendència (Global & Per Explotació)
+  page.appendChild(createRealEstateDashboard(properties, data.year || 2024));
 
   // Taula Informativa de Coeficients Màxims d'Amortització AEAT
   const coefBanner = document.createElement('div');
