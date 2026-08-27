@@ -131,6 +131,8 @@ export interface Ascendant {
   id: string;
   age: number;
   disability: number;
+  liveTogether?: boolean; // Convivència durant almenys la meitat de l'any (Art. 59 LIRPF)
+  annualIncome?: number;  // Rendes anuals de l'ascendent (màx 8.000 €)
 }
 
 export interface EmployerItem {

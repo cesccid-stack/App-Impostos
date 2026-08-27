@@ -271,6 +271,46 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     });
   }
 
+  // 1.8 Rendiments Irregulars del Treball (Art. 18.2 LIRPF - Sostre 300.000 €)
+  if ((work.irregularIncomeAmount || 0) > 300000) {
+    issues.push({
+      id: 'work-irregular-income-capped',
+      module: 'general',
+      severity: 'warning',
+      title: `Rendiment irregular (${formatCurrency(work.irregularIncomeAmount || 0)}) supera el sostre legal de 300.000 €`,
+      message: `La base sobre la qual s'aplica la reducció del 30% per rendiments generats en més de 2 anys està limitada a un màxim legal de 300.000 € anuals.`,
+      legalReference: 'Art. 18.2 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: false,
+    });
+  }
+
+  // 1.9 Exempció per Indemnització per Acomiadament (Art. 7.e LIRPF - Sostre 180.000 €)
+  if ((work.severancePay || 0) > 180000) {
+    issues.push({
+      id: 'work-severance-pay-exemption-capped',
+      module: 'general',
+      severity: 'critical',
+      title: `Indemnització per acomiadament (${formatCurrency(work.severancePay || 0)}) superior al límit exempt de 180.000 €`,
+      message: `L'exempció legal per acomiadament laboral està limitada a 180.000 €. L'excés de ${formatCurrency((work.severancePay || 0) - 180000)} ha de tributar obligatòriament a l'IRPF com a rendiment del treball.`,
+      legalReference: 'Art. 7.e de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: false,
+    });
+  }
+
+  // 1.10 Exempció de Dietes i Desplaçaments (> 0,26 €/km / Ordre HFP/792/2023)
+  const excessiveMileage = (work.employers || []).filter(e => (e.mileageKm || 0) > 0 && (e.mileageIncome || 0) > ((e.mileageKm || 0) * 0.26 + 1.0));
+  if (excessiveMileage.length > 0) {
+    issues.push({
+      id: 'work-mileage-allowance-excess',
+      module: 'general',
+      severity: 'info',
+      title: 'Compensació de quilometratge superior al límit reglamentari exempt (0,26 €/km)',
+      message: `L'import percebut en concepte de quilometratge supera el límit reglamentari de 0,26 €/km. L'excés no justificat amb despeses addicionals ha de tributar com a retribució ordinària.`,
+      legalReference: 'Art. 9.A.2 del Reglament de l\'IRPF (Ordre HFP/792/2023)',
+      autoFixable: false,
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 2: RENDIMENTS DEL CAPITAL MOBILIARI I INTERNACIONAL (ARTS. 25, 26, 80 LIRPF)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -660,6 +700,20 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     });
   }
 
+  // 6.5 Convivència de l'Ascendent amb el Contribuent (Art. 59 LIRPF)
+  const nonCohabitingAscendants = (personal.ascendants || []).filter(a => a.liveTogether === false);
+  if (nonCohabitingAscendants.length > 0) {
+    issues.push({
+      id: 'personal-ascendant-not-cohabiting',
+      module: 'general',
+      severity: 'critical',
+      title: `${nonCohabitingAscendants.length} ascendent(s) sense convivència reglamentària amb el contribuent`,
+      message: `L'Art. 59 LIRPF exigeix que els ascendents convisquin amb el contribuent almenys la meitat de l'exercici (o depenguin d'ell en centres residencials) per poder aplicar el mínim per ascendents.`,
+      legalReference: 'Art. 59 de la Llei de l\'IRPF (Llei 35/2006)',
+      autoFixable: false,
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 7: DEDUCCIONS ESTATALS I AUTONÒMIQUES DE CATALUNYA (LLEI 31/2002)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -785,6 +839,23 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
       autoFixLabel: 'Ajustar la base d\'eficiència energètica a 7.500 €',
       autoFixKey: 'fix_cap_energy_deduction',
     });
+  }
+
+  // 7.6 Sostre del 15% de la Base Liquidable en Deduccions per Donatius (Art. 69.1 LIRPF)
+  const totalDonationsAmount = (deductions.donations || []).reduce((s: number, d: any) => s + (d.amount || 0), 0);
+  if (totalDonationsAmount > 0 && data.workIncome) {
+    const approxBase = (data.workIncome.employers || []).reduce((s: number, e: any) => s + (e.grossSalary || 0), 0);
+    if (approxBase > 0 && totalDonationsAmount > (approxBase * 0.15)) {
+      issues.push({
+        id: 'ded-donations-15pct-base-cap',
+        module: 'general',
+        severity: 'info',
+        title: 'Deducció per donatius subjecta al límit del 15% de la base liquidable',
+        message: `La base de la deducció per donatius a ONGs i entitats sense ànim de lucre no pot superar el 15% de la base liquidable del contribuent. L'excés no genera dret a deducció en aquest exercici.`,
+        legalReference: 'Art. 69.1 de la Llei de l\'IRPF i Art. 19 Llei 49/2002',
+        autoFixable: false,
+      });
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

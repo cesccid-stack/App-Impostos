@@ -807,6 +807,44 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
     assert(incCapIssue !== undefined, 'Ha de detectar superació del límit de 20.000 € de renda a Catalunya');
   });
+
+  test('6.11 Detecció de sostre legal d\'acomiadament (> 180.000 €) i rendiments irregulars (> 300.000 €)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.severancePay = 250000;
+    data.workIncome.irregularIncomeAmount = 400000;
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const sevIssue = compliance.issues.find(i => i.id === 'work-severance-pay-exemption-capped');
+    const irregIssue = compliance.issues.find(i => i.id === 'work-irregular-income-capped');
+
+    assert(sevIssue !== undefined, 'Ha de detectar indemnització per acomiadament superior a 180.000 €');
+    assert(irregIssue !== undefined, 'Ha de detectar base de rendiments irregulars superior a 300.000 €');
+  });
+
+  test('6.12 Detecció de manca de convivència reglamentària amb l\'ascendent (Art. 59 LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.ascendants = [
+      { id: 'asc1', age: 72, disability: 0, liveTogether: false }
+    ];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const cohabIssue = compliance.issues.find(i => i.id === 'personal-ascendant-not-cohabiting');
+
+    assert(cohabIssue !== undefined, 'Ha de detectar ascendent que no conviu amb el contribuent');
+  });
+
+  test('6.13 Detecció de límit de donacions del 15% sobre la base liquidable (Art. 69.1 LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 20000, inKind: 0, withholdings: 3000, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.deductions.donations = [
+      { id: 'don1', entity: 'ONG Metges Sense Fronteres', amount: 5000, recurring: true, priority: true }
+    ];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const donCapIssue = compliance.issues.find(i => i.id === 'ded-donations-15pct-base-cap');
+
+    assert(donCapIssue !== undefined, 'Ha de detectar donacions superiors al 15% de la base');
+  });
 });
 
 // ── 7. SUITE 7: MOTOR D'IVA MODEL 303 & MODEL 390 ───────────────────────────
