@@ -6,6 +6,7 @@
 import { router } from './router.ts';
 import { createSidebar, createMobileHeader, createMobileOverlay } from './components/navbar.ts';
 import { initCommandPaletteShortcut } from './components/command-palette.ts';
+import { createLiveTaxHUD } from './components/live-tax-hud.ts';
 import type { Route } from './types.ts';
 
 /** All application routes configured with code-splitting dynamic imports */
@@ -257,6 +258,7 @@ function init(): void {
   app.appendChild(overlay);
   app.appendChild(sidebar);
   app.appendChild(main);
+  app.appendChild(createLiveTaxHUD());
 
   // Setup router
   router.setContainer(pageContainer);

@@ -10,6 +10,7 @@ import { showToast } from '../components/toast.ts';
 import { generateCSV } from '../utils/export-csv.ts';
 import { generateAEATAnnexF2, generateAEATAnnexA } from '../utils/aeat-export.ts';
 import { generateTaxDefenseDossier } from '../fiscal/audit-dossier-generator.ts';
+import { explainTaxReturn } from '../fiscal/tax-explainer-engine.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
 
 export function renderExport(): HTMLElement {
@@ -44,6 +45,26 @@ export function renderExport(): HTMLElement {
     },
   });
   grid.appendChild(defenseDossierCard);
+
+  // Informe Didàctic i Viatge Fiscal de la Renda
+  const explainerReportCard = createExportCard({
+    icon: '🧭',
+    title: 'Informe Didàctic & Viatge Fiscal (10 Passos)',
+    description: 'Descarrega l\'informe complet d\'explicació en llenguatge planer, desglossament de trams i cascada tributària per a clients o arxiu personal.',
+    onClick: () => {
+      try {
+        const data = store.getData();
+        const result = calculateIRPF(data);
+        const report = explainTaxReturn(data, result);
+        const json = JSON.stringify(report, null, 2);
+        downloadFile(json, `informe_didactic_renda_${data.year}.json`, 'application/json');
+        showToast('Informe didàctic descarregat correctament', 'success');
+      } catch (e) {
+        showToast('Error en generar l\'informe didàctic', 'error');
+      }
+    },
+  });
+  grid.appendChild(explainerReportCard);
 
   // Renta Web Guide
   const rentaWebCard = createExportCard({
