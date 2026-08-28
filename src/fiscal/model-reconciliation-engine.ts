@@ -1567,7 +1567,7 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
     inspectionRiskExplanation: "El rendiment net atribuït ha d'estar correctament reflectit.",
     canAutoReconcile: true,
     check: (data) => {
-      if ((data.activities?.estimationType as any) === 'objective_modules' && (data.activities.income || 0) < 0) {
+      if (data.activities?.estimationType === 'objective_modules' && (data.activities.income || 0) < 0) {
         return { isCompliant: false, expectedValue: 0, currentValue: data.activities.income, difference: Math.abs(data.activities.income), severity: 'critical' };
       }
       return { isCompliant: true };
@@ -2887,13 +2887,13 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
     inspectionRiskExplanation: "Auditoria automàtica de consistència fiscal i concordança documental per a la regla #122.",
     canAutoReconcile: true,
     check: (data) => {
-      if ((data.activities?.estimationType as any) === 'objective_modules' && (data.activities.income || 0) > 250000) {
+      if (data.activities?.estimationType === 'objective_modules' && (data.activities.income || 0) > 250000) {
         return { isCompliant: false, expectedValue: 250000, currentValue: data.activities.income, difference: data.activities.income - 250000, severity: 'critical' };
       }
       return { isCompliant: true };
     },
     reconcile: (data) => {
-      if ((data.activities?.estimationType as any) === 'objective_modules' && (data.activities.income || 0) > 250000) {
+      if (data.activities?.estimationType === 'objective_modules' && (data.activities.income || 0) > 250000) {
         data.activities.estimationType = 'direct_simplified';
       }
     },
@@ -3473,7 +3473,7 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
     inspectionRiskExplanation: "Auditoria automàtica de consistència fiscal i concordança documental per a la regla #151.",
     canAutoReconcile: true,
     check: (data) => {
-      if (data.iva?.config?.regime === 'criterio_caja' && (data.activities?.estimationType as any) === 'objective_modules') {
+      if (data.iva?.config?.regime === 'criterio_caja' && data.activities?.estimationType === 'objective_modules') {
         return { isCompliant: false, expectedValue: 0, currentValue: 1, difference: 1, severity: 'critical' };
       }
       return { isCompliant: true };
@@ -3489,7 +3489,7 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
     inspectionRiskExplanation: "Auditoria automàtica de consistència fiscal i concordança documental per a la regla #152.",
     canAutoReconcile: true,
     check: (data) => {
-      if ((data.activities?.estimationType as any) === 'objective_modules' && (data.activities.income || 0) < 0) {
+      if (data.activities?.estimationType === 'objective_modules' && (data.activities.income || 0) < 0) {
         return { isCompliant: false, expectedValue: 0, currentValue: data.activities.income, difference: Math.abs(data.activities.income), severity: 'critical' };
       }
       return { isCompliant: true };

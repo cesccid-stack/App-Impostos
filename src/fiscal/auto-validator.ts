@@ -13,7 +13,8 @@
  * 9. Gestió Patrimonial i Impost sobre el Patrimoni (Model 714 / Llei 19/1991).
  */
 
-import type { DeclaracionData } from '../types.ts';
+import type { DeclaracionData, DonationItem, EmployerItem } from '../types.ts';
+import type { FiscalQuarter, Model303QuarterResult } from '../types-iva.ts';
 import { calculateModel390Annual } from './iva-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { store } from '../store.ts';
@@ -55,7 +56,7 @@ const EU_COUNTRY_CODES = new Set([
 ]);
 
 /**
- * Valida l'estructura i algorisme oficial del NIF / NIE / CIF espanyol segons la normativa de l'AEAT.
+ * Valida l'estructura i algorisme oficial del NIF / NIE / CIF espanyol segons la normativa de l'AEAT (RD 1065/2007).
  */
 export function isValidSpanishTaxId(taxId: string): boolean {
   if (!taxId) return false;
@@ -82,7 +83,15 @@ export function isValidSpanishTaxId(taxId: string): boolean {
     return nieMatch[3] === expectedLetter;
   }
 
-  // 3. CIF (Lletra d'entitat + 7 dígits + dígit o lletra de control)
+  // 3. NIF especial per a persones físiques sense DNI/NIE (K: menors de 14, L: espanyols a l'estranger, M: no residents)
+  const klmMatch = clean.match(/^([KLM])(\d{7})([A-Z])$/);
+  if (klmMatch) {
+    const num = parseInt(klmMatch[2], 10);
+    const expectedLetter = controlLetters[num % 23];
+    return klmMatch[3] === expectedLetter;
+  }
+
+  // 4. CIF (Lletra d'entitat + 7 dígits + dígit o lletra de control segons tipologia)
   const cifMatch = clean.match(/^([ABCDEFGHJNPQRSUVW])(\d{7})([0-9A-J])$/);
   if (cifMatch) {
     const letter = cifMatch[1];
@@ -110,7 +119,7 @@ export function isValidSpanishTaxId(taxId: string): boolean {
     const expectedLetter = cifControlLetters[complement];
     const expectedDigit = complement.toString();
 
-    if (['P', 'Q', 'S', 'R', 'W'].includes(letter)) {
+    if (['P', 'Q', 'S', 'R', 'W', 'N'].includes(letter)) {
       return control === expectedLetter;
     }
     if (['A', 'B', 'E', 'H'].includes(letter)) {
@@ -151,14 +160,14 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
     issuedInvoices: [],
     receivedInvoices: [],
     investmentAssets: [],
-    quarters: {} as any,
+    quarters: {} as Record<FiscalQuarter, Model303QuarterResult>,
   };
 
   const act = data.activities || { income: 0, expenses: 0, withholdings: 0, socialSecuritySelfEmployed: 0, estimationType: 'direct_simplified' };
   const properties = data.properties || [];
   const work = data.workIncome || { employers: [], unionFees: 0, otherDeductible: 0, pensionContributions: 0 };
   const cap = data.capitalIncome || { interests: 0, dividends: 0, foreignDividends: 0, foreignTaxWithheld: 0, insuranceGains: 0, otherMobiliary: 0, mobiliaryWithholdings: 0, rentalIncome: 0, rentalExpenses: 0, imputedIncome: 0, realEstateWithholdings: 0 };
-  const deductions = data.deductions || {} as any;
+  const deductions = data.deductions;
   const gains = data.gains || { items: [], totalWithholdings: 0 };
   const personal = data.personal || { name: '', nif: '', age: 35, disability: 0, descendants: [], ascendants: [], community: 'CAT', taxDeclarationType: 'individual' };
 
@@ -842,9 +851,9 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
   }
 
   // 7.6 Sostre del 15% de la Base Liquidable en Deduccions per Donatius (Art. 69.1 LIRPF)
-  const totalDonationsAmount = (deductions.donations || []).reduce((s: number, d: any) => s + (d.amount || 0), 0);
+  const totalDonationsAmount = (deductions.donations || []).reduce((s: number, d: DonationItem) => s + (d.amount || 0), 0);
   if (totalDonationsAmount > 0 && data.workIncome) {
-    const approxBase = (data.workIncome.employers || []).reduce((s: number, e: any) => s + (e.grossSalary || 0), 0);
+    const approxBase = (data.workIncome.employers || []).reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0), 0);
     if (approxBase > 0 && totalDonationsAmount > (approxBase * 0.15)) {
       issues.push({
         id: 'ded-donations-15pct-base-cap',
@@ -965,7 +974,7 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
   const intraEuWithoutVies = [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].filter(i => {
     const isIntra = i.category === 'intra_eu_delivery' || i.category === 'intra_eu_acquisition';
     if (!isIntra) return false;
-    const nif = ('clientNif' in i ? i.clientNif : (i as any).supplierNif) || '';
+    const nif = ('clientNif' in i ? i.clientNif : i.supplierNif) || '';
     const prefix = nif.trim().substring(0, 2).toUpperCase();
     return !EU_COUNTRY_CODES.has(prefix);
   });
@@ -1181,8 +1190,8 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
   // 8.17 Llindar d'Operacions amb Terceres Persones (> 3.005,06 € - Model 347)
   const nifTotals = new Map<string, { name: string; total: number }>();
   [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].forEach(i => {
-    const nif = ('clientNif' in i ? i.clientNif : (i as any).supplierNif) || '';
-    const name = ('clientName' in i ? i.clientName : (i as any).supplierName) || '';
+    const nif = ('clientNif' in i ? i.clientNif : i.supplierNif) || '';
+    const name = ('clientName' in i ? i.clientName : i.supplierName) || '';
     if (nif) {
       const current = nifTotals.get(nif) || { name, total: 0 };
       current.total += (i.totalInvoice || 0);

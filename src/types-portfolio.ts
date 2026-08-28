@@ -6,13 +6,13 @@
 /** Moviment individual importat */
 export interface TradeRecord {
   id: string;
-  broker: 'ibkr' | 'degiro' | 'traderepublic' | 'revolut' | 'quantfury' | 'generic';
+  broker: 'ibkr' | 'degiro' | 'traderepublic' | 'revolut' | 'quantfury' | 'etoro' | 'scalable' | 'myinvestor' | 'binance' | 'coinbase' | 'generic';
   date: string;              // ISO date
   symbol: string;            // Ticker
   isin: string;              // Codi ISIN (Ex: US0378331005)
   name: string;              // Asset name
   type: 'buy' | 'sell';
-  assetClass: 'shares' | 'etf' | 'options' | 'futures' | 'cfd' | 'crypto' | 'warrants';
+  assetClass: 'shares' | 'funds' | 'etf' | 'options' | 'futures' | 'cfd' | 'crypto' | 'warrants';
   quantity: number;
   price: number;             // Preu per unitat
   currency: string;          // EUR, USD, GBP...

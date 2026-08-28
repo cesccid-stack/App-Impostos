@@ -62,7 +62,7 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
     container.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
-        activeMode = (target.dataset.mode as any) || 'portfolio';
+        activeMode = (target.dataset.mode === 'property' ? 'property' : 'portfolio');
         renderContent();
       });
     });

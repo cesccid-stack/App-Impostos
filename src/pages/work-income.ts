@@ -8,7 +8,7 @@ import { createField, createFormRow, createFormSection } from '../components/for
 import { showToast } from '../components/toast.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
-import { calculateEmployeeSalaryCost } from '../fiscal/social-security-engine.ts';
+import { calculateEmployeeSalaryCost, type EmployeeRegimeType } from '../fiscal/social-security-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import type { EmployerItem } from '../types.ts';
 
@@ -176,7 +176,7 @@ export function renderWorkIncome(): HTMLElement {
   const renderSalaryBreakdown = () => {
     const grossVal = parseFloat((salaryCard.querySelector('#calc-ss-gross') as HTMLInputElement)?.value) || 0;
     const irpfRate = parseFloat((salaryCard.querySelector('#calc-ss-irpf-rate') as HTMLInputElement)?.value) || 0;
-    const regime = ((salaryCard.querySelector('#calc-ss-contract') as HTMLSelectElement)?.value || 'private_indefinite') as any;
+    const regime = ((salaryCard.querySelector('#calc-ss-contract') as HTMLSelectElement)?.value || 'private_indefinite') as EmployeeRegimeType;
     const payments = parseInt((salaryCard.querySelector('#calc-ss-payments') as HTMLSelectElement)?.value || '12', 10) as 12 | 14;
 
     const breakdown = calculateEmployeeSalaryCost(grossVal, irpfRate, regime, data.year || 2024, payments);
@@ -363,10 +363,15 @@ function renderEmployersList(container: HTMLElement) {
     headerRow.appendChild(delBtn);
     row.appendChild(headerRow);
 
-    const updateEmployer = (field: keyof EmployerItem, val: string | number) => {
+    const updateEmployer = <K extends keyof EmployerItem>(field: K, val: EmployerItem[K] | string) => {
       const arr = [...store.getData().workIncome.employers];
-      const e = arr.find(e => e.id === emp.id)!;
-      (e as any)[field] = typeof val === 'string' ? val : (parseFloat(val as any) || 0);
+      const target = arr.find(e => e.id === emp.id);
+      if (!target) return;
+      if (field === 'name' || field === 'id') {
+        (target[field] as string) = String(val);
+      } else {
+        (target[field] as number) = typeof val === 'number' ? val : (parseFloat(String(val)) || 0);
+      }
       store.update('workIncome', { employers: arr });
     };
 

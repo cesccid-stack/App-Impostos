@@ -896,7 +896,7 @@ function openContractModal(property: RentalProperty, page: HTMLElement): void {
 
   function updateSimulation() {
     const curRent = parseFloat(rentInput.value) || 0;
-    const type = indexTypeSelect.value as any;
+    const type = (indexTypeSelect.value as 'ipc' | 'irav' | 'custom') || 'ipc';
     const customRate = parseFloat(rateInput.value) || 0;
     const result = calculateRentAdjustment(curRent, type, customRate, store.getData().year || 2024);
 
@@ -916,7 +916,7 @@ function openContractModal(property: RentalProperty, page: HTMLElement): void {
   modal.querySelector('#modal-save-contract-btn')?.addEventListener('click', () => {
     const curRent = parseFloat(rentInput.value) || 0;
     const customRate = parseFloat(rateInput.value) || 0;
-    const result = calculateRentAdjustment(curRent, indexTypeSelect.value as any, customRate, store.getData().year || 2024);
+    const result = calculateRentAdjustment(curRent, (indexTypeSelect.value as 'ipc' | 'irav' | 'custom') || 'ipc', customRate, store.getData().year || 2024);
 
     property.monthlyRent = result.newMonthlyRent;
     property.grossRentalIncome = Math.round(result.newMonthlyRent * 12);
@@ -1418,7 +1418,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     p.ownershipPercentage = parseFloat((modal.querySelector('#prop-own') as HTMLInputElement).value) || 100;
     p.cadastralReference = (modal.querySelector('#prop-cadastre') as HTMLInputElement).value.trim();
     p.address = (modal.querySelector('#prop-address') as HTMLInputElement).value.trim();
-    p.usageType = (modal.querySelector('#prop-usage') as HTMLSelectElement).value as any;
+    p.usageType = (modal.querySelector('#prop-usage') as HTMLSelectElement).value as RentalProperty['usageType'];
     p.tenantNIFs = (modal.querySelector('#prop-tenants') as HTMLInputElement).value.split(',').map(s => s.trim()).filter(Boolean);
     
     p.isMixedUsage = (modal.querySelector('#prop-is-mixed') as HTMLInputElement)?.checked || false;
@@ -1428,7 +1428,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
 
     p.grossRentalIncome = parseFloat((modal.querySelector('#prop-gross') as HTMLInputElement).value) || 0;
     p.otherIncomes = parseFloat((modal.querySelector('#prop-other-inc') as HTMLInputElement).value) || 0;
-    p.reductionType = (modal.querySelector('#prop-reduction') as HTMLSelectElement).value as any;
+    p.reductionType = (modal.querySelector('#prop-reduction') as HTMLSelectElement).value as RentalProperty['reductionType'];
 
     p.mortgageInterests = parseFloat((modal.querySelector('#prop-mortgage') as HTMLInputElement).value) || 0;
     p.repairExpenses = parseFloat((modal.querySelector('#prop-repairs') as HTMLInputElement).value) || 0;

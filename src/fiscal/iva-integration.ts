@@ -13,7 +13,8 @@ import type {
   IVAInvoiceReceived, 
   IVABienInversion, 
   FiscalQuarter,
-  Model303QuarterResult
+  Model303QuarterResult,
+  WithholdingRate
 } from '../types-iva.ts';
 import { calculateAllQuarters } from './iva-engine.ts';
 
@@ -67,7 +68,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
         taxableBase: base,
         vatRate: 21,
         vatAmount: vatAmount,
-        withholdingRate: effectiveWithhRate as any,
+        withholdingRate: effectiveWithhRate as WithholdingRate,
         withholdingAmount: withhAmount,
         totalInvoice: base + vatAmount - withhAmount,
         category: 'activity_service',

@@ -27,7 +27,7 @@ export function renderImport(): HTMLElement {
   configCard.className = 'card';
   configCard.innerHTML = `<div class="card__header"><div class="card__title">1. Selecció de Bròker</div></div>`;
   
-  let selectedBroker = 'degiro';
+  let selectedBroker: TradeRecord['broker'] = 'degiro';
   let parsedTrades: TradeRecord[] = [];
   let fifoResult: { matches: FIFOMatch[], summaries: AssetSummary[] } | null = null;
 
@@ -44,7 +44,7 @@ export function renderImport(): HTMLElement {
       { value: 'quantfury', label: 'Quantfury (CSV)' },
       { value: 'generic', label: 'Genèric (Auto-detecció bàsica)' },
     ],
-    onChange: (val) => { selectedBroker = val; },
+    onChange: (val) => { selectedBroker = val as TradeRecord['broker']; },
   });
   configCard.appendChild(brokerSelect);
 
@@ -115,7 +115,7 @@ function resetDropZone(zone: HTMLElement, filename?: string) {
   }
 }
 
-async function processCSV(csv: string, broker: string): Promise<TradeRecord[]> {
+async function processCSV(csv: string, broker: TradeRecord['broker']): Promise<TradeRecord[]> {
   if (broker === 'degiro') {
     try {
       const degiroTrades = await parseDegiro(csv);
@@ -126,7 +126,7 @@ async function processCSV(csv: string, broker: string): Promise<TradeRecord[]> {
   }
 
   // Universal smart auto-detection parser (handles IBKR, Trade Republic, Revolut, eToro, Binance, Coinbase, etc.)
-  return parseGeneric(csv, undefined, broker as any);
+  return parseGeneric(csv, undefined, broker);
 }
 
 function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], summaries: AssetSummary[] }) {

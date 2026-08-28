@@ -1,6 +1,6 @@
 import { store } from '../store.ts';
 import { InheritanceTaxEngine } from '../fiscal/inheritance-tax-engine.ts';
-import type { InheritanceDonationData } from '../types-patrimonial.ts';
+import type { InheritanceDonationData, AutonomousCommunity } from '../types-patrimonial.ts';
 
 export function renderInheritanceTax(): HTMLElement {
   const container = document.createElement('div');
@@ -82,7 +82,7 @@ export function renderInheritanceTax(): HTMLElement {
       const newSim: InheritanceDonationData = {
         type: 'inheritance',
         date: new Date().toISOString().split('T')[0],
-        community: data.personal.community as any || 'CAT',
+        community: (data.personal.community as AutonomousCommunity) || 'CAT',
         kinshipGroup: 'I',
         preExistingWealth: 150000,
         disabilityDegree: 0,

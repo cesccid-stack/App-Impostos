@@ -12,6 +12,7 @@ import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
 import { escapeHtml } from '../utils/dom.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
+import type { Model390AnnualSummary, Model303QuarterResult } from '../types-iva.ts';
 
 export interface CasellaItem {
   model: '100' | '303' | '714' | '720';
@@ -223,7 +224,7 @@ export function renderCasellesPage(): HTMLElement {
 
     page.querySelectorAll('.filter-pill[data-model]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        selectedModelFilter = btn.getAttribute('data-model') as any;
+        selectedModelFilter = (btn.getAttribute('data-model') as 'all' | '100' | '303' | '714') || 'all';
         render();
       });
     });
@@ -273,7 +274,7 @@ export function renderCasellesPage(): HTMLElement {
   return page;
 }
 
-function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSummary: any): CasellaItem[] {
+function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSummary: Model390AnnualSummary): CasellaItem[] {
   const workGross = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
   const workSS = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.socialSecurity || 0), 0);
   const workUnion = data.workIncome?.unionFees || 0;
@@ -350,7 +351,7 @@ function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSumma
     { model: '303', category: 'IVA Deduïble', boxNumber: '29', title: 'Quota deduïble en operacions interiors', legalBasis: 'Art. 92 LIVA', computedValue: ivaSummary.totalDeducible || 0, routePath: '/iva' },
     { model: '303', category: 'IVA Deduïble', boxNumber: '45', title: 'Total quotes suportades deduïbles', legalBasis: 'Art. 99 LIVA', computedValue: ivaSummary.totalDeducible || 0, routePath: '/iva' },
     { model: '303', category: 'Liquidació IVA', boxNumber: '46', title: 'Resultat del règim general (Meritat - Deduïble)', legalBasis: 'Art. 100 LIVA', computedValue: (ivaSummary.totalDevengado || 0) - (ivaSummary.totalDeducible || 0), routePath: '/iva' },
-    { model: '303', category: 'Liquidació IVA', boxNumber: '70', title: 'A deduir: Ingrés efectuat en autoliquidacions complementàries anteriors', legalBasis: 'Art. 70 M303', computedValue: (data.iva?.quarters ? Object.values(data.iva.quarters).reduce((s: number, q: any) => s + (q.previousResultIngressat || 0), 0) : 0), routePath: '/iva' },
+    { model: '303', category: 'Liquidació IVA', boxNumber: '70', title: 'A deduir: Ingrés efectuat en autoliquidacions complementàries anteriors', legalBasis: 'Art. 70 M303', computedValue: (data.iva?.quarters ? Object.values(data.iva.quarters).reduce((s: number, q: Model303QuarterResult) => s + (q.previousResultIngressat || 0), 0) : 0), routePath: '/iva' },
     { model: '303', category: 'Liquidació IVA', boxNumber: '71', title: 'Resultat final liquidació Model 303 / 390', legalBasis: 'Art. 167 LIVA', computedValue: ivaSummary.totalAnnualResult || 0, routePath: '/iva' },
 
     // ── Model 714: Impost sobre el Patrimoni ────────────────────

@@ -1,6 +1,6 @@
 import { store } from '../store.ts';
 import { ITPAndAJDEngine } from '../fiscal/itp-plusvalia-engine.ts';
-import type { ITPAndAJDData, MunicipalPlusvaliaData } from '../types-patrimonial.ts';
+import type { ITPAndAJDData, MunicipalPlusvaliaData, AutonomousCommunity } from '../types-patrimonial.ts';
 
 export function renderRealEstateTaxes(): HTMLElement {
   const container = document.createElement('div');
@@ -103,7 +103,7 @@ export function renderRealEstateTaxes(): HTMLElement {
       const simITP: ITPAndAJDData = {
         operationType: 'TPO',
         date: new Date().toISOString().split('T')[0],
-        community: data.personal.community as any || 'CAT',
+        community: (data.personal.community as AutonomousCommunity) || 'CAT',
         propertyValue: 200000,
         isPrimaryResidence: false,
         buyerAge: 35,

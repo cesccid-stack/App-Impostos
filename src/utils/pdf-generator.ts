@@ -9,6 +9,12 @@ import type { DeclaracionData, FiscalResult } from '../types.ts';
 import { calculatePropertyFiscalResult } from '../fiscal/real-estate-engine.ts';
 import { formatCurrency } from './currency.ts';
 
+interface AutoTableJsPDF extends jsPDF {
+  lastAutoTable: {
+    finalY: number;
+  };
+}
+
 /**
  * Genera i descarrega el document oficial PDF de la Declaració de la Renda (Model 100).
  */
@@ -17,7 +23,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
-  });
+  }) as AutoTableJsPDF;
 
   const year = data.year || 2024;
   const primaryColor: [number, number, number] = [99, 102, 241];   // #6366f1
@@ -56,7 +62,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
   });
 
   // Bases i Quotes
-  const lastY = (doc as any).lastAutoTable.finalY + 6;
+  const lastY = doc.lastAutoTable.finalY + 6;
 
   autoTable(doc, {
     startY: lastY,
@@ -80,7 +86,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
   });
 
   // Resultat Final Banner
-  const resultY = (doc as any).lastAutoTable.finalY + 8;
+  const resultY = doc.lastAutoTable.finalY + 8;
   const isRefund = result.result < 0;
   const isComp = !!data.complementary?.isComplementary;
 
@@ -140,7 +146,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
   });
 
   // Capital Mobiliari & Estranger
-  const capY = (doc as any).lastAutoTable.finalY + 8;
+  const capY = doc.lastAutoTable.finalY + 8;
   autoTable(doc, {
     startY: capY,
     head: [['Rendiments del Capital Mobiliari', 'Import Brut (€)', 'Retenció / Impost Estranger (€)', 'Casella AEAT']],
@@ -184,7 +190,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
   });
 
   // Detall d'Actius d'Inventari
-  const allInventoryItems: any[] = [];
+  const allInventoryItems: string[][] = [];
   (data.properties || []).forEach(p => {
     (p.inventory || []).forEach(inv => {
       allInventoryItems.push([
@@ -199,7 +205,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
     });
   });
 
-  const invY = (doc as any).lastAutoTable.finalY + 8;
+  const invY = doc.lastAutoTable.finalY + 8;
   doc.setFontSize(11);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.text("Llibre Registre d'Actius i Béns d'Inversió (Taula Simplificada AEAT):", 14, invY);
@@ -242,7 +248,7 @@ export function generateModel100PDF(data: DeclaracionData, result: FiscalResult)
   });
 
   // Deduccions Catalunya
-  const catDeducY = (doc as any).lastAutoTable.finalY + 8;
+  const catDeducY = doc.lastAutoTable.finalY + 8;
   doc.setFontSize(11);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.text("Deduccions Autonòmiques de la Comunitat Autònoma de Catalunya:", 14, catDeducY);

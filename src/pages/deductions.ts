@@ -15,7 +15,7 @@ import { showToast } from '../components/toast.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
-import type { DonationItem } from '../types.ts';
+import type { DonationItem, DeductionsData } from '../types.ts';
 
 export function renderDeductions(): HTMLElement {
   const page = document.createElement('div');
@@ -133,7 +133,7 @@ export function renderDeductions(): HTMLElement {
           { value: 'single_parent', label: 'Família monoparental (límit 600€)' },
         ],
         onChange: (val) => {
-          store.update('deductions', { catalanRentalSituation: val as any });
+          store.update('deductions', { catalanRentalSituation: val as DeductionsData['catalanRentalSituation'] });
         },
       }),
     )
@@ -341,7 +341,7 @@ export function renderDeductions(): HTMLElement {
           { value: 'building_rehab_60', label: '60% - Obres de rehabilitació energètica d\'edifici residencial (màx 5.000€/any)' },
         ],
         onChange: (val) => {
-          store.update('deductions', { energyEfficiencyType: val as any });
+          store.update('deductions', { energyEfficiencyType: val as DeductionsData['energyEfficiencyType'] });
         },
       }),
       createField({

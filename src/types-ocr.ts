@@ -3,13 +3,15 @@
  * Tipus per a l'ingesta intel·ligent (OCR i Data Entry)
  */
 
+import type { IVAInvoiceIssued, IVAInvoiceReceived } from './types-iva.ts';
+
 export interface OCRDocument {
   id: string;
   filename: string;
   uploadDate: string;
   status: 'pending' | 'processing' | 'processed' | 'error';
   documentType?: 'invoice_received' | 'invoice_issued' | 'ticket' | 'payroll' | 'other';
-  extractedData?: any;
+  extractedData?: IVAInvoiceReceived | IVAInvoiceIssued | Record<string, unknown> | null;
   confidenceScore?: number; // 0.0 to 1.0
   errorMessage?: string;
 }

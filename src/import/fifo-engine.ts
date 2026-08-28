@@ -194,7 +194,7 @@ export function matchesToGainItems(matches: FIFOMatch[]): GainItem[] {
   return matches.map(match => {
     let type: GainItem['type'] = 'shares';
     const c = match.sellTrade.assetClass;
-    if (c === 'etf' || (c as any) === 'funds') type = 'funds';
+    if (c === 'etf' || c === 'funds') type = 'funds';
     else if (c === 'crypto') type = 'crypto';
     else if (c === 'options' || c === 'futures' || c === 'cfd' || c === 'warrants') type = 'other';
 

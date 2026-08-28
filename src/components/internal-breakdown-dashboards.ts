@@ -75,7 +75,7 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
     container.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
-        activeTab = (target.dataset.tab as any) || 'immobles';
+        activeTab = (target.dataset.tab as typeof activeTab) || 'immobles';
         renderContent();
       });
     });
@@ -299,7 +299,7 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
 
   // ── 4. QUADRE DE DEDUCCIONS AUTONÒMIQUES DE CATALUNYA ─────────────────────
   function renderCatalanDeductionsBreakdown(d: DeclaracionData, r: FiscalResult): string {
-    const ded = d.deductions || {} as any;
+    const ded = d.deductions;
 
     return `
       <div>

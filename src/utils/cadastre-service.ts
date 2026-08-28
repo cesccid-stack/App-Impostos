@@ -16,7 +16,7 @@ export interface CadastreLookupResult {
   cadastralValueEstimated?: number;
   constructionValueEstimated?: number;
   constructionRatioEstimated?: number;
-  rawResponse?: any;
+  rawResponse?: Record<string, unknown>;
   error?: string;
 }
 

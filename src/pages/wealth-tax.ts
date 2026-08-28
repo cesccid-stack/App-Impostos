@@ -9,7 +9,7 @@ import { calculateIRPF } from '../fiscal/irpf.ts';
 import { calculateWealthTax, type WealthTaxData, type WealthAssetItem, type WealthDebtItem } from '../fiscal/wealth-tax-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
-import type { DeclaracionData } from '../types.ts';
+import type { DeclaracionData, GainItem, RentalProperty } from '../types.ts';
 
 export function renderWealthTax(): HTMLElement {
   const page = document.createElement('div');
@@ -253,7 +253,7 @@ function initializeWealthFromIRPF(data: DeclaracionData): WealthTaxData {
     });
   });
 
-  const totalGainsValue = (data.gains?.items || []).reduce((s: number, i: any) => s + (i.transferValue || i.acquisitionValue || 0), 0);
+  const totalGainsValue = (data.gains?.items || []).reduce((s: number, i: GainItem) => s + (i.transferValue || i.acquisitionValue || 0), 0);
   if (totalGainsValue > 0) {
     autoAssets.push({
       id: 'shares-auto',
@@ -264,12 +264,12 @@ function initializeWealthFromIRPF(data: DeclaracionData): WealthTaxData {
   }
 
   const autoDebts: WealthDebtItem[] = [];
-  (data.properties || []).forEach((p: any, idx: number) => {
-    if (p.mortgageInterests > 0) {
+  (data.properties || []).forEach((p: RentalProperty, idx: number) => {
+    if ((p.mortgageInterests || 0) > 0) {
       autoDebts.push({
         id: `debt-prop-${idx}`,
         description: `Hipoteca restant ${p.name || 'Immoble'}`,
-        amount: p.mortgageInterests * 20,
+        amount: (p.mortgageInterests || 0) * 20,
       });
     }
   });

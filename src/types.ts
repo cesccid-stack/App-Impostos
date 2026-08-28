@@ -3,6 +3,7 @@
  * Core TypeScript interfaces for the Declaració de la Renda application.
  */
 
+export type { RentalProperty } from './types-properties.ts';
 import type { RentalProperty } from './types-properties.ts';
 import type { IVAData } from './types-iva.ts';
 import type { WealthTaxData } from './fiscal/wealth-tax-engine.ts';
@@ -201,7 +202,7 @@ export interface ActivitiesData {
   expenses: number;
   withholdings: number;
   socialSecuritySelfEmployed: number;
-  estimationType: 'direct_simplified' | 'direct_normal';
+  estimationType: 'direct_simplified' | 'direct_normal' | 'objective_modules';
   iae?: string; // Codi d'epígraf IAE (ex: 763, 511, 722)
 }
 

@@ -22,7 +22,7 @@ import { openToolManagerModal } from '../components/tool-manager-modal.ts';
 import { ALL_APP_MODULES } from '../fiscal/modules-catalog.ts';
 import { checkTaxPrescription } from '../fiscal/tax-prescription-engine.ts';
 import { createTaxJourneyVisualizer } from '../components/tax-journey-visualizer.ts';
-import type { DeclaracionData, FiscalResult, UserProfile } from '../types.ts';
+import type { DeclaracionData, FiscalResult, UserProfile, EmployerItem } from '../types.ts';
 
 interface DashboardContext {
   data: DeclaracionData;
@@ -317,10 +317,10 @@ export function renderDashboard(): HTMLElement {
               <span class="badge badge--primary">${(data.workIncome?.employers || []).length} pagadors</span>
             </div>
             <div style="font-size:1.5rem; font-weight:800; color:var(--text-primary);">
-              ${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: any) => s + (e.grossSalary || 0), 0) || 0)}
+              ${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0), 0) || 0)}
             </div>
             <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
-              Retencions IRPF: ${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: any) => s + (e.withholdings || 0), 0) || 0)} | SS: -${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: any) => s + (e.socialSecurity || 0), 0) || 0)}
+              Retencions IRPF: ${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: EmployerItem) => s + (e.withholdings || 0), 0) || 0)} | SS: -${formatCurrency(data.workIncome?.employers?.reduce((s: number, e: EmployerItem) => s + (e.socialSecurity || 0), 0) || 0)}
             </div>
           </div>
           <div style="margin-top:var(--space-sm); padding-top:var(--space-xs); border-top:1px dashed var(--border-default); font-size:0.75rem;">
@@ -852,13 +852,51 @@ export function renderDashboard(): HTMLElement {
     let consolidatedWithholdings = 0;
     let consolidatedResult = 0;
 
-    const profileSummaries = allProfiles.map((p) => {
+    interface ProfileSummaryItem {
+      profile: UserProfile;
+      gross: number;
+      netTax: number;
+      withholdings: number;
+      result: number;
+    }
+
+    const profileSummaries: ProfileSummaryItem[] = allProfiles.map((p) => {
       const pData = store.getProfileData(p.id, currentYear as FiscalYear);
       let res: FiscalResult;
       try {
         res = calculateIRPF(pData);
       } catch {
-        res = { result: 0, generalBase: 0, savingsBase: 0, netTax: 0, totalWithholdings: 0 } as any;
+        res = {
+          generalBase: 0,
+          savingsBase: 0,
+          workIncomeReduction: 0,
+          pensionReduction: 0,
+          totalReductions: 0,
+          liquidableGeneralBase: 0,
+          liquidableSavingsBase: 0,
+          personalMinimum: 0,
+          descendantsMinimum: 0,
+          ascendantsMinimum: 0,
+          totalMinimum: 0,
+          stateGeneralTax: 0,
+          stateSavingsTax: 0,
+          stateMinimumTaxCredit: 0,
+          autonomicGeneralTax: 0,
+          autonomicSavingsTax: 0,
+          autonomicMinimumTaxCredit: 0,
+          generalTax: 0,
+          savingsTax: 0,
+          minimumTaxCredit: 0,
+          grossTax: 0,
+          housingDeductionAmount: 0,
+          donationsDeductionAmount: 0,
+          maternityDeductionAmount: 0,
+          catalanDeductionsAmount: 0,
+          totalDeductions: 0,
+          netTax: 0,
+          totalWithholdings: 0,
+          result: 0,
+        };
       }
 
       const gross = (res.generalBase || 0) + (res.savingsBase || 0);
@@ -926,7 +964,7 @@ export function renderDashboard(): HTMLElement {
               </tr>
             </thead>
             <tbody>
-              ${profileSummaries.map((ps: any) => {
+              ${profileSummaries.map((ps: ProfileSummaryItem) => {
                 const isRef = ps.result < 0;
                 const isAct = ps.profile.id === store.getActiveProfileId();
                 return `

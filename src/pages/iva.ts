@@ -259,7 +259,7 @@ export function renderIVA(): HTMLElement {
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl);">
         ${QUARTERS.map(q => {
           const qr = quarters[q];
-          const dl = (IVA_FILING_DEADLINES as any)[q];
+          const dl = IVA_FILING_DEADLINES[q];
           const isPositive = qr.resultadoLiquidacion > 0;
           const isZero = qr.resultadoLiquidacion === 0;
 
@@ -618,7 +618,17 @@ export function renderIVA(): HTMLElement {
     const received = ivaData.receivedInvoices || [];
     const assets = ivaData.investmentAssets || [];
 
-    const filterQuarter = (invList: any[]) => {
+    const filterQuarter = <T extends {
+      quarter: FiscalQuarter;
+      hasAttachment?: boolean;
+      clientName?: string;
+      supplierName?: string;
+      description?: string;
+      invoiceNumber?: string;
+      concept?: string;
+      clientNif?: string;
+      supplierNif?: string;
+    }>(invList: T[]): T[] => {
       let filtered = invList;
       if (invoiceQuarterFilter !== 'ALL') {
         filtered = filtered.filter(i => i.quarter === invoiceQuarterFilter);
@@ -1244,7 +1254,7 @@ export function renderIVA(): HTMLElement {
 
     page.querySelectorAll('.btn-header-quarter').forEach(btn => {
       btn.addEventListener('click', () => {
-        const q = (btn as HTMLElement).dataset.quarter as any;
+        const q = ((btn as HTMLElement).dataset.quarter as FiscalQuarter | 'ALL') || 'ALL';
         selectedPeriodFilter = q;
         if (q !== 'ALL') {
           active303Quarter = q;
@@ -1259,7 +1269,7 @@ export function renderIVA(): HTMLElement {
     // 1. Canvi de pestanya principal
     page.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        activeTab = (btn as HTMLElement).dataset.tab as any;
+        activeTab = ((btn as HTMLElement).dataset.tab as typeof activeTab) || 'overview';
         render();
       });
     });
@@ -1307,7 +1317,7 @@ export function renderIVA(): HTMLElement {
     // 3. Canvi de subpestanya de factures
     page.querySelectorAll('.btn-invoice-subtab').forEach(btn => {
       btn.addEventListener('click', () => {
-        activeInvoiceSubTab = (btn as HTMLElement).dataset.subtab as any;
+        activeInvoiceSubTab = ((btn as HTMLElement).dataset.subtab as typeof activeInvoiceSubTab) || 'issued';
         render();
       });
     });
@@ -1316,7 +1326,7 @@ export function renderIVA(): HTMLElement {
     const qFilter = page.querySelector<HTMLSelectElement>('#invoice-quarter-filter');
     if (qFilter) {
       qFilter.addEventListener('change', () => {
-        invoiceQuarterFilter = qFilter.value as any;
+        invoiceQuarterFilter = (qFilter.value as typeof invoiceQuarterFilter) || 'ALL';
         render();
       });
     }
@@ -1324,7 +1334,7 @@ export function renderIVA(): HTMLElement {
     const pFilter = page.querySelector<HTMLSelectElement>('#invoice-pdf-filter');
     if (pFilter) {
       pFilter.addEventListener('change', () => {
-        invoicePdfFilter = pFilter.value as any;
+        invoicePdfFilter = (pFilter.value as typeof invoicePdfFilter) || 'ALL';
         render();
       });
     }
@@ -1475,7 +1485,7 @@ export function renderIVA(): HTMLElement {
             ...ivaData.config,
             prorrata: {
               ...ivaData.config.prorrata,
-              type: selProrrataType.value as any,
+              type: (selProrrataType.value as 'general' | 'special') || 'general',
             }
           }
         });
@@ -1799,7 +1809,7 @@ export function renderIVA(): HTMLElement {
       const partyNif = modal.querySelector<HTMLInputElement>('#inv-party-nif')!.value.trim().toUpperCase();
       const concept = modal.querySelector<HTMLInputElement>('#inv-concept')!.value.trim();
       const category = modal.querySelector<HTMLSelectElement>('#inv-category')!.value;
-      const paymentMethod = modal.querySelector<HTMLSelectElement>('#inv-payment-method')!.value as any;
+      const paymentMethod = modal.querySelector<HTMLSelectElement>('#inv-payment-method')!.value as IVAInvoiceIssued['paymentMethod'];
       const fileInput = modal.querySelector<HTMLInputElement>('#inv-file-upload');
       const file = fileInput?.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
 
@@ -2003,7 +2013,7 @@ export function renderIVA(): HTMLElement {
       const newAsset: IVABienInversion = {
         id: `asset_${Date.now()}`,
         description: desc,
-        assetType: type as any,
+        assetType: (type as IVABienInversion['assetType']) || 'movable_machinery',
         acquisitionDate: date,
         startDate: date,
         taxableBase: base,

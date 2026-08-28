@@ -1,6 +1,7 @@
 import { store } from '../store.ts';
 import { OCRIngestionEngine } from '../fiscal/ocr-ingestion-engine.ts';
 import type { OCRDocument, IngestionBatch } from '../types-ocr.ts';
+import type { IVAInvoiceIssued, IVAInvoiceReceived } from '../types-iva.ts';
 
 export function renderDocumentIngestion(): HTMLElement {
   const container = document.createElement('div');
@@ -115,10 +116,10 @@ export function renderDocumentIngestion(): HTMLElement {
       for (const batch of batches) {
         for (const doc of batch.documents) {
           if (doc.extractedData && doc.documentType === 'invoice_received') {
-            store.addReceivedInvoice(doc.extractedData);
+            store.addReceivedInvoice(doc.extractedData as IVAInvoiceReceived);
             importedCount++;
           } else if (doc.extractedData && doc.documentType === 'invoice_issued') {
-            store.addIssuedInvoice(doc.extractedData);
+            store.addIssuedInvoice(doc.extractedData as IVAInvoiceIssued);
             importedCount++;
           }
         }

@@ -7,6 +7,8 @@
 import { store } from '../store.ts';
 import { calculateIRPF } from '../fiscal/irpf.ts';
 import { formatCurrency } from '../utils/currency.ts';
+import type { DeclaracionData, EmployerItem, RentalProperty } from '../types.ts';
+import type { WealthAssetItem } from '../fiscal/wealth-tax-engine.ts';
 
 
 export interface YearProjection {
@@ -222,7 +224,7 @@ export function renderProjeccioPage(): HTMLElement {
 }
 
 function computeProjections(
-  data: any,
+  data: DeclaracionData,
   params: {
     currentYear: number;
     incomeGrowthRate: number;
@@ -235,12 +237,12 @@ function computeProjections(
 ): YearProjection[] {
   const resultCurrent = calculateIRPF(data);
 
-  const baseWork = (data.workIncome?.employers || []).reduce((s: number, e: any) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  const baseWork = (data.workIncome?.employers || []).reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
   const baseActivities = data.activities?.income || 0;
-  const baseRentals = (data.properties || []).reduce((s: number, p: any) => s + (p.grossRentalIncome || 0), 0);
+  const baseRentals = (data.properties || []).reduce((s: number, p: RentalProperty) => s + (p.grossRentalIncome || 0), 0);
   const baseDividends = (data.capitalIncome?.interests || 0) + (data.capitalIncome?.dividends || 0) + (data.capitalIncome?.foreignDividends || 0);
 
-  let currentWealth = (data.wealth?.assets || []).reduce((s: number, a: any) => s + (a.value || 0), 0);
+  let currentWealth = (data.wealth?.assets || []).reduce((s: number, a: WealthAssetItem) => s + (a.grossValue || 0), 0);
   if (currentWealth === 0) currentWealth = 25000; // Valor per defecte raonable si està buit
 
   const projections: YearProjection[] = [];

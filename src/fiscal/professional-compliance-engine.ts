@@ -1,4 +1,4 @@
-import type { ComplianceData, VerifactuRecord } from '../types-compliance.ts';
+import type { ComplianceData, VerifactuRecord, OfficialBook } from '../types-compliance.ts';
 import type { IVAInvoiceIssued } from '../types-iva.ts';
 
 export class ProfessionalComplianceEngine {
@@ -50,7 +50,7 @@ export class ProfessionalComplianceEngine {
    * Tanca un llibre oficial de registre (ex. Llibre de Factures Emeses 2024).
    * Assegura que no es puguin esborrar ni alterar registres anteriors.
    */
-  public static lockOfficialBook(complianceData: ComplianceData, bookType: string, year: number): ComplianceData {
+  public static lockOfficialBook(complianceData: ComplianceData, bookType: OfficialBook['bookType'], year: number): ComplianceData {
     const bookIndex = complianceData.officialBooks.findIndex(b => b.bookType === bookType && b.year === year);
     
     const updatedBooks = [...complianceData.officialBooks];
@@ -63,7 +63,7 @@ export class ProfessionalComplianceEngine {
       };
     } else {
       updatedBooks.push({
-        bookType: bookType as any,
+        bookType,
         year,
         totalRecords: 0, // En un sistema real això es calcularia creuant amb types-iva.ts
         lastUpdated: new Date().toISOString(),

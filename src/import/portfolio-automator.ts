@@ -100,7 +100,7 @@ export async function autoParseBrokerCSV(csvText: string, forcedBroker?: Detecte
       trades = await parseGeneric(csvText, undefined, 'degiro');
     }
   } else {
-    trades = await parseGeneric(csvText, undefined, detected.broker as any);
+    trades = await parseGeneric(csvText, undefined, detected.broker);
   }
 
   // Extreure dividends si existeixen al fitxer

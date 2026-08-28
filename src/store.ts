@@ -44,7 +44,7 @@ class Store {
   private profiles: UserProfile[];
   private currentTheme: AppTheme;
   private listeners = new Set<StoreListener>();
-  private keyListeners = new Map<string, Set<(sectionData: any) => void>>();
+  private keyListeners = new Map<string, Set<(sectionData: unknown) => void>>();
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -468,9 +468,10 @@ class Store {
       this.keyListeners.set(keyStr, new Set());
     }
     const set = this.keyListeners.get(keyStr)!;
-    set.add(listener);
+    const genericListener = listener as (sectionData: unknown) => void;
+    set.add(genericListener);
     return () => {
-      set.delete(listener);
+      set.delete(genericListener);
       if (set.size === 0) this.keyListeners.delete(keyStr);
     };
   }

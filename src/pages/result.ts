@@ -9,6 +9,7 @@ import { evaluateAuditRisk } from '../fiscal/audit-risk-radar.ts';
 import {
   STATE_GENERAL_TAX_BRACKETS,
   STATE_SAVINGS_TAX_BRACKETS,
+  type TaxBracket,
 } from '../fiscal/constants.ts';
 import { formatCurrency, formatPercent } from '../utils/currency.ts';
 import { createStackedBar } from '../components/chart.ts';
@@ -399,7 +400,7 @@ export function renderResult(): HTMLElement {
     // Gràfic de trams
     const bracketsCard = page.querySelector('#brackets-card-container');
     if (bracketsCard) {
-      const bracketItems = STATE_GENERAL_TAX_BRACKETS.map((bracket: any, i: number) => {
+      const bracketItems = STATE_GENERAL_TAX_BRACKETS.map((bracket: TaxBracket, i: number) => {
         const prevLimit = i === 0 ? 0 : STATE_GENERAL_TAX_BRACKETS[i - 1].upTo;
         const tierSize = bracket.upTo === Infinity ? result.liquidableGeneralBase - prevLimit : bracket.upTo - prevLimit;
         const taxableInTier = Math.max(0, Math.min(result.liquidableGeneralBase - prevLimit, tierSize));
@@ -410,7 +411,7 @@ export function renderResult(): HTMLElement {
             : `${formatCurrency(prevLimit)} – ${formatCurrency(bracket.upTo)} (${(bracket.rate * 100).toFixed(0)}%)`,
           value: taxableInTier,
         };
-      }).filter((item: any) => item.value > 0);
+      }).filter((item: { label: string; value: number }) => item.value > 0);
 
       bracketsCard.appendChild(createStackedBar(bracketItems));
 
@@ -418,7 +419,7 @@ export function renderResult(): HTMLElement {
       legendDiv.className = 'chart-legend';
       legendDiv.style.marginTop = '12px';
       const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
-      bracketItems.forEach((item: any, i: number) => {
+      bracketItems.forEach((item: { label: string; value: number }, i: number) => {
         const el = document.createElement('div');
         el.className = 'chart-legend__item';
         el.innerHTML = `

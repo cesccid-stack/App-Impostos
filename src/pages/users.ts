@@ -484,8 +484,8 @@ export function renderUsersPage(): HTMLElement {
             showToast(`Declarant "${imported.name}" importat correctament`, 'success');
             render();
             window.dispatchEvent(new CustomEvent('app:refresh-sidebar'));
-          } catch (err: any) {
-            showToast(err.message || 'Error en importar el fitxer', 'error');
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : 'Error en importar el fitxer', 'error');
           }
         };
         reader.readAsText(file);
@@ -555,8 +555,8 @@ export function renderUsersPage(): HTMLElement {
             a.click();
             URL.revokeObjectURL(url);
             showToast('Declarant descarregat en format JSON', 'success');
-          } catch (e: any) {
-            showToast(e.message || 'Error en exportar', 'error');
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Error en exportar', 'error');
           }
         }
       });
