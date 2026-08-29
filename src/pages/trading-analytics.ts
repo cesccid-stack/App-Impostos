@@ -18,7 +18,8 @@ import {
   runInstitutionalBacktest, 
   type BacktestParameters, 
   type BacktestReport,
-  DEFAULT_BACKTEST_PARAMETERS
+  DEFAULT_BACKTEST_PARAMETERS,
+  BACKTEST_PRESETS
 } from '../fiscal/backtest-engine.ts';
 import { analyzeTradingPerformance } from '../fiscal/trading-analytics.ts';
 import { calculateTaxLossHarvesting, type OpenPosition } from '../fiscal/tax-loss-harvesting.ts';
@@ -88,7 +89,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <span class="badge badge--success">${report.totalTrades} operacions reals</span>
           </div>
           <p class="page-header__subtitle" style="margin:0; color:var(--text-secondary); font-size:0.9rem;">
-            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN), ràtios Kelly/VaR i millora contínua Kaizen.
+            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Omega), ràtios Kelly/VaR i millora contínua Kaizen.
           </p>
         </div>
         <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap;">
@@ -246,7 +247,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Win Rate</div>
               <div style="font-size:1.8rem; font-weight:900; color:var(--color-primary);">${report.winRate}%</div>
-              <div style="font-size:0.7rem; color:var(--text-secondary);">${report.winningTrades}W / ${report.losingTrades}L (${report.breakevenTrades} BE)</div>
+              <div style="font-size:0.7rem; color:var(--text-secondary handicaps);">${report.winningTrades}W / ${report.losingTrades}L (${report.breakevenTrades} BE)</div>
             </div>
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Profit Factor</div>
@@ -385,6 +386,22 @@ export function renderTradingAnalytics(): HTMLElement {
 
   // ── 2. LABORATORI DE BACKTESTING INSTITUCIONAL ─────────────────────────────
   function renderBacktestLaboratoryView(bt: BacktestReport): string {
+    if (bt.totalTrades === 0) {
+      return `
+        <div class="card" style="text-align:center; padding:var(--space-2xl); border:1px dashed var(--border-default);">
+          <div style="font-size:3rem; margin-bottom:var(--space-md);">🧪</div>
+          <h2 style="margin:0 0 var(--space-xs) 0; font-weight:800;">Sense Operacions Registrades per al Backtest</h2>
+          <p style="color:var(--text-secondary); font-size:0.9rem; max-width:500px; margin:0 auto var(--space-lg) auto;">
+            Per executar el laboratori de backtesting institucional, importa primer un extracte del teu bròker o afegeix transaccions de guanys i pèrdues patrimonials.
+          </p>
+          <div style="display:flex; justify-content:center; gap:var(--space-sm);">
+            <a href="#/importar" class="btn btn--primary btn--sm">📥 Importar Extracte CSV</a>
+            <a href="#/guanys" class="btn btn--secondary btn--sm">➕ Afegir Transacció Manual</a>
+          </div>
+        </div>
+      `;
+    }
+
     const isOutperforming = bt.strategyEdgeOverRealEUR >= 0;
 
     // Filtrar operacions per a la taula d'inspecció
@@ -415,6 +432,15 @@ export function renderTradingAnalytics(): HTMLElement {
               ⚡ Recalcular Backtest
             </button>
           </div>
+        </div>
+
+        <!-- Presets Ràpids de Trading -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:var(--space-md); flex-wrap:wrap; padding-bottom:var(--space-sm); border-bottom:1px solid var(--border-default);">
+          <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Presets Ràpids:</span>
+          <button class="btn btn--secondary btn--sm btn-bt-preset" data-preset="conservative">🛡️ Conservador</button>
+          <button class="btn btn--secondary btn--sm btn-bt-preset" data-preset="balanced">⚖️ Equilibrat (Swing)</button>
+          <button class="btn btn--secondary btn--sm btn-bt-preset" data-preset="aggressive">🚀 Agressiu (Momentum)</button>
+          <button class="btn btn--secondary btn--sm btn-bt-preset" data-preset="dca_rebalance">💎 DCA Rebalance</button>
         </div>
 
         <!-- Controls Interactius de Paràmetres -->
@@ -518,6 +544,46 @@ export function renderTradingAnalytics(): HTMLElement {
 
       </div>
 
+      <!-- Dashboard de Ràtios Quantitatius Institucionals Avançats -->
+      <div class="card" style="margin-bottom:var(--space-xl); border:1px solid var(--border-default);">
+        <h3 style="margin:0 0 var(--space-md) 0; font-size:1rem; font-weight:800; display:flex; align-items:center; gap:8px;">
+          <span>🔬 Mètriques de Rendiment Avançat & Volatilitat (Hedge Fund Standards)</span>
+          <span class="badge badge--primary">Rigor Quant</span>
+        </h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:var(--space-md); text-align:center;">
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Ràtio Omega</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-primary);">${bt.omegaRatio.toFixed(2)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Guanys vs Pèrdues Ponderats</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Gain-to-Pain Ratio</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-success);">${bt.gainToPainRatio.toFixed(2)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Fórmula Jack Schwager</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Tail Ratio (P95 / |P5|)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--accent-start);">${bt.tailRatio.toFixed(2)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Asimetria de Cues</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Ulcer Index (UI)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:${bt.ulcerIndex > 10 ? 'var(--color-warning)' : 'var(--color-success)'};">${bt.ulcerIndex.toFixed(2)}%</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Volatilitat de Drawdowns</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Underwater Màxim</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--text-primary);">${bt.maxDrawdownDurationDays} dies</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Temps màxim en Drawdown</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">K-Ratio (Suavitat)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-info);">${bt.kRatio.toFixed(2)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Regressió Lineal Equitat</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Corba d'Equitat Comparativa Triple: Backtest vs Real vs Benchmark -->
       <div class="card" style="margin-bottom:var(--space-xl);">
         <div class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm); margin-bottom:var(--space-md);">
@@ -549,6 +615,90 @@ export function renderTradingAnalytics(): HTMLElement {
           ${renderBacktestEquityCurveSvg(bt.equityCurve)}
         </div>
       </div>
+
+      <!-- Matriu de Rendibilitat Mensual & Anual -->
+      ${bt.monthlyReturnMatrix.length > 0 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md);">
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>📅 Rendibilitat Mensual & Anual del Sistema (Històric)</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              P&L simulat net de comissions i slippage per cada mes natural de trading
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table" style="width:100%; font-size:0.8rem; text-align:center;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Any</th>
+                  <th>Gen</th><th>Feb</th><th>Mar</th><th>Abr</th><th>Mai</th><th>Jun</th>
+                  <th>Jul</th><th>Ago</th><th>Set</th><th>Oct</th><th>Nov</th><th>Des</th>
+                  <th style="text-align:right;">Total Simulat</th>
+                  <th style="text-align:right;">Total Real</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bt.monthlyReturnMatrix.map(yr => `
+                  <tr>
+                    <td style="text-align:left; font-weight:800;">${yr.year}</td>
+                    ${yr.months.map(m => {
+                      const isPos = m.simulatedPnL > 0;
+                      const isNeg = m.simulatedPnL < 0;
+                      return `
+                        <td style="${isPos ? 'background:rgba(16, 185, 129, 0.08); color:var(--color-success); font-weight:700;' : (isNeg ? 'background:rgba(239, 68, 68, 0.08); color:var(--color-error); font-weight:700;' : 'color:var(--text-muted);')}">
+                          ${m.tradesCount > 0 ? (isPos ? '+' : '') + Math.round(m.simulatedPnL) + '€' : '-'}
+                        </td>
+                      `;
+                    }).join('')}
+                    <td style="text-align:right; font-weight:900; font-family:var(--font-mono); color:${yr.totalYearSimulatedPnL >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+                      ${yr.totalYearSimulatedPnL >= 0 ? '+' : ''}${formatCurrency(yr.totalYearSimulatedPnL)}
+                    </td>
+                    <td style="text-align:right; font-weight:700; font-family:var(--font-mono); color:${yr.totalYearActualPnL >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+                      ${yr.totalYearActualPnL >= 0 ? '+' : ''}${formatCurrency(yr.totalYearActualPnL)}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Rendiment del Backtest per Classe d'Actiu -->
+      ${bt.assetClassPerformance.length > 0 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md);">
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>🏷️ Rendiment de l'Estratègia per Classe d'Actiu</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              Compara com reacciona el model de trading a cada mercat (Borsa vs Cripto vs Fons)
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:var(--space-md);">
+            ${bt.assetClassPerformance.map(ac => `
+              <div style="background:var(--bg-surface-elevated); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                  <span style="font-size:1.2rem;">${ac.icon}</span>
+                  <strong style="font-size:0.85rem;">${ac.label}</strong>
+                </div>
+                <div style="font-size:1.3rem; font-weight:900; font-family:var(--font-mono); color:${ac.simulatedPnL >= 0 ? 'var(--color-success)' : 'var(--color-error)'}; margin-bottom:4px;">
+                  ${ac.simulatedPnL >= 0 ? '+' : ''}${formatCurrency(ac.simulatedPnL)}
+                </div>
+                <div style="font-size:0.7rem; color:var(--text-muted);">
+                  Real: <strong>${formatCurrency(ac.actualPnL)}</strong> | Edge: <strong style="color:${ac.edgeEUR >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">${ac.edgeEUR >= 0 ? '+' : ''}${formatCurrency(ac.edgeEUR)}</strong>
+                </div>
+                <div style="font-size:0.65rem; color:var(--text-secondary); margin-top:2px;">
+                  ${ac.tradesCount} operacions | Win Rate: <strong>${ac.winRate}%</strong>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Taula de Validació Walk-Forward (In-Sample vs Out-of-Sample) -->
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap:var(--space-lg); margin-bottom:var(--space-xl);">
@@ -1282,6 +1432,7 @@ export function renderTradingAnalytics(): HTMLElement {
     const headers = [
       'Trade #',
       'Actiu / Concepte',
+      'Classe d\'Actiu',
       'Data Entrada',
       'Data Sortida',
       'Durada (dies)',
@@ -1301,6 +1452,7 @@ export function renderTradingAnalytics(): HTMLElement {
     const rows = bt.trades.map(t => [
       t.tradeIndex,
       `"${(t.concept || '').replace(/"/g, '""')}"`,
+      t.assetClass,
       t.entryDate,
       t.exitDate,
       t.holdingDays,
@@ -1376,6 +1528,19 @@ export function renderTradingAnalytics(): HTMLElement {
     btTradeFilterSelect?.addEventListener('change', () => {
       backtestTradeFilter = (btTradeFilterSelect.value as typeof backtestTradeFilter) || 'ALL';
       render();
+    });
+
+    // Presets de Backtest
+    container.querySelectorAll('.btn-bt-preset').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const presetKey = target.dataset.preset as keyof typeof BACKTEST_PRESETS;
+        if (presetKey && BACKTEST_PRESETS[presetKey]) {
+          Object.assign(backtestParams, BACKTEST_PRESETS[presetKey].params);
+          render();
+          showToast(`Preset aplicat: ${BACKTEST_PRESETS[presetKey].name}`, 'info');
+        }
+      });
     });
 
     // Export CSV Backtest

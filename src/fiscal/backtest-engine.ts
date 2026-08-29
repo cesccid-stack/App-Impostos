@@ -1,13 +1,13 @@
 /**
  * @module fiscal/backtest-engine
  * Motor Institucional de Backtesting, Optimització Paramètrica (Grid Search),
- * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional (SQN, K-Ratio, Kelly).
+ * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional (SQN, K-Ratio, Omega, Ulcer, Kelly).
  * 100% connectat a les dades reals d'operativa del declarant sense hipòtesis sintètiques.
  */
 
 import type { GainItem } from '../types.ts';
 import { roundCurrency } from '../utils/math.ts';
-import { calculateSavingsTaxEUR } from './investment-cockpit-engine.ts';
+import { calculateSavingsTaxEUR, classifyAssetType } from './investment-cockpit-engine.ts';
 
 export type BacktestStrategyType =
   | 'trend_breakout'      // Trencament de màxims (Donchian / Breakout) amb Trailing Stop
@@ -44,6 +44,7 @@ export interface BacktestParameters {
 export interface BacktestTradeResult {
   tradeIndex: number;
   concept: string;
+  assetClass: string;
   entryDate: string;
   exitDate: string;
   holdingDays: number;
@@ -72,6 +73,30 @@ export interface SensitivityMatrixCell {
   sqn: number;
 }
 
+export interface MonthlyReturnRow {
+  year: number;
+  months: {
+    month: number;
+    monthName: string;
+    simulatedPnL: number;
+    actualPnL: number;
+    tradesCount: number;
+  }[];
+  totalYearSimulatedPnL: number;
+  totalYearActualPnL: number;
+}
+
+export interface AssetClassBacktestPerformance {
+  assetClass: string;
+  label: string;
+  icon: string;
+  tradesCount: number;
+  winRate: number;
+  simulatedPnL: number;
+  actualPnL: number;
+  edgeEUR: number;
+}
+
 export interface BacktestReport {
   params: BacktestParameters;
   initialCapital: number;
@@ -95,10 +120,15 @@ export interface BacktestReport {
   
   maxDrawdownEUR: number;
   maxDrawdownPercent: number;
+  maxDrawdownDurationDays: number;// Temps màxim sota l'aigua (Underwater period)
   recoveryFactor: number;         // Net PnL / Max Drawdown EUR
   calmarRatio: number;            // Retorn Anualitzat / Max Drawdown %
   sharpeRatio: number;
   sortinoRatio: number;
+  omegaRatio: number;             // Ràtio Omega (Guanys vs Pèrdues sobre llindar 0)
+  gainToPainRatio: number;        // Ràtio Gain-to-Pain (Jack Schwager)
+  tailRatio: number;              // Ràtio de Cues (P95 / |P5|)
+  ulcerIndex: number;             // Índex d'Úlcera (Volatilitat de drawdowns)
   sqn: number;                    // System Quality Number (Van Tharp)
   sqnRating: 'Pobre' | 'Mitjà' | 'Bo' | 'Excel·lent' | 'Superb' | 'Graal';
   kRatio: number;                 // Suavitat de la corba d'equitat (regressió lineal)
@@ -140,7 +170,7 @@ export interface BacktestReport {
   walkForwardEfficiencyRatio: number; // OOS Net Return / IS Net Return (anualitzat)
   isRobustWalkForward: boolean;       // WFE >= 60%
   
-  // Sèries Temporals
+  // Sèries Temporals i Desglossaments
   equityCurve: {
     tradeIndex: number;
     date: string;
@@ -154,7 +184,68 @@ export interface BacktestReport {
   
   trades: BacktestTradeResult[];
   sensitivityMatrix: SensitivityMatrixCell[];
+  monthlyReturnMatrix: MonthlyReturnRow[];
+  assetClassPerformance: AssetClassBacktestPerformance[];
 }
+
+export const BACKTEST_PRESETS = {
+  conservative: {
+    name: '🛡️ Conservador (Capital Preservation)',
+    params: {
+      strategyType: 'trend_breakout' as BacktestStrategyType,
+      stopLossPercent: 4,
+      takeProfitPercent: 10,
+      trailingStopPercent: 3,
+      sizingModel: 'half_kelly' as PositionSizingModel,
+      riskPerTradePercent: 1.0,
+      slippageBps: 8,
+      commissionPerTradeEUR: 2.0,
+      walkForwardSplitPercent: 70,
+    },
+  },
+  balanced: {
+    name: '⚖️ Equilibrat (Swing Trend Following)',
+    params: {
+      strategyType: 'trend_breakout' as BacktestStrategyType,
+      stopLossPercent: 6,
+      takeProfitPercent: 18,
+      trailingStopPercent: 5,
+      sizingModel: 'actual_trade_capital' as PositionSizingModel,
+      riskPerTradePercent: 1.5,
+      slippageBps: 10,
+      commissionPerTradeEUR: 2.5,
+      walkForwardSplitPercent: 70,
+    },
+  },
+  aggressive: {
+    name: '🚀 Agressiu (Momentum & Breakouts)',
+    params: {
+      strategyType: 'momentum_pullback' as BacktestStrategyType,
+      stopLossPercent: 8,
+      takeProfitPercent: 30,
+      trailingStopPercent: 7,
+      sizingModel: 'volatility_parity' as PositionSizingModel,
+      riskPerTradePercent: 2.0,
+      slippageBps: 15,
+      commissionPerTradeEUR: 3.0,
+      walkForwardSplitPercent: 65,
+    },
+  },
+  dca_rebalance: {
+    name: '💎 Inversió Sistemàtica (DCA Rebalance)',
+    params: {
+      strategyType: 'dca_smart_rebalance' as BacktestStrategyType,
+      stopLossPercent: 12,
+      takeProfitPercent: 40,
+      trailingStopPercent: 10,
+      sizingModel: 'actual_trade_capital' as PositionSizingModel,
+      riskPerTradePercent: 2.0,
+      slippageBps: 5,
+      commissionPerTradeEUR: 1.5,
+      walkForwardSplitPercent: 75,
+    },
+  },
+};
 
 export const DEFAULT_BACKTEST_PARAMETERS: BacktestParameters = {
   strategyType: 'trend_breakout',
@@ -230,8 +321,14 @@ export function runInstitutionalBacktest(
   let oosGrossProfit = 0;
   let oosGrossLoss = 0;
 
+  // Variables per calcular la durada màxima del Drawdown (Underwater days)
+  let peakDateMs = new Date(sorted[0].transferDate || sorted[0].acquisitionDate || '2024-01-01').getTime();
+  let maxDrawdownDurationDays = 0;
+
   const tradeReturnsR: number[] = [];
   const simulatedTrades: BacktestTradeResult[] = [];
+  const squaredDrawdownsPct: number[] = [];
+
   const equityCurve: BacktestReport['equityCurve'] = [
     {
       tradeIndex: 0,
@@ -263,9 +360,11 @@ export function runInstitutionalBacktest(
 
     // Càlcul de la durada real de la posició (Holding Days)
     let holdingDays = 15;
-    if (item.acquisitionDate && item.transferDate) {
-      const d1 = new Date(item.acquisitionDate).getTime();
-      const d2 = new Date(item.transferDate).getTime();
+    const date1 = item.acquisitionDate;
+    const date2 = item.transferDate;
+    if (date1 && date2) {
+      const d1 = new Date(date1).getTime();
+      const d2 = new Date(date2).getTime();
       if (!isNaN(d1) && !isNaN(d2)) {
         holdingDays = Math.max(1, Math.round(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)));
       }
@@ -339,12 +438,22 @@ export function runInstitutionalBacktest(
     const benchmarkTradePnL = roundCurrency(positionSizeEUR * benchmarkTradeRate);
     benchmarkCumulativePnL = roundCurrency(benchmarkCumulativePnL + benchmarkTradePnL);
 
-    if (currentCapital > peakCapital) peakCapital = currentCapital;
+    const currentDateMs = new Date(item.transferDate || item.acquisitionDate || '2024-01-01').getTime();
+
+    if (currentCapital > peakCapital) {
+      peakCapital = currentCapital;
+      peakDateMs = currentDateMs;
+    } else if (!isNaN(currentDateMs) && !isNaN(peakDateMs)) {
+      const underWaterDays = Math.max(0, Math.round((currentDateMs - peakDateMs) / (1000 * 60 * 60 * 24)));
+      if (underWaterDays > maxDrawdownDurationDays) maxDrawdownDurationDays = underWaterDays;
+    }
+
     const curDrawdown = roundCurrency(peakCapital - currentCapital);
     if (curDrawdown > maxDrawdownEUR) maxDrawdownEUR = curDrawdown;
 
     const curDdPct = peakCapital > 0 ? roundCurrency((curDrawdown / peakCapital) * 100) : 0;
     if (curDdPct > maxDrawdownPercent) maxDrawdownPercent = curDdPct;
+    squaredDrawdownsPct.push(Math.pow(curDdPct, 2));
 
     const isWin = simulatedPnL > 0;
     const isLoss = simulatedPnL < 0;
@@ -375,6 +484,7 @@ export function runInstitutionalBacktest(
     const tradeRes: BacktestTradeResult = {
       tradeIndex: idx + 1,
       concept: item.description || (item as unknown as { concept?: string }).concept || `Trade ${idx + 1}`,
+      assetClass: classifyAssetType(item.description || (item as unknown as { concept?: string }).concept || '', item.type),
       entryDate: item.acquisitionDate || '2024-01-01',
       exitDate: item.transferDate || '2024-01-15',
       holdingDays,
@@ -473,6 +583,24 @@ export function runInstitutionalBacktest(
   const downStd = Math.sqrt(downReturns.reduce((s, r) => s + Math.pow(r, 2), 0) / Math.max(1, downReturns.length)) || 1;
   const sortinoRatio = roundCurrency(avgRet / downStd);
 
+  // Omega Ratio & Gain-to-Pain Ratio (Jack Schwager)
+  const sumPosRets = pnlReturns.filter(r => r > 0).reduce((a, b) => a + b, 0);
+  const sumNegRets = Math.abs(pnlReturns.filter(r => r < 0).reduce((a, b) => a + b, 0));
+  const omegaRatio = sumNegRets > 0 ? roundCurrency(sumPosRets / sumNegRets) : (sumPosRets > 0 ? 99.9 : 1.0);
+  const gainToPainRatio = grossLoss > 0 ? roundCurrency((grossProfit - grossLoss) / grossLoss) : (grossProfit > 0 ? 99.9 : 1.0);
+
+  // Tail Ratio (Percentil 95% / |Percentil 5%|)
+  const sortedRets = [...pnlReturns].sort((a, b) => a - b);
+  const p5Idx = Math.floor(sortedRets.length * 0.05);
+  const p95Idx = Math.floor(sortedRets.length * 0.95);
+  const p5Val = Math.abs(sortedRets[p5Idx] || -1);
+  const p95Val = sortedRets[p95Idx] || 1;
+  const tailRatio = p5Val > 0 ? roundCurrency(p95Val / p5Val) : 1.0;
+
+  // Ulcer Index (UI) - Arrel quadrada de la mitjana de quadrats de percentatges de drawdown
+  const meanSqDd = squaredDrawdownsPct.length > 0 ? squaredDrawdownsPct.reduce((a, b) => a + b, 0) / squaredDrawdownsPct.length : 0;
+  const ulcerIndex = roundCurrency(Math.sqrt(meanSqDd));
+
   // Risc de Ruïna (Risk of Ruin segons fórmula de Perry Kaufman)
   const lossProb = 1 - (winRate / 100);
   const winProb = winRate / 100;
@@ -518,6 +646,12 @@ export function runInstitutionalBacktest(
   // 4. Matriu de Sensibilitat Paramètrica (Grid Search 4x4)
   const sensitivityMatrix = generateSensitivityMatrix(sorted, params);
 
+  // 5. Matriu de Rendibilitat Mensual & Anual
+  const monthlyReturnMatrix = generateMonthlyReturnMatrix(simulatedTrades);
+
+  // 6. Rendiment per Classe d'Actiu en el Backtest
+  const assetClassPerformance = generateAssetClassPerformance(simulatedTrades);
+
   return {
     params,
     initialCapital: params.initialCapitalEUR,
@@ -539,10 +673,15 @@ export function runInstitutionalBacktest(
     maxConsecutiveLosses: maxConsecLosses,
     maxDrawdownEUR,
     maxDrawdownPercent,
+    maxDrawdownDurationDays,
     recoveryFactor,
     calmarRatio,
     sharpeRatio,
     sortinoRatio,
+    omegaRatio,
+    gainToPainRatio,
+    tailRatio,
+    ulcerIndex,
     sqn,
     sqnRating,
     kRatio,
@@ -580,7 +719,93 @@ export function runInstitutionalBacktest(
     equityCurve,
     trades: simulatedTrades,
     sensitivityMatrix,
+    monthlyReturnMatrix,
+    assetClassPerformance,
   };
+}
+
+/**
+ * Genera la matriu mensual i anual de guanys simulats vs reals.
+ */
+function generateMonthlyReturnMatrix(trades: BacktestTradeResult[]): MonthlyReturnRow[] {
+  const monthNames = ['Gen', 'Feb', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Des'];
+  const yearsMap = new Map<number, MonthlyReturnRow>();
+
+  for (const t of trades) {
+    const d = new Date(t.exitDate || t.entryDate || '2024-01-01');
+    const y = isNaN(d.getFullYear()) ? 2024 : d.getFullYear();
+    const m = isNaN(d.getMonth()) ? 0 : d.getMonth();
+
+    if (!yearsMap.has(y)) {
+      yearsMap.set(y, {
+        year: y,
+        months: Array.from({ length: 12 }).map((_, i) => ({
+          month: i + 1,
+          monthName: monthNames[i],
+          simulatedPnL: 0,
+          actualPnL: 0,
+          tradesCount: 0,
+        })),
+        totalYearSimulatedPnL: 0,
+        totalYearActualPnL: 0,
+      });
+    }
+
+    const yrRow = yearsMap.get(y)!;
+    yrRow.months[m].simulatedPnL = roundCurrency(yrRow.months[m].simulatedPnL + t.simulatedPnL);
+    yrRow.months[m].actualPnL = roundCurrency(yrRow.months[m].actualPnL + t.actualPnL);
+    yrRow.months[m].tradesCount++;
+
+    yrRow.totalYearSimulatedPnL = roundCurrency(yrRow.totalYearSimulatedPnL + t.simulatedPnL);
+    yrRow.totalYearActualPnL = roundCurrency(yrRow.totalYearActualPnL + t.actualPnL);
+  }
+
+  return Array.from(yearsMap.values()).sort((a, b) => b.year - a.year);
+}
+
+/**
+ * Agrupa el rendiment del backtest segons la classe d'actiu real.
+ */
+function generateAssetClassPerformance(trades: BacktestTradeResult[]): AssetClassBacktestPerformance[] {
+  const map = new Map<string, { label: string; icon: string; count: number; wins: number; simPnL: number; actPnL: number }>();
+  
+  const labels: Record<string, { label: string; icon: string }> = {
+    shares: { label: 'Borsa / Accions', icon: '📈' },
+    crypto: { label: 'Criptoactius & DeFi', icon: '🪙' },
+    funds: { label: 'Fons d\'Inversió', icon: '🏦' },
+    etf: { label: 'ETFs Indexats', icon: '📊' },
+    derivatives: { label: 'Derivats / Opcions', icon: '⚡' },
+  };
+
+  for (const t of trades) {
+    const ac = t.assetClass || 'shares';
+    if (!map.has(ac)) {
+      map.set(ac, {
+        label: labels[ac]?.label || ac.toUpperCase(),
+        icon: labels[ac]?.icon || '🏷️',
+        count: 0,
+        wins: 0,
+        simPnL: 0,
+        actPnL: 0,
+      });
+    }
+    const rec = map.get(ac)!;
+    rec.count++;
+    if (t.isWin) rec.wins++;
+    rec.simPnL = roundCurrency(rec.simPnL + t.simulatedPnL);
+    rec.actPnL = roundCurrency(rec.actPnL + t.actualPnL);
+  }
+
+  return Array.from(map.entries()).map(([ac, v]) => ({
+    assetClass: ac,
+    label: v.label,
+    icon: v.icon,
+    tradesCount: v.count,
+    winRate: v.count > 0 ? roundCurrency((v.wins / v.count) * 100) : 0,
+    simulatedPnL: v.simPnL,
+    actualPnL: v.actPnL,
+    edgeEUR: roundCurrency(v.simPnL - v.actPnL),
+  }));
 }
 
 /**
@@ -595,7 +820,6 @@ function calculateMonteCarloPermutationPValue(pnlArray: number[]): number {
   const iterations = 500;
 
   for (let iter = 0; iter < iterations; iter++) {
-    // Generar signes aleatoris (+ / -) sota la hipòtesi nul·la que no hi ha edge
     let sum = 0;
     for (let i = 0; i < pnlArray.length; i++) {
       const sign = Math.random() >= 0.5 ? 1 : -1;
@@ -692,10 +916,15 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     maxConsecutiveLosses: 0,
     maxDrawdownEUR: 0,
     maxDrawdownPercent: 0,
+    maxDrawdownDurationDays: 0,
     recoveryFactor: 0,
     calmarRatio: 0,
     sharpeRatio: 0,
     sortinoRatio: 0,
+    omegaRatio: 1.0,
+    gainToPainRatio: 0,
+    tailRatio: 1.0,
+    ulcerIndex: 0,
     sqn: 0,
     sqnRating: 'Mitjà',
     kRatio: 0,
@@ -721,5 +950,7 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     equityCurve: [],
     trades: [],
     sensitivityMatrix: [],
+    monthlyReturnMatrix: [],
+    assetClassPerformance: [],
   };
 }

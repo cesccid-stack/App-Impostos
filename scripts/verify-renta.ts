@@ -2437,6 +2437,51 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
     assert(res.outOfSampleMetrics.tradesCount === 3, '3 trades Out-of-Sample (30%)');
     assert(res.sensitivityMatrix.length === 16, 'Matriu de sensibilitat 4x4 (16 combinacions)');
   });
+
+  test('34.4 Mètriques Hedge Fund: Ràtio Omega, Ulcer Index, Tail Ratio i Matriu Mensual', () => {
+    const trades: any[] = [
+      {
+        id: 't_m1',
+        description: 'Trade Gen',
+        type: 'shares',
+        acquisitionDate: '2024-01-05',
+        transferDate: '2024-01-25',
+        acquisitionValue: 3000,
+        transferValue: 3600,
+        expenses: 10,
+      },
+      {
+        id: 't_m2',
+        description: 'Trade Feb',
+        type: 'crypto',
+        acquisitionDate: '2024-02-01',
+        transferDate: '2024-02-18',
+        acquisitionValue: 2000,
+        transferValue: 1800,
+        expenses: 5,
+      },
+      {
+        id: 't_m3',
+        description: 'Trade Mar',
+        type: 'funds',
+        acquisitionDate: '2024-03-01',
+        transferDate: '2024-03-30',
+        acquisitionValue: 4000,
+        transferValue: 4500,
+        expenses: 0,
+      },
+    ];
+
+    const res = runInstitutionalBacktest(trades);
+    assert(res.omegaRatio > 0, 'Ràtio Omega calculat');
+    assert(res.gainToPainRatio !== undefined, 'Gain-to-Pain calculat');
+    assert(res.tailRatio > 0, 'Tail ratio calculat');
+    assert(res.ulcerIndex >= 0, 'Ulcer Index calculat');
+    assert(res.monthlyReturnMatrix.length > 0, 'Matriu mensual generada');
+    assert(res.assetClassPerformance.length > 0, 'Rendiment per classe d\'actiu calculat');
+    assert(res.assetClassPerformance.some(ac => ac.assetClass === 'shares'), 'Conté accions');
+    assert(res.assetClassPerformance.some(ac => ac.assetClass === 'crypto'), 'Conté cripto');
+  });
 });
 
 // ── INFORME I BALANÇ FINAL ──────────────────────────────────────────────────
