@@ -148,13 +148,13 @@ export const ALL_APP_MODULES: AppModuleItem[] = [
   // ── Inversió & Patrimoni ──
   {
     id: 'trading',
-    name: 'Trading Analytics & Backtesting Fiscal',
-    shortName: 'Trading & FIFO',
-    description: 'Anàlisi de rendiment de carteres financeres, càlcul avançat de pèrdues i guanys patrimonials i optimització de Tax-Loss Harvesting.',
+    name: 'Quadre de Comandament d\'Inversió & Diari de Trading',
+    shortName: 'Cockpit d\'Inversions',
+    description: 'Quadre de comandament 360°, avaluació de tècniques (accions, cripto, fons), diari post-mortem de biaixos, fricció fiscal (Tax Drag) i simulador What-If.',
     icon: '📈',
     category: 'Inversió & Patrimoni',
     path: '/trading',
-    tags: ['Trading', 'Tax Loss Harvesting', 'Backtesting'],
+    tags: ['Trading', 'Cockpit', 'Post-Mortem', 'Tax Drag', 'What-If', 'Tax Loss Harvesting'],
   },
   {
     id: 'projeccio',

@@ -204,6 +204,8 @@ import { createTaxJourneyVisualizer } from '../src/components/tax-journey-visual
 import { createInternalBreakdownDashboards } from '../src/components/internal-breakdown-dashboards.ts';
 import { analyzePortfolioFinances, analyzePropertyFinances } from '../src/fiscal/real-estate-analytics-engine.ts';
 import { createRealEstateDashboard } from '../src/components/real-estate-dashboard.ts';
+import { analyzeInvestmentCockpit, calculateSavingsTaxEUR, classifyAssetType, determineHoldingStyle } from '../src/fiscal/investment-cockpit-engine.ts';
+import { runInstitutionalBacktest } from '../src/fiscal/backtest-engine.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
@@ -2164,6 +2166,276 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
     assert(dashboard !== null && dashboard !== undefined, 'El component ha de retornar un element DOM');
     assert(dashboard.className.includes('real-estate-dashboard-container'), 'Classe del contenidor correcta');
     assert(dashboard.innerHTML.includes('Quadre de Comandament de Rendibilitat'), 'Títol del quadre present');
+  });
+});
+
+suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-cockpit-engine.ts)', () => {
+  test('33.1 Classificació intel·ligent d\'actius i estils de permanència', () => {
+    assert(classifyAssetType('Bitcoin (BTC)') === 'crypto', 'Detecció de criptoactiu');
+    assert(classifyAssetType('Vanguard Global Stock Index Fund') === 'funds', 'Detecció de fons d\'inversió');
+    assert(classifyAssetType('iShares Core S&P 500 ETF') === 'etf', 'Detecció d\'ETF');
+    assert(classifyAssetType('NVIDIA Corp (NVDA)') === 'shares', 'Detecció d\'accions');
+
+    assert(determineHoldingStyle(0) === 'scalping', '0 dies = Scalping');
+    assert(determineHoldingStyle(15) === 'swing', '15 dies = Swing');
+    assert(determineHoldingStyle(90) === 'positional', '90 dies = Posicional');
+    assert(determineHoldingStyle(400) === 'long_term', '400 dies = Llarg Termini');
+  });
+
+  test('33.2 Càlcul de mètriques quantitatives, P&L, Win Rate i Profit Factor', () => {
+    const trades: any[] = [
+      {
+        id: 't1',
+        concept: 'Apple Inc',
+        assetType: 'shares',
+        acquisitionDate: '2024-01-10',
+        transferDate: '2024-02-10',
+        acquisitionValue: 1000,
+        transferValue: 1500,
+        expenses: 10,
+      },
+      {
+        id: 't2',
+        concept: 'Tesla Inc',
+        assetType: 'shares',
+        acquisitionDate: '2024-03-01',
+        transferDate: '2024-03-15',
+        acquisitionValue: 2000,
+        transferValue: 1600,
+        expenses: 10,
+      },
+      {
+        id: 't3',
+        concept: 'Ethereum',
+        assetType: 'crypto',
+        acquisitionDate: '2024-02-01',
+        transferDate: '2024-05-01',
+        acquisitionValue: 3000,
+        transferValue: 4500,
+        expenses: 20,
+      },
+    ];
+
+    const report = analyzeInvestmentCockpit(trades);
+
+    // t1: 1500 - 1000 - 10 = +490
+    // t2: 1600 - 2000 - 10 = -410
+    // t3: 4500 - 3000 - 20 = +1480
+    // GrossProfit: 490 + 1480 = 1970
+    // GrossLoss: 410
+    // NetPnL: 1970 - 410 = 1560
+    assert(report.totalTrades === 3, '3 operacions analitzades');
+    assert(report.winningTrades === 2, '2 victòries');
+    assert(report.losingTrades === 1, '1 derrota');
+    assert(report.winRate === 66.67, 'Win rate 66.67%');
+    assert(report.grossProfit === 1970, `Gross profit 1.970 € (obtingut: ${report.grossProfit})`);
+    assert(report.grossLoss === 410, `Gross loss 410 € (obtingut: ${report.grossLoss})`);
+    assert(report.netPnL === 1560, `Net PnL 1.560 € (obtingut: ${report.netPnL})`);
+    assert(report.profitFactor === 4.8, `Profit factor 4.8 (obtingut: ${report.profitFactor})`);
+    assert(report.equityCurve.length === 3, '3 punts a la corba d\'equitat');
+  });
+
+  test('33.3 Càlcul de Fricció Fiscal (Tax Drag) i escala de l\'estalvi', () => {
+    // Base imposable 10.000 €:
+    // Fins a 6.000 € al 19% = 1.140 €
+    // De 6.000 a 10.000 (4.000 €) al 21% = 840 €
+    // Total = 1.980 €
+    const tax = calculateSavingsTaxEUR(10000);
+    assert(tax === 1980, `Impost de l'estalvi sobre 10.000 € és 1.980 € (obtingut: ${tax})`);
+
+    const zeroTax = calculateSavingsTaxEUR(-500);
+    assert(zeroTax === 0, 'Pèrdues tributen 0 €');
+  });
+
+  test('33.4 Detecció de Regla dels 2 Mesos (Wash Sales Art. 33.5 LIRPF) i simulació What-If', () => {
+    const washTrades: any[] = [
+      {
+        id: 'w1',
+        concept: 'Santander SA',
+        assetType: 'shares',
+        acquisitionDate: '2024-01-01',
+        transferDate: '2024-01-20',
+        acquisitionValue: 5000,
+        transferValue: 4000,
+        expenses: 0,
+      },
+      {
+        id: 'w2',
+        concept: 'Santander SA',
+        assetType: 'shares',
+        acquisitionDate: '2024-02-05', // 16 dies després! (< 60 dies)
+        transferDate: '2024-06-01',
+        acquisitionValue: 4000,
+        transferValue: 4200,
+        expenses: 0,
+      },
+    ];
+
+    const report = analyzeInvestmentCockpit(washTrades);
+    assert(report.postMortem.hasWashSaleLock === true, 'Detectada recompra en menys de 2 mesos');
+    assert(report.postMortem.blockedWashSaleLossesEUR === 1000, 'Pèrdua de 1.000 € bloquejada');
+    assert(report.whatIfNoWashSales.pnlDifferenceEUR === 190, 'Estalvi d\'impost del 19% = 190 €');
+    assert(report.whatIfStrictStopLoss5Pct.tradesModifiedCount === 1, '1 trade superava el límit del -5%');
+  });
+
+  test('33.5 Gestió de Risc Professional: Criteri de Kelly, VaR 95% i R-Multiples', () => {
+    const trades: any[] = [
+      {
+        id: 'r1',
+        concept: 'Nvidia Corp',
+        type: 'shares',
+        acquisitionDate: '2024-01-10',
+        transferDate: '2024-02-10',
+        acquisitionValue: 5000,
+        transferValue: 6000,
+        expenses: 0,
+        riskAmountEUR: 250, // 1R = 250 € -> PnL = +1.000 € -> +4R
+      },
+      {
+        id: 'r2',
+        concept: 'Tesla Inc',
+        type: 'shares',
+        acquisitionDate: '2024-03-01',
+        transferDate: '2024-03-15',
+        acquisitionValue: 5000,
+        transferValue: 4500,
+        expenses: 0,
+        riskAmountEUR: 250, // 1R = 250 € -> PnL = -500 € -> -2R
+      },
+    ];
+
+    const report = analyzeInvestmentCockpit(trades);
+    assert(report.riskMetrics.totalRAccumulated === 2.0, `R-Multiples nets = +2R (obtingut: ${report.riskMetrics.totalRAccumulated}R)`);
+    assert(report.riskMetrics.kellyFractionPct >= 0, 'Càlcul de fracció de Kelly vàlid');
+    assert(report.riskMetrics.halfKellyPct === report.riskMetrics.kellyFractionPct / 2, 'Half Kelly exactament la meitat');
+    assert(report.riskMetrics.var95EUR > 0, 'Value at Risk calculat per sobre de 0');
+  });
+
+  test('33.6 Mapa de Calor Calendari, Anàlisi per Setups i Diari Kaizen', () => {
+    const trades: any[] = [
+      {
+        id: 's1',
+        concept: 'BTC Breakout',
+        type: 'crypto',
+        acquisitionDate: '2024-01-10',
+        transferDate: '2024-01-11',
+        acquisitionValue: 1000,
+        transferValue: 1300,
+        expenses: 0,
+        setup: 'Breakout',
+        emotionTag: 'Pla Executat',
+        executionGrade: 'A+',
+      },
+      {
+        id: 's2',
+        concept: 'ETH DCA',
+        type: 'crypto',
+        acquisitionDate: '2024-02-01',
+        transferDate: '2024-02-20',
+        acquisitionValue: 1000,
+        transferValue: 1100,
+        expenses: 0,
+        setup: 'DCA / Acumulació',
+        emotionTag: 'Pla Executat',
+        executionGrade: 'A',
+      },
+    ];
+
+    const report = analyzeInvestmentCockpit(trades);
+    assert(report.setups.length === 2, '2 setups registrats');
+    assert(report.setups.some(s => s.setup === 'Breakout'), 'Conté setup Breakout');
+    assert(report.dailyCalendarHeatmap.length === 2, '2 dies al mapa de calor');
+    assert(report.postMortem.kaizenGoldenRules.length > 0, 'Generades regles d\'or Kaizen');
+  });
+});
+
+suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engine.ts)', () => {
+  test('34.1 Execució de backtest amb Stop Loss, Take Profit i Fricció (Slippage/Comissions)', () => {
+    const trades: any[] = [
+      {
+        id: 'bt1',
+        description: 'Apple Inc',
+        type: 'shares',
+        acquisitionDate: '2024-01-10',
+        transferDate: '2024-01-20',
+        acquisitionValue: 2000,
+        transferValue: 2600, // +30% raw -> Take Profit a +18%
+        expenses: 0,
+      },
+      {
+        id: 'bt2',
+        description: 'Tesla Inc',
+        type: 'shares',
+        acquisitionDate: '2024-02-01',
+        transferDate: '2024-02-15',
+        acquisitionValue: 2000,
+        transferValue: 1600, // -20% raw -> Stop Loss tallat a -6%
+        expenses: 0,
+      },
+      {
+        id: 'bt3',
+        description: 'Nvidia Corp',
+        type: 'shares',
+        acquisitionDate: '2024-03-01',
+        transferDate: '2024-03-20',
+        acquisitionValue: 2000,
+        transferValue: 2200, // +10% raw
+        expenses: 0,
+      },
+    ];
+
+    const res = runInstitutionalBacktest(trades, {
+      stopLossPercent: 6,
+      takeProfitPercent: 18,
+      sizingModel: 'fixed_eur',
+      fixedTradeAmountEUR: 2000,
+      commissionPerTradeEUR: 2.50,
+      slippageBps: 10,
+    });
+
+    assert(res.totalTrades === 3, '3 operacions simulades');
+    assert(res.trades[0].exitReason === 'TAKE_PROFIT', 'Primera operació tancada per Take Profit');
+    assert(res.trades[1].exitReason === 'STOP_LOSS', 'Segona operació tallada per Stop Loss');
+    assert(res.totalNetPnL > 0, 'P&L net simulat positiu');
+    assert(res.totalCommissionsEUR === 15, `Comissions totals 15 € (2.50 x 2 x 3 trades) - obtingut: ${res.totalCommissionsEUR}`);
+    assert(res.totalSlippageEUR > 0, 'Slippage calculat');
+  });
+
+  test('34.2 Càlcul de mètriques quantitatives: SQN (Van Tharp), K-Ratio i Z-Score', () => {
+    const trades: any[] = Array.from({ length: 10 }).map((_, i) => ({
+      id: `t_${i}`,
+      description: `Stock ${i}`,
+      type: 'shares',
+      acquisitionDate: `2024-0${Math.floor(i / 2) + 1}-01`,
+      transferDate: `2024-0${Math.floor(i / 2) + 1}-15`,
+      acquisitionValue: 1000,
+      transferValue: i % 3 === 0 ? 800 : 1250,
+      expenses: 0,
+    }));
+
+    const res = runInstitutionalBacktest(trades);
+    assert(res.sqn !== undefined && res.sqn !== null, 'SQN calculat');
+    assert(res.sqnRating.length > 0, 'Qualificació de SQN assignada');
+    assert(res.recoveryFactor > 0, 'Recovery factor calculat');
+    assert(res.runsDependencyText.length > 0, 'Diagnòstic de dependència de ratxes present');
+  });
+
+  test('34.3 Validació Walk-Forward (In-Sample vs Out-of-Sample) i Matriu de Sensibilitat', () => {
+    const trades: any[] = Array.from({ length: 10 }).map((_, i) => ({
+      id: `wf_${i}`,
+      description: `Asset ${i}`,
+      type: 'shares',
+      acquisitionDate: `2024-0${Math.floor(i / 2) + 1}-01`,
+      transferDate: `2024-0${Math.floor(i / 2) + 1}-15`,
+      acquisitionValue: 1000,
+      transferValue: 1150,
+      expenses: 0,
+    }));
+
+    const res = runInstitutionalBacktest(trades, { walkForwardSplitPercent: 70 });
+    assert(res.inSampleMetrics.tradesCount === 7, '7 trades In-Sample (70%)');
+    assert(res.outOfSampleMetrics.tradesCount === 3, '3 trades Out-of-Sample (30%)');
+    assert(res.sensitivityMatrix.length === 16, 'Matriu de sensibilitat 4x4 (16 combinacions)');
   });
 });
 

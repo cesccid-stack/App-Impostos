@@ -230,6 +230,13 @@ export interface GainItem {
   reinvestmentAmount?: number;              // Import efectivament reinvertit en 2 anys (€)
   isLifeAnnuityExemptOver65?: boolean;     // Exempció reinversió en renda vitalícia > 65 anys (Art. 38.3)
   lifeAnnuityAmount?: number;              // Import reinvertit en renda vitalícia (màx 240.000 €)
+
+  // Metadades de Diari de Trading & Optimització Operativa
+  setup?: string;                          // Setup tècnic (ex: Breakout, Mean Reversion, Trend Following, DCA, Dip Buying)
+  emotionTag?: string;                     // Emoció / Biaix (ex: Planned, FOMO, Chasing, Panic Exit, Over-Leveraged)
+  executionGrade?: 'A+' | 'A' | 'B' | 'C' | 'F' | 'Unrated'; // Qualificació d'execució segons pla
+  riskAmountEUR?: number;                  // Risc inicial planificat 1R (€)
+  notes?: string;                          // Diari de reflexió i lliçons apreses
 }
 
 /** Deduccions */
