@@ -2,7 +2,7 @@
  * @module fiscal/backtest-engine
  * Motor Institucional de Backtesting, Optimització Paramètrica (Grid Search),
  * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional
- * (SQN, K-Ratio, Omega, Ulcer, Jensen's Alpha, Cornish-Fisher VaR, CVaR, MAE/MFE, Treynor, Kelly).
+ * (SQN, K-Ratio, Omega, Ulcer, Jensen's Alpha, CAGR, Cornish-Fisher VaR, CVaR, MAE/MFE, Rolling Edge, Treynor, Kelly).
  * 100% connectat a les dades reals d'operativa del declarant sense hipòtesis sintètiques.
  */
 
@@ -120,6 +120,20 @@ export interface StressTestScenario {
   severity: 'BAIXA' | 'MITJANA' | 'ALTA' | 'EXTREMA';
 }
 
+export interface RollingMetricPoint {
+  tradeIndex: number;
+  date: string;
+  rollingWinRatePct: number;
+  rollingProfitFactor: number;
+}
+
+export interface KellyCurvePoint {
+  kellyMultiplier: number;
+  projectedAnnualGrowthPct: number;
+  projectedVolPct: number;
+  label: string;
+}
+
 export interface BacktestReport {
   params: BacktestParameters;
   initialCapital: number;
@@ -146,8 +160,12 @@ export interface BacktestReport {
   maxDrawdownDurationDays: number;// Temps màxim sota l'aigua (Underwater period)
   recoveryFactor: number;         // Net PnL / Max Drawdown EUR
   calmarRatio: number;            // Retorn Anualitzat / Max Drawdown %
+  cagrPercent: number;            // Taxa de Creixement Anual Compost (CAGR) real
+  annualizedVolatilityPercent: number; // Volatilitat anualitzada
   sharpeRatio: number;
   sortinoRatio: number;
+  annualizedSharpeRatio: number;  // Sharpe Anualitzat
+  annualizedSortinoRatio: number; // Sortino Anualitzat
   omegaRatio: number;             // Ràtio Omega (Guanys vs Pèrdues sobre llindar 0)
   gainToPainRatio: number;        // Ràtio Gain-to-Pain (Jack Schwager)
   tailRatio: number;              // Ràtio de Cues (P95 / |P5|)
@@ -232,6 +250,8 @@ export interface BacktestReport {
   assetClassPerformance: AssetClassBacktestPerformance[];
   rMultipleDistribution: RMultipleBucket[];
   stressTestScenarios: StressTestScenario[];
+  rollingWinRateTimeSeries: RollingMetricPoint[];
+  kellyOptimizationCurve: KellyCurvePoint[];
 }
 
 export const BACKTEST_PRESETS = {
@@ -375,6 +395,12 @@ export function runInstitutionalBacktest(
   let oosGrossProfit = 0;
   let oosGrossLoss = 0;
 
+  // Temps total transcorregut
+  const firstDateMs = new Date(sorted[0].acquisitionDate || sorted[0].transferDate || '2024-01-01').getTime();
+  const lastDateMs = new Date(sorted[totalTrades - 1].transferDate || sorted[totalTrades - 1].acquisitionDate || '2024-12-31').getTime();
+  const totalCalendarDays = Math.max(30, Math.round(Math.abs(lastDateMs - firstDateMs) / (1000 * 60 * 60 * 24)));
+  const yearsElapsed = Math.max(0.08, totalCalendarDays / 365.25);
+
   // Underwater Duration
   let peakDateMs = new Date(sorted[0].transferDate || sorted[0].acquisitionDate || '2024-01-01').getTime();
   let maxDrawdownDurationDays = 0;
@@ -385,6 +411,7 @@ export function runInstitutionalBacktest(
   const pnlReturns: number[] = [];
   const benchmarkReturns: number[] = [];
   const simulatedPnLsList: number[] = [];
+  const rollingWinRateTimeSeries: RollingMetricPoint[] = [];
 
   const equityCurve: BacktestReport['equityCurve'] = [
     {
@@ -477,7 +504,7 @@ export function runInstitutionalBacktest(
 
     // Fricció de Mercat Realista: Slippage + Comissions
     const slippageRate = params.slippageBps / 10000;
-    const slippageEUR = roundCurrency(positionSizeEUR * slippageRate * 2); // Entrada i sortida
+    const slippageEUR = roundCurrency(positionSizeEUR * slippageRate * 2);
     const commissionEUR = roundCurrency(params.commissionPerTradeEUR * 2);
 
     totalSlippageEUR = roundCurrency(totalSlippageEUR + slippageEUR);
@@ -613,6 +640,21 @@ export function runInstitutionalBacktest(
       simulatedDrawdownPct: curDdPct,
       isOutOfSample,
     });
+
+    // Càlcul de Rolling Win Rate i Profit Factor (Finestra mòbil de 10 operacions)
+    if (idx >= 4) {
+      const windowStart = Math.max(0, idx - 9);
+      const windowTrades = simulatedTrades.slice(windowStart, idx + 1);
+      const wWins = windowTrades.filter(t => t.isWin).length;
+      const wGrossP = windowTrades.filter(t => t.isWin).reduce((s, t) => s + t.simulatedPnL, 0);
+      const wGrossL = Math.abs(windowTrades.filter(t => t.isLoss).reduce((s, t) => s + t.simulatedPnL, 0));
+      rollingWinRateTimeSeries.push({
+        tradeIndex: idx + 1,
+        date: item.transferDate || `T${idx + 1}`,
+        rollingWinRatePct: roundCurrency((wWins / windowTrades.length) * 100),
+        rollingProfitFactor: wGrossL > 0 ? roundCurrency(wGrossP / wGrossL) : (wGrossP > 0 ? 5.0 : 1.0),
+      });
+    }
   }
 
   // 3. Mètriques Estadístiques Avançades
@@ -623,6 +665,30 @@ export function runInstitutionalBacktest(
   const payoffRatio = avgLoss > 0 ? roundCurrency(avgWin / avgLoss) : 1.0;
   const expectancyEUR = totalTrades > 0 ? roundCurrency(simulatedCumulativePnL / totalTrades) : 0;
   const avgRMultiple = tradeReturnsR.length > 0 ? roundCurrency(tradeReturnsR.reduce((a, b) => a + b, 0) / tradeReturnsR.length) : 0;
+
+  // CAGR i Volatilitat Anualitzada Real
+  const totalNetReturnFraction = simulatedCumulativePnL / params.initialCapitalEUR;
+  const cagrPercent = roundCurrency((Math.pow(Math.max(0.01, 1 + totalNetReturnFraction), 1 / yearsElapsed) - 1) * 100);
+  
+  const tradesPerYear = totalTrades / yearsElapsed;
+  const avgRet = pnlReturns.length > 0 ? pnlReturns.reduce((a, b) => a + b, 0) / pnlReturns.length : 0;
+  const retStd = Math.sqrt(pnlReturns.reduce((s, r) => s + Math.pow(r - avgRet, 2), 0) / Math.max(1, pnlReturns.length - 1)) || 1;
+  const annualizedVolatilityPercent = roundCurrency(retStd * Math.sqrt(Math.max(1, tradesPerYear)));
+
+  // Sharpe i Sortino Anualitzats
+  const RISK_FREE_RATE_ANNUAL = 3.0; // Tipus lliure de risc BCE/Euribor ~3%
+  const sharpeRatio = roundCurrency(avgRet / retStd);
+  const annualizedSharpeRatio = annualizedVolatilityPercent > 0
+    ? roundCurrency((cagrPercent - RISK_FREE_RATE_ANNUAL) / annualizedVolatilityPercent)
+    : sharpeRatio;
+
+  const downReturns = pnlReturns.filter(r => r < 0);
+  const downStd = Math.sqrt(downReturns.reduce((s, r) => s + Math.pow(r, 2), 0) / Math.max(1, downReturns.length)) || 1;
+  const sortinoRatio = roundCurrency(avgRet / downStd);
+  const annualizedDownsideVol = downStd * Math.sqrt(Math.max(1, tradesPerYear));
+  const annualizedSortinoRatio = annualizedDownsideVol > 0
+    ? roundCurrency((cagrPercent - RISK_FREE_RATE_ANNUAL) / annualizedDownsideVol)
+    : sortinoRatio;
 
   // System Quality Number (SQN) de Van Tharp: (Mean R / StdDev R) * sqrt(N)
   const meanR = avgRMultiple;
@@ -668,17 +734,7 @@ export function runInstitutionalBacktest(
 
   // Recovery Factor & Calmar
   const recoveryFactor = maxDrawdownEUR > 0 ? roundCurrency(simulatedCumulativePnL / maxDrawdownEUR) : 5.0;
-  const annualReturnPct = (simulatedCumulativePnL / params.initialCapitalEUR) * 100;
-  const calmarRatio = maxDrawdownPercent > 0 ? roundCurrency(annualReturnPct / maxDrawdownPercent) : 5.0;
-
-  // Sharpe i Sortino
-  const avgRet = pnlReturns.length > 0 ? pnlReturns.reduce((a, b) => a + b, 0) / pnlReturns.length : 0;
-  const retStd = Math.sqrt(pnlReturns.reduce((s, r) => s + Math.pow(r - avgRet, 2), 0) / Math.max(1, pnlReturns.length - 1)) || 1;
-  const sharpeRatio = roundCurrency(avgRet / retStd);
-
-  const downReturns = pnlReturns.filter(r => r < 0);
-  const downStd = Math.sqrt(downReturns.reduce((s, r) => s + Math.pow(r, 2), 0) / Math.max(1, downReturns.length)) || 1;
-  const sortinoRatio = roundCurrency(avgRet / downStd);
+  const calmarRatio = maxDrawdownPercent > 0 ? roundCurrency(cagrPercent / maxDrawdownPercent) : 5.0;
 
   // Beta & Jensen's Alpha vs Benchmark (CAPM)
   const avgBenchRet = benchmarkReturns.length > 0 ? benchmarkReturns.reduce((a, b) => a + b, 0) / benchmarkReturns.length : 0;
@@ -714,7 +770,7 @@ export function runInstitutionalBacktest(
   const p95Val = sortedRets[p95Idx] || 1;
   const tailRatio = p5Val > 0 ? roundCurrency(p95Val / p5Val) : 1.0;
 
-  // Ulcer Index (UI) - Arrel quadrada de la mitjana de quadrats de percentatges de drawdown
+  // Ulcer Index (UI)
   const meanSqDd = squaredDrawdownsPct.length > 0 ? squaredDrawdownsPct.reduce((a, b) => a + b, 0) / squaredDrawdownsPct.length : 0;
   const ulcerIndex = roundCurrency(Math.sqrt(meanSqDd));
 
@@ -731,12 +787,10 @@ export function runInstitutionalBacktest(
   const historicalVaR95EUR = Math.abs(Math.min(0, sortedPnLs[histP5Idx] || 0));
   const historicalVaR99EUR = Math.abs(Math.min(0, sortedPnLs[histP1Idx] || 0));
 
-  // Cornish-Fisher VaR: z_cf = z + (z^2 - 1)*S/6 + (z^3 - 3*z)*K/24 - (2*z^3 - 5*z)*S^2/36
   const z95 = 1.645;
   const z_cf = z95 + (Math.pow(z95, 2) - 1) * (skewness / 6) + (Math.pow(z95, 3) - 3 * z95) * (kurtosis / 24) - (2 * Math.pow(z95, 3) - 5 * z95) * (Math.pow(skewness, 2) / 36);
   const cornishFisherVaR95EUR = roundCurrency(Math.max(historicalVaR95EUR, (params.initialCapitalEUR * (z_cf * (retStd / 100)))));
 
-  // Conditional VaR (Expected Shortfall)
   const worst5PctTrades = sortedPnLs.slice(0, Math.max(1, histP5Idx + 1));
   const conditionalVaR95EUR = roundCurrency(Math.abs(worst5PctTrades.reduce((a, b) => a + b, 0) / worst5PctTrades.length));
 
@@ -745,17 +799,17 @@ export function runInstitutionalBacktest(
   const avgMfePercent = roundCurrency(simulatedTrades.reduce((s, t) => s + t.mfePercent, 0) / (totalTrades || 1));
   const tradeExecutionEfficiencyScore = roundCurrency(simulatedTrades.reduce((s, t) => s + t.executionEfficiencyPct, 0) / (totalTrades || 1));
 
-  // Risc de Ruïna (Risk of Ruin segons fórmula de Perry Kaufman)
+  // Risc de Ruïna
   const lossProb = 1 - (winRate / 100);
   const winProb = winRate / 100;
   const rorBase = winProb > 0 ? (lossProb / winProb) : 1;
   const riskOfRuinPercent = Math.min(100, Math.max(0, roundCurrency(Math.pow(rorBase, 15) * 100)));
 
-  // Test de Significació Estadística Monte Carlo (Permutation Test p-value)
+  // Test de Significació Estadística Monte Carlo
   const monteCarloPValue = calculateMonteCarloPermutationPValue(simulatedTrades.map(t => t.simulatedPnL));
   const isEdgeStatisticallySignificant = monteCarloPValue < 0.05;
 
-  // Fiscalitat IRPF (Escala de l'Estalvi 19%-28%)
+  // Fiscalitat IRPF
   const taxableBase = Math.max(0, simulatedCumulativePnL + totalWashSaleDeferredLossEUR);
   const estimatedTaxIRPF = calculateSavingsTaxEUR(taxableBase);
   const netCapitalAfterTax = roundCurrency(currentCapital - estimatedTaxIRPF);
@@ -825,6 +879,23 @@ export function runInstitutionalBacktest(
     },
   ];
 
+  // 9. Corba d'Assignació Òptima de Kelly (Kelly Curve Optimization)
+  const kellyOptimizationCurve: KellyCurvePoint[] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5].map(kMult => {
+    const projGrowth = roundCurrency(cagrPercent * kMult * (1 - (kMult > 1 ? (kMult - 1) * 0.3 : 0)));
+    const projVol = roundCurrency(annualizedVolatilityPercent * kMult);
+    let label = `${kMult}x Kelly`;
+    if (kMult === 0.5) label = '0.5x Half-Kelly (Òptim Institucional)';
+    else if (kMult === 1.0) label = '1.0x Full Kelly (Màxim Creixement)';
+    else if (kMult > 1.0) label = `${kMult}x Over-betting (Zona de Perill)`;
+
+    return {
+      kellyMultiplier: kMult,
+      projectedAnnualGrowthPct: projGrowth,
+      projectedVolPct: projVol,
+      label,
+    };
+  });
+
   return {
     params,
     initialCapital: params.initialCapitalEUR,
@@ -849,8 +920,12 @@ export function runInstitutionalBacktest(
     maxDrawdownDurationDays,
     recoveryFactor,
     calmarRatio,
+    cagrPercent,
+    annualizedVolatilityPercent,
     sharpeRatio,
     sortinoRatio,
+    annualizedSharpeRatio,
+    annualizedSortinoRatio,
     omegaRatio,
     gainToPainRatio,
     tailRatio,
@@ -911,6 +986,8 @@ export function runInstitutionalBacktest(
     assetClassPerformance,
     rMultipleDistribution,
     stressTestScenarios,
+    rollingWinRateTimeSeries,
+    kellyOptimizationCurve,
   };
 }
 
@@ -1146,8 +1223,12 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     maxDrawdownDurationDays: 0,
     recoveryFactor: 0,
     calmarRatio: 0,
+    cagrPercent: 0,
+    annualizedVolatilityPercent: 0,
     sharpeRatio: 0,
     sortinoRatio: 0,
+    annualizedSharpeRatio: 0,
+    annualizedSortinoRatio: 0,
     omegaRatio: 1.0,
     gainToPainRatio: 0,
     tailRatio: 1.0,
@@ -1196,5 +1277,7 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     assetClassPerformance: [],
     rMultipleDistribution: [],
     stressTestScenarios: [],
+    rollingWinRateTimeSeries: [],
+    kellyOptimizationCurve: [],
   };
 }

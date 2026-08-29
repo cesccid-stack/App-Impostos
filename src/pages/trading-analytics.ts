@@ -1,7 +1,7 @@
 /**
  * @module pages/trading-analytics
  * Quadre de Comandament d'Inversions, Trading, Laboratori de Backtest Institucional & Kaizen 360°.
- * Avalua el rendiment, tècniques operatives (Borsa, Cripto, Fons), gestió de risc (Kelly/VaR/Cornish-Fisher),
+ * Avalua el rendiment, tècniques operatives (Borsa, Cripto, Fons), gestió de risc (Kelly/VaR/Cornish-Fisher/CAGR),
  * simulació de backtesting multi-estratègia, mapa de calor calendari i pla de millora contínua.
  */
 
@@ -91,7 +91,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <span class="badge badge--success">${report.totalTrades} operacions reals</span>
           </div>
           <p class="page-header__subtitle" style="margin:0; color:var(--text-secondary); font-size:0.9rem;">
-            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Cornish-Fisher VaR / CAPM), ràtios Kelly/VaR i millora contínua Kaizen.
+            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / CAGR / Cornish-Fisher VaR / CAPM), ràtios Kelly/VaR i millora contínua Kaizen.
           </p>
         </div>
         <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap;">
@@ -249,7 +249,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Win Rate</div>
               <div style="font-size:1.8rem; font-weight:900; color:var(--color-primary);">${report.winRate}%</div>
-              <div style="font-size:0.7rem; color:var(--text-secondary);">${report.winningTrades}W / ${report.losingTrades}L (${report.breakevenTrades} BE)</div>
+              <div style="font-size:0.7rem; color:var(--text-secondary);">(${report.winningTrades}W / ${report.losingTrades}L / ${report.breakevenTrades} BE)</div>
             </div>
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Profit Factor</div>
@@ -436,8 +436,11 @@ export function renderTradingAnalytics(): HTMLElement {
             </p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--secondary btn--sm" id="btn-export-backtest-html">
+              🌐 Exportar HTML
+            </button>
             <button class="btn btn--secondary btn--sm" id="btn-export-backtest-json">
-              📥 Exportar JSON (Quant)
+              📥 Exportar JSON
             </button>
             <button class="btn btn--secondary btn--sm" id="btn-export-backtest-csv">
               📥 Descarregar CSV
@@ -524,12 +527,20 @@ export function renderTradingAnalytics(): HTMLElement {
         </div>
 
         <div class="card" style="border-top:4px solid var(--accent-start);">
+          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">CAGR & Volatilitat</div>
+          <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:${bt.cagrPercent >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+            ${bt.cagrPercent >= 0 ? '+' : ''}${bt.cagrPercent}%
+          </div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">Vol. Anual: <strong>${bt.annualizedVolatilityPercent}%</strong> | Sharpe An.: <strong>${bt.annualizedSharpeRatio}</strong></div>
+        </div>
+
+        <div class="card" style="border-top:4px solid var(--color-info);">
           <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">System Quality Number (SQN)</div>
-          <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:var(--accent-start);">
+          <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:var(--color-info);">
             ${bt.sqn.toFixed(2)}
             <span class="badge badge--success" style="font-size:0.7rem; vertical-align:middle;">${bt.sqnRating}</span>
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">Van Tharp Quality Score</div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">Van Tharp Score</div>
         </div>
 
         <div class="card" style="border-top:4px solid ${bt.isRobustWalkForward ? 'var(--color-success)' : 'var(--color-warning)'};">
@@ -537,7 +548,7 @@ export function renderTradingAnalytics(): HTMLElement {
           <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:${bt.isRobustWalkForward ? 'var(--color-success)' : 'var(--color-warning)'};">
             ${bt.walkForwardEfficiencyRatio}%
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isRobustWalkForward ? '✅ Model Robust (Sense Curve-Fitting)' : '⚠️ Risc de Sobreajust'}</div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isRobustWalkForward ? '✅ Model Robust' : '⚠️ Risc de Sobreajust'}</div>
         </div>
 
         <div class="card" style="border-top:4px solid ${bt.isEdgeStatisticallySignificant ? 'var(--color-success)' : 'var(--color-info)'};">
@@ -545,15 +556,7 @@ export function renderTradingAnalytics(): HTMLElement {
           <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:${bt.isEdgeStatisticallySignificant ? 'var(--color-success)' : 'var(--color-info)'};">
             p = ${bt.monteCarloPValue}
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isEdgeStatisticallySignificant ? '⭐ Edge Estadístic Significatiu (p < 0.05)' : 'Edge Dins de l\'Atzar Normal'}</div>
-        </div>
-
-        <div class="card" style="border-top:4px solid var(--color-info);">
-          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Profit Factor & Payoff</div>
-          <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:var(--color-info);">
-            ${bt.profitFactor.toFixed(2)}
-          </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">Payoff: <strong>${bt.payoffRatio.toFixed(2)}</strong> | WR: <strong>${bt.winRate}%</strong></div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isEdgeStatisticallySignificant ? '⭐ Edge Significatiu (p < 0.05)' : 'Edge Dins de l\'Atzar'}</div>
         </div>
 
       </div>
@@ -641,6 +644,56 @@ export function renderTradingAnalytics(): HTMLElement {
           ${renderBacktestEquityCurveSvg(bt.equityCurve)}
         </div>
       </div>
+
+      <!-- Monitor de Rolling Edge & Decaïment d'Alpha (Ventana de 10 Trades) -->
+      ${bt.rollingWinRateTimeSeries.length > 2 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
+            <div>
+              <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+                <span>🌊 Monitor de Rolling Edge & Estabilitat d'Alpha (Finestra Mòbil 10 Trades)</span>
+              </div>
+              <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+                Supervisió de la consistència temporal: detecta si l'avantatge competitiu es manté viu o si s'està degradant
+              </div>
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;">
+            ${renderRollingEdgeSvg(bt.rollingWinRateTimeSeries)}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Corba d'Assignació Òptima de Kelly (Kelly Allocation Curve) -->
+      ${bt.kellyOptimizationCurve.length > 0 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md);">
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>⚖️ Corba d'Assignació Òptima de Capital segons el Criteri de Kelly</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              Compara el compromís entre creixement anual projectat i volatilitat de cartera per fraccions de Kelly
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:var(--space-md); text-align:center;">
+            ${bt.kellyOptimizationCurve.map(k => `
+              <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md); border:1px solid ${k.kellyMultiplier === 0.5 ? 'var(--color-primary)' : 'var(--border-default)'};">
+                <div style="font-size:0.75rem; font-weight:800; color:${k.kellyMultiplier === 0.5 ? 'var(--color-primary)' : (k.kellyMultiplier > 1.0 ? 'var(--color-error)' : 'var(--text-secondary)')}; margin-bottom:4px;">
+                  ${k.label}
+                </div>
+                <div style="font-size:1.2rem; font-weight:900; font-family:var(--font-mono); color:${k.projectedAnnualGrowthPct >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+                  ${k.projectedAnnualGrowthPct >= 0 ? '+' : ''}${k.projectedAnnualGrowthPct}% / any
+                </div>
+                <div style="font-size:0.65rem; color:var(--text-muted); margin-top:2px;">
+                  Volatilitat: <strong>${k.projectedVolPct}%</strong>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Proves d'Estrès de Mercat (Stress-Testing Scenarios) -->
       ${bt.stressTestScenarios.length > 0 ? `
@@ -1517,7 +1570,7 @@ export function renderTradingAnalytics(): HTMLElement {
     });
   }
 
-  // ── EXPORTACIÓ CSV & JSON DEL BACKTEST ──────────────────────────────────────
+  // ── EXPORTACIONS MULTI-FORMAT (CSV, JSON & HTML AUTÒNOM) ───────────────────
   function exportBacktestCsv(bt: BacktestReport) {
     const headers = [
       'Trade #',
@@ -1586,6 +1639,100 @@ export function renderTradingAnalytics(): HTMLElement {
     link.click();
     link.remove();
     showToast('Informe JSON quantitatiu descarregat per a Python / Pandas!', 'success');
+  }
+
+  function exportBacktestHtmlReport(bt: BacktestReport) {
+    const html = `
+      <!DOCTYPE html>
+      <html lang="ca">
+      <head>
+        <meta charset="utf-8" />
+        <title>Informe Quant de Backtesting Institucional</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+          .header { margin-bottom: 24px; border-bottom: 1px solid #334155; padding-bottom: 16px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+          .card { background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
+          .val { font-size: 1.8rem; font-weight: 900; margin: 6px 0; font-family: monospace; }
+          .pos { color: #10b981; } .neg { color: #ef4444; } .prim { color: #6366f1; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.85rem; }
+          th, td { padding: 8px 12px; border-bottom: 1px solid #334155; text-align: left; }
+          th { background: #0f172a; color: #94a3b8; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🧪 Informe Quantitatiu de Backtesting & Gestió de Risc</h1>
+          <p>Generat per App-Impostos | ${new Date().toLocaleDateString('ca-ES')}</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div>P&L Simulat</div>
+            <div class="val ${bt.totalNetPnL >= 0 ? 'pos' : 'neg'}">${bt.totalNetPnL >= 0 ? '+' : ''}${formatCurrency(bt.totalNetPnL)}</div>
+          </div>
+          <div class="card">
+            <div>CAGR Anual</div>
+            <div class="val ${bt.cagrPercent >= 0 ? 'pos' : 'neg'}">${bt.cagrPercent >= 0 ? '+' : ''}${bt.cagrPercent}%</div>
+          </div>
+          <div class="card">
+            <div>SQN (Van Tharp)</div>
+            <div class="val prim">${bt.sqn.toFixed(2)} (${bt.sqnRating})</div>
+          </div>
+          <div class="card">
+            <div>Walk-Forward Eff.</div>
+            <div class="val pos">${bt.walkForwardEfficiencyRatio}%</div>
+          </div>
+          <div class="card">
+            <div>Jensen's Alpha</div>
+            <div class="val ${bt.jensenAlphaPct >= 0 ? 'pos' : 'neg'}">${bt.jensenAlphaPct >= 0 ? '+' : ''}${bt.jensenAlphaPct}%</div>
+          </div>
+          <div class="card">
+            <div>Cornish-Fisher VaR 95%</div>
+            <div class="val neg">${formatCurrency(bt.cornishFisherVaR95EUR)}</div>
+          </div>
+        </div>
+
+        <h2>Auditoria d'Operacions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Actiu</th>
+              <th>Dates</th>
+              <th>P&L Real</th>
+              <th>P&L Simulat</th>
+              <th>Sortida</th>
+              <th>R-Multiple</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bt.trades.map(t => `
+              <tr>
+                <td>${t.tradeIndex}</td>
+                <td>${t.concept}</td>
+                <td>${t.entryDate} → ${t.exitDate} (${t.holdingDays}d)</td>
+                <td class="${t.actualPnL >= 0 ? 'pos' : 'neg'}">${formatCurrency(t.actualPnL)}</td>
+                <td class="${t.simulatedPnL >= 0 ? 'pos' : 'neg'}"><strong>${formatCurrency(t.simulatedPnL)}</strong></td>
+                <td>${t.exitReason}</td>
+                <td>${t.rMultiple}R</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `informe_quant_trading_${new Date().toISOString().split('T')[0]}.html`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Informe HTML autònom descarregat!', 'success');
   }
 
   // ── ATTACH LISTENERS ───────────────────────────────────────────────────────
@@ -1664,13 +1811,17 @@ export function renderTradingAnalytics(): HTMLElement {
       });
     });
 
-    // Export CSV & JSON Backtest
+    // Exportacions Multi-Format
     container.querySelector('#btn-export-backtest-csv')?.addEventListener('click', () => {
       exportBacktestCsv(btReport);
     });
 
     container.querySelector('#btn-export-backtest-json')?.addEventListener('click', () => {
       exportBacktestJson(btReport);
+    });
+
+    container.querySelector('#btn-export-backtest-html')?.addEventListener('click', () => {
+      exportBacktestHtmlReport(btReport);
     });
 
     // Sliders i controls de Backtest
@@ -1856,6 +2007,34 @@ function renderBacktestEquityCurveSvg(points: BacktestReport['equityCurve']): st
 
       <!-- Simulat Optimizat (Lila / Primari) -->
       <path d="${simPath}" fill="none" stroke="var(--color-primary)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+}
+
+function renderRollingEdgeSvg(points: { tradeIndex: number; date: string; rollingWinRatePct: number; rollingProfitFactor: number }[]): string {
+  if (points.length < 2) return '';
+
+  const width = 800;
+  const height = 180;
+  const padding = 40;
+
+  const minWR = 0;
+  const wrRange = 100;
+
+  const getX = (i: number) => padding + (i / (points.length - 1)) * (width - 2 * padding);
+  const getY = (wr: number) => height - padding - ((wr - minWR) / wrRange) * (height - 2 * padding);
+
+  const wrPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(p.rollingWinRatePct).toFixed(1)}`).join(' ');
+  const benchmark50Y = getY(50);
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${padding}" y1="${benchmark50Y}" x2="${width - padding}" y2="${benchmark50Y}" stroke="var(--border-default)" stroke-width="1.5" stroke-dasharray="4 4" />
+      <text x="${padding - 8}" y="${benchmark50Y + 4}" text-anchor="end" fill="var(--text-muted)" font-size="10" font-family="monospace">50% WR</text>
+      <path d="${wrPath}" fill="none" stroke="var(--color-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      ${points.map((p, i) => `
+        <circle cx="${getX(i).toFixed(1)}" cy="${getY(p.rollingWinRatePct).toFixed(1)}" r="3.5" fill="${p.rollingWinRatePct >= 50 ? '#10b981' : '#ef4444'}" />
+      `).join('')}
     </svg>
   `;
 }

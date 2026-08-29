@@ -2549,6 +2549,49 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
     assert(res.tradeExecutionEfficiencyScore >= 0, 'Trade execution efficiency calculada');
     assert(res.stressTestScenarios.length === 3, '3 escenaris de stress testing generats');
   });
+
+  test('34.7 Mètriques Temporals: CAGR, Volatilitat Anualitzada, Rolling Edge i Corba de Kelly', () => {
+    const trades: any[] = [
+      {
+        id: 'cagr_1',
+        description: 'Trade Jan',
+        type: 'shares',
+        acquisitionDate: '2024-01-01',
+        transferDate: '2024-03-01',
+        acquisitionValue: 5000,
+        transferValue: 5800,
+        expenses: 5,
+      },
+      {
+        id: 'cagr_2',
+        description: 'Trade Jun',
+        type: 'crypto',
+        acquisitionDate: '2024-06-01',
+        transferDate: '2024-08-01',
+        acquisitionValue: 5000,
+        transferValue: 5600,
+        expenses: 5,
+      },
+      {
+        id: 'cagr_3',
+        description: 'Trade Nov',
+        type: 'funds',
+        acquisitionDate: '2024-11-01',
+        transferDate: '2024-12-15',
+        acquisitionValue: 5000,
+        transferValue: 5400,
+        expenses: 5,
+      },
+    ];
+
+    const res = runInstitutionalBacktest(trades);
+    assert(res.cagrPercent !== undefined, 'CAGR calculat');
+    assert(res.annualizedVolatilityPercent >= 0, 'Volatilitat anualitzada calculada');
+    assert(res.annualizedSharpeRatio !== undefined, 'Sharpe anualitzat calculat');
+    assert(res.annualizedSortinoRatio !== undefined, 'Sortino anualitzat calculat');
+    assert(res.kellyOptimizationCurve.length === 6, '6 punts de la corba d\'optimització de Kelly');
+    assert(res.kellyOptimizationCurve.some(k => k.kellyMultiplier === 0.5), 'Conté Half-Kelly');
+  });
 });
 
 // ── INFORME I BALANÇ FINAL ──────────────────────────────────────────────────
