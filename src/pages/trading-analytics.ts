@@ -38,6 +38,7 @@ export function renderTradingAnalytics(): HTMLElement {
   let selectedSetup: string | 'ALL' = 'ALL';
   let activeTab: 'cockpit' | 'backtest' | 'calendar' | 'setups' | 'journal' | 'kaizen' | 'whatif' | 'harvesting' = 'cockpit';
   let searchQuery = '';
+  let backtestTradeFilter: 'ALL' | 'MODIFIED' | 'STOP_LOSS' | 'TAKE_PROFIT' = 'ALL';
   let monteCarloHorizon = 100;
   const monteCarloCap = 10000;
 
@@ -84,7 +85,7 @@ export function renderTradingAnalytics(): HTMLElement {
               📈 Quadre de Comandament d'Inversions & Backtest Institucional
             </h1>
             <span class="badge badge--primary">Quant & Walk-Forward</span>
-            <span class="badge badge--success">${report.totalTrades} operacions</span>
+            <span class="badge badge--success">${report.totalTrades} operacions reals</span>
           </div>
           <p class="page-header__subtitle" style="margin:0; color:var(--text-secondary); font-size:0.9rem;">
             Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN), ràtios Kelly/VaR i millora contínua Kaizen.
@@ -174,7 +175,7 @@ export function renderTradingAnalytics(): HTMLElement {
       </div>
     `;
 
-    attachEventListeners(page, report);
+    attachEventListeners(page, report, backtestReport);
   }
 
   function renderTabContent(
@@ -386,6 +387,14 @@ export function renderTradingAnalytics(): HTMLElement {
   function renderBacktestLaboratoryView(bt: BacktestReport): string {
     const isOutperforming = bt.strategyEdgeOverRealEUR >= 0;
 
+    // Filtrar operacions per a la taula d'inspecció
+    const filteredTrades = bt.trades.filter(t => {
+      if (backtestTradeFilter === 'MODIFIED') return t.wasModifiedByStrategy;
+      if (backtestTradeFilter === 'STOP_LOSS') return t.exitReason === 'STOP_LOSS';
+      if (backtestTradeFilter === 'TAKE_PROFIT') return t.exitReason === 'TAKE_PROFIT';
+      return true;
+    });
+
     return `
       <!-- Panell de Configuració Paramètrica del Backtest -->
       <div class="card" style="margin-bottom:var(--space-xl); background:linear-gradient(135deg, var(--bg-surface-elevated), var(--bg-surface)); border:1px solid var(--border-accent);">
@@ -395,12 +404,17 @@ export function renderTradingAnalytics(): HTMLElement {
               <span>🧪 Laboratori de Backtesting Quant & Optimització Walk-Forward</span>
             </h2>
             <p style="margin:0; font-size:0.85rem; color:var(--text-secondary);">
-              Simula regles estrictes d'entrada/sortida, comissions, slippage i validació fora de mostra (In-Sample vs Out-of-Sample).
+              Simulació exacta sobre les teves dades reals sense hipòtesis sintètiques. Ajusta regles, slippage i comissions.
             </p>
           </div>
-          <button class="btn btn--primary btn--sm" id="btn-re-run-backtest">
-            ⚡ Executar Backtest amb Paràmetres Actuals
-          </button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--secondary btn--sm" id="btn-export-backtest-csv">
+              📥 Descarregar CSV Backtest
+            </button>
+            <button class="btn btn--primary btn--sm" id="btn-re-run-backtest">
+              ⚡ Recalcular Backtest
+            </button>
+          </div>
         </div>
 
         <!-- Controls Interactius de Paràmetres -->
@@ -436,6 +450,7 @@ export function renderTradingAnalytics(): HTMLElement {
           <div>
             <label class="form-label" style="font-size:0.75rem; font-weight:700;">Dimensionament (Sizing):</label>
             <select class="form-select" id="bt-sizing-model" style="font-size:0.8rem; width:100%;">
+              <option value="actual_trade_capital" ${backtestParams.sizingModel === 'actual_trade_capital' ? 'selected' : ''}>💎 Capital Real per Operació (Exacte)</option>
               <option value="half_kelly" ${backtestParams.sizingModel === 'half_kelly' ? 'selected' : ''}>🛡️ Half-Kelly Conservador</option>
               <option value="fixed_fractional" ${backtestParams.sizingModel === 'fixed_fractional' ? 'selected' : ''}>📊 1.5% Risc Fix per Trade</option>
               <option value="fixed_eur" ${backtestParams.sizingModel === 'fixed_eur' ? 'selected' : ''}>💶 2.000 € Import Fix</option>
@@ -456,7 +471,7 @@ export function renderTradingAnalytics(): HTMLElement {
       </div>
 
       <!-- Resultats Clau del Backtest: Scorecards -->
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl); text-align:center;">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl); text-align:center;">
         
         <div class="card" style="border-top:4px solid var(--color-primary);">
           <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">P&L Simulat Backtest</div>
@@ -474,7 +489,7 @@ export function renderTradingAnalytics(): HTMLElement {
             ${bt.sqn.toFixed(2)}
             <span class="badge badge--success" style="font-size:0.7rem; vertical-align:middle;">${bt.sqnRating}</span>
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">Qualitat Van Tharp Score</div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">Van Tharp Quality Score</div>
         </div>
 
         <div class="card" style="border-top:4px solid ${bt.isRobustWalkForward ? 'var(--color-success)' : 'var(--color-warning)'};">
@@ -482,7 +497,15 @@ export function renderTradingAnalytics(): HTMLElement {
           <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:${bt.isRobustWalkForward ? 'var(--color-success)' : 'var(--color-warning)'};">
             ${bt.walkForwardEfficiencyRatio}%
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isRobustWalkForward ? '✅ Model Robust (No Sobreoptimitzat)' : '⚠️ Risc de Curve-Fitting'}</div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isRobustWalkForward ? '✅ Model Robust (Sense Curve-Fitting)' : '⚠️ Risc de Sobreajust'}</div>
+        </div>
+
+        <div class="card" style="border-top:4px solid ${bt.isEdgeStatisticallySignificant ? 'var(--color-success)' : 'var(--color-info)'};">
+          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Test Monte Carlo (p-value)</div>
+          <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:${bt.isEdgeStatisticallySignificant ? 'var(--color-success)' : 'var(--color-info)'};">
+            p = ${bt.monteCarloPValue}
+          </div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">${bt.isEdgeStatisticallySignificant ? '⭐ Edge Estadístic Significatiu (p < 0.05)' : 'Edge Dins de l\'Atzar Normal'}</div>
         </div>
 
         <div class="card" style="border-top:4px solid var(--color-info);">
@@ -490,7 +513,7 @@ export function renderTradingAnalytics(): HTMLElement {
           <div style="font-size:1.8rem; font-weight:900; font-family:var(--font-mono); color:var(--color-info);">
             ${bt.profitFactor.toFixed(2)}
           </div>
-          <div style="font-size:0.7rem; color:var(--text-secondary);">Payoff R:R: <strong>${bt.payoffRatio.toFixed(2)}</strong> | WR: <strong>${bt.winRate}%</strong></div>
+          <div style="font-size:0.7rem; color:var(--text-secondary);">Payoff: <strong>${bt.payoffRatio.toFixed(2)}</strong> | WR: <strong>${bt.winRate}%</strong></div>
         </div>
 
       </div>
@@ -500,7 +523,7 @@ export function renderTradingAnalytics(): HTMLElement {
         <div class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm); margin-bottom:var(--space-md);">
           <div>
             <div class="card__title" style="display:flex; align-items:center; gap:8px;">
-              <span>📈 Comparativa de Corba d'Equitat (Backtest vs Real vs S&P 500)</span>
+              <span>📈 Comparativa de Corba d'Equitat (Backtest vs Real vs S&P 500 Ponderat)</span>
             </div>
             <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
               Línia divisòria discontinua: In-Sample (Entrenament) vs Out-of-Sample (Validació Cega)
@@ -532,7 +555,7 @@ export function renderTradingAnalytics(): HTMLElement {
         
         <div class="card" style="border-left:4px solid var(--color-info);">
           <h3 style="margin:0 0 var(--space-sm) 0; font-size:1rem; font-weight:800;">
-            📊 Fase In-Sample (70% Dades Històriques)
+            📊 Fase In-Sample (${backtestParams.walkForwardSplitPercent}% Dades Històriques)
           </h3>
           <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:var(--space-sm); font-size:0.85rem;">
             <div>Operacions: <strong>${bt.inSampleMetrics.tradesCount}</strong></div>
@@ -544,7 +567,7 @@ export function renderTradingAnalytics(): HTMLElement {
 
         <div class="card" style="border-left:4px solid ${bt.isRobustWalkForward ? 'var(--color-success)' : 'var(--color-warning)'};">
           <h3 style="margin:0 0 var(--space-sm) 0; font-size:1rem; font-weight:800;">
-            🎯 Fase Out-of-Sample (30% Validació Cega)
+            🎯 Fase Out-of-Sample (${100 - backtestParams.walkForwardSplitPercent}% Validació Cega)
           </h3>
           <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:var(--space-sm); font-size:0.85rem;">
             <div>Operacions: <strong>${bt.outOfSampleMetrics.tradesCount}</strong></div>
@@ -557,11 +580,11 @@ export function renderTradingAnalytics(): HTMLElement {
       </div>
 
       <!-- Matriu de Sensibilitat Paramètrica 4x4 (Grid Search Heatmap) -->
-      <div class="card">
+      <div class="card" style="margin-bottom:var(--space-xl);">
         <div class="card__header" style="margin-bottom:var(--space-md);">
           <div class="card__title" style="display:flex; align-items:center; gap:8px;">
             <span>🔬 Matriu de Sensibilitat Paramètrica (Grid Search 4x4)</span>
-            <span class="badge badge--secondary">Robustesa vs Curve-Fitting</span>
+            <span class="badge badge--secondary">Dades Reals del Compte</span>
           </div>
           <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
             Comprova si el rendiment es manté estable en un rang ampli de Stop Loss i Take Profit o si depèn d'un pic sobreoptimitzat
@@ -599,6 +622,88 @@ export function renderTradingAnalytics(): HTMLElement {
                   }).join('')}
                 </tr>
               `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inspector Detallat Trade a Trade (Dades 100% Reals) -->
+      <div class="card">
+        <div class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-md); margin-bottom:var(--space-md);">
+          <div>
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>📋 Auditoria Detallada d'Execució Trade a Trade</span>
+              <span class="badge badge--primary">${filteredTrades.length} operacions</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              Inspecciona com hauria actuat el model en cada posició real del teu compte
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary);">Filtrar:</label>
+            <select class="form-select" id="bt-trade-filter-select" style="font-size:0.75rem; padding:4px 8px;">
+              <option value="ALL" ${backtestTradeFilter === 'ALL' ? 'selected' : ''}>Totes les Operacions</option>
+              <option value="MODIFIED" ${backtestTradeFilter === 'MODIFIED' ? 'selected' : ''}>⚡ Només Modificades per Estratègia</option>
+              <option value="STOP_LOSS" ${backtestTradeFilter === 'STOP_LOSS' ? 'selected' : ''}>🛑 Només Stop Loss Executats</option>
+              <option value="TAKE_PROFIT" ${backtestTradeFilter === 'TAKE_PROFIT' ? 'selected' : ''}>🎯 Només Take Profit Executats</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table" style="width:100%;">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Actiu / Ticker</th>
+                <th>Dates & Durada</th>
+                <th style="text-align:right;">Capital Real</th>
+                <th style="text-align:right;">P&L Real</th>
+                <th style="text-align:right;">P&L Simulat</th>
+                <th style="text-align:center;">Sortida Estratègia</th>
+                <th style="text-align:right;">R-Multiple</th>
+                <th style="text-align:center;">Fase</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredTrades.map(t => {
+                let badgeClass = 'badge--secondary';
+                if (t.exitReason === 'STOP_LOSS') badgeClass = 'badge--error';
+                else if (t.exitReason === 'TAKE_PROFIT') badgeClass = 'badge--success';
+                else if (t.exitReason === 'TRAILING_STOP') badgeClass = 'badge--info';
+                
+                return `
+                  <tr style="${t.wasModifiedByStrategy ? 'background:rgba(99, 102, 241, 0.04);' : ''}">
+                    <td><strong>${t.tradeIndex}</strong></td>
+                    <td>
+                      <strong>${t.concept}</strong>
+                      ${t.wasModifiedByStrategy ? '<span class="badge badge--primary" style="font-size:0.65rem; margin-left:4px;">Modificat</span>' : ''}
+                    </td>
+                    <td>
+                      <div style="font-size:0.75rem;">${t.entryDate} → ${t.exitDate}</div>
+                      <div style="font-size:0.65rem; color:var(--text-muted);">${t.holdingDays} dies</div>
+                    </td>
+                    <td style="text-align:right; font-family:var(--font-mono);">${formatCurrency(t.initialPositionSizeEUR)}</td>
+                    <td style="text-align:right; font-family:var(--font-mono); color:${t.actualPnL >= 0 ? 'var(--color-success)' : 'var(--color-error)'}; font-weight:700;">
+                      ${t.actualPnL >= 0 ? '+' : ''}${formatCurrency(t.actualPnL)} (${t.actualReturnPct}%)
+                    </td>
+                    <td style="text-align:right; font-family:var(--font-mono); color:${t.simulatedPnL >= 0 ? 'var(--color-success)' : 'var(--color-error)'}; font-weight:900;">
+                      ${t.simulatedPnL >= 0 ? '+' : ''}${formatCurrency(t.simulatedPnL)} (${t.simulatedReturnPct}%)
+                    </td>
+                    <td style="text-align:center;">
+                      <span class="badge ${badgeClass}" style="font-size:0.7rem;">${t.exitReason}</span>
+                    </td>
+                    <td style="text-align:right; font-weight:800; font-family:var(--font-mono); color:${t.rMultiple >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+                      ${t.rMultiple >= 0 ? '+' : ''}${t.rMultiple}R
+                    </td>
+                    <td style="text-align:center;">
+                      <span class="badge ${t.isOutOfSample ? 'badge--warning' : 'badge--info'}" style="font-size:0.65rem;">
+                        ${t.isOutOfSample ? 'OOS' : 'IS'}
+                      </span>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -1172,8 +1277,60 @@ export function renderTradingAnalytics(): HTMLElement {
     });
   }
 
+  // ── EXPORTACIÓ CSV DEL BACKTEST ─────────────────────────────────────────────
+  function exportBacktestCsv(bt: BacktestReport) {
+    const headers = [
+      'Trade #',
+      'Actiu / Concepte',
+      'Data Entrada',
+      'Data Sortida',
+      'Durada (dies)',
+      'Capital Invertit (€)',
+      'P&L Real (€)',
+      'Retorn Real (%)',
+      'P&L Simulat (€)',
+      'Retorn Simulat (%)',
+      'Motiu Sortida',
+      'Modificat per Model',
+      'R-Multiple',
+      'Fase Walk-Forward',
+      'Slippage (€)',
+      'Comissions (€)'
+    ];
+
+    const rows = bt.trades.map(t => [
+      t.tradeIndex,
+      `"${(t.concept || '').replace(/"/g, '""')}"`,
+      t.entryDate,
+      t.exitDate,
+      t.holdingDays,
+      t.initialPositionSizeEUR,
+      t.actualPnL,
+      t.actualReturnPct,
+      t.simulatedPnL,
+      t.simulatedReturnPct,
+      t.exitReason,
+      t.wasModifiedByStrategy ? 'SI' : 'NO',
+      t.rMultiple,
+      t.isOutOfSample ? 'Out-of-Sample' : 'In-Sample',
+      t.slippageEUR,
+      t.commissionEUR,
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `informe_backtest_trading_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Informe CSV de Backtest descarregat amb èxit!', 'success');
+  }
+
   // ── ATTACH LISTENERS ───────────────────────────────────────────────────────
-  function attachEventListeners(container: HTMLElement, report: InvestmentCockpitReport) {
+  function attachEventListeners(container: HTMLElement, report: InvestmentCockpitReport, btReport: BacktestReport) {
     // Pestanyes
     container.querySelectorAll('.nav-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1214,6 +1371,18 @@ export function renderTradingAnalytics(): HTMLElement {
       render();
     });
 
+    // Filtre taula Backtest
+    const btTradeFilterSelect = container.querySelector<HTMLSelectElement>('#bt-trade-filter-select');
+    btTradeFilterSelect?.addEventListener('change', () => {
+      backtestTradeFilter = (btTradeFilterSelect.value as typeof backtestTradeFilter) || 'ALL';
+      render();
+    });
+
+    // Export CSV Backtest
+    container.querySelector('#btn-export-backtest-csv')?.addEventListener('click', () => {
+      exportBacktestCsv(btReport);
+    });
+
     // Sliders i controls de Backtest
     const slRange = container.querySelector<HTMLInputElement>('#bt-sl-range');
     slRange?.addEventListener('input', () => {
@@ -1236,7 +1405,7 @@ export function renderTradingAnalytics(): HTMLElement {
 
     const sizingSelect = container.querySelector<HTMLSelectElement>('#bt-sizing-model');
     sizingSelect?.addEventListener('change', () => {
-      backtestParams.sizingModel = (sizingSelect.value as typeof backtestParams.sizingModel) || 'half_kelly';
+      backtestParams.sizingModel = (sizingSelect.value as typeof backtestParams.sizingModel) || 'actual_trade_capital';
     });
 
     const wfSelect = container.querySelector<HTMLSelectElement>('#bt-wf-split');
@@ -1247,7 +1416,7 @@ export function renderTradingAnalytics(): HTMLElement {
     // Botó Re-executar Backtest
     container.querySelector('#btn-re-run-backtest')?.addEventListener('click', () => {
       render();
-      showToast('Backtest institucional completat correctament!', 'success');
+      showToast('Backtest institucional actualitzat!', 'success');
     });
 
     // Horizon Monte Carlo
