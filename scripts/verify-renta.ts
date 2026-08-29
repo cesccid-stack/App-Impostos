@@ -2482,6 +2482,49 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
     assert(res.assetClassPerformance.some(ac => ac.assetClass === 'shares'), 'Conté accions');
     assert(res.assetClassPerformance.some(ac => ac.assetClass === 'crypto'), 'Conté cripto');
   });
+
+  test('34.5 Modelització CAPM (Alpha, Beta), Fiscalitat Wash Sale Art. 33.5 i R-Multiples', () => {
+    const trades: any[] = [
+      {
+        id: 'ws_1',
+        description: 'Santander SA',
+        type: 'shares',
+        acquisitionDate: '2024-01-10',
+        transferDate: '2024-01-20',
+        acquisitionValue: 5000,
+        transferValue: 4000, // Pèrdua de 1000€
+        expenses: 0,
+      },
+      {
+        id: 'ws_2',
+        description: 'Santander SA', // Recompra homogènia en <60 dies (1 de febrer)
+        type: 'shares',
+        acquisitionDate: '2024-02-01',
+        transferDate: '2024-02-28',
+        acquisitionValue: 5000,
+        transferValue: 5500,
+        expenses: 0,
+      },
+      {
+        id: 'ws_3',
+        description: 'BBVA SA',
+        type: 'shares',
+        acquisitionDate: '2024-03-01',
+        transferDate: '2024-03-15',
+        acquisitionValue: 3000,
+        transferValue: 3600,
+        expenses: 0,
+      },
+    ];
+
+    const res = runInstitutionalBacktest(trades, { enforce2MonthWashSale: true });
+    assert(res.beta !== undefined, 'Beta calculada');
+    assert(res.jensenAlphaPct !== undefined, 'Jensen Alpha calculat');
+    assert(res.treynorRatio !== undefined, 'Treynor ratio calculat');
+    assert(res.totalWashSaleDeferredLossEUR > 0, 'Pèrdua suspesa per Wash Sale identificada');
+    assert(res.washSaleTradesCount === 1, '1 operació afectada per regla dels 2 mesos');
+    assert(res.rMultipleDistribution.length > 0, 'Distribució de R-Multiples calculada');
+  });
 });
 
 // ── INFORME I BALANÇ FINAL ──────────────────────────────────────────────────

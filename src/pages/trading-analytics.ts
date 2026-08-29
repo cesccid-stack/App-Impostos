@@ -89,7 +89,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <span class="badge badge--success">${report.totalTrades} operacions reals</span>
           </div>
           <p class="page-header__subtitle" style="margin:0; color:var(--text-secondary); font-size:0.9rem;">
-            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Omega), ràtios Kelly/VaR i millora contínua Kaizen.
+            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Omega / CAPM), ràtios Kelly/VaR i millora contínua Kaizen.
           </p>
         </div>
         <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap;">
@@ -247,7 +247,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Win Rate</div>
               <div style="font-size:1.8rem; font-weight:900; color:var(--color-primary);">${report.winRate}%</div>
-              <div style="font-size:0.7rem; color:var(--text-secondary handicaps);">${report.winningTrades}W / ${report.losingTrades}L (${report.breakevenTrades} BE)</div>
+              <div style="font-size:0.7rem; color:var(--text-secondary);">${report.winningTrades}W / ${report.losingTrades}L (${report.breakevenTrades} BE)</div>
             </div>
             <div>
               <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Profit Factor</div>
@@ -421,12 +421,15 @@ export function renderTradingAnalytics(): HTMLElement {
               <span>🧪 Laboratori de Backtesting Quant & Optimització Walk-Forward</span>
             </h2>
             <p style="margin:0; font-size:0.85rem; color:var(--text-secondary);">
-              Simulació exacta sobre les teves dades reals sense hipòtesis sintètiques. Ajusta regles, slippage i comissions.
+              Simulació exacta sobre les teves dades reals sense hipòtesis sintètiques. Ajusta regles, slippage, comissions i fiscalitat IRPF.
             </p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--secondary btn--sm" id="btn-export-backtest-json">
+              📥 Exportar JSON (Quant)
+            </button>
             <button class="btn btn--secondary btn--sm" id="btn-export-backtest-csv">
-              📥 Descarregar CSV Backtest
+              📥 Descarregar CSV
             </button>
             <button class="btn btn--primary btn--sm" id="btn-re-run-backtest">
               ⚡ Recalcular Backtest
@@ -544,22 +547,34 @@ export function renderTradingAnalytics(): HTMLElement {
 
       </div>
 
-      <!-- Dashboard de Ràtios Quantitatius Institucionals Avançats -->
+      <!-- Dashboard de Ràtios Quantitatius Institucionals Avançats (CAPM, Omega, Ulcer) -->
       <div class="card" style="margin-bottom:var(--space-xl); border:1px solid var(--border-default);">
         <h3 style="margin:0 0 var(--space-md) 0; font-size:1rem; font-weight:800; display:flex; align-items:center; gap:8px;">
-          <span>🔬 Mètriques de Rendiment Avançat & Volatilitat (Hedge Fund Standards)</span>
+          <span>🔬 Mètriques de Rendiment Avançat & CAPM (Hedge Fund Standards)</span>
           <span class="badge badge--primary">Rigor Quant</span>
         </h3>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:var(--space-md); text-align:center;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:var(--space-md); text-align:center;">
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Jensen's Alpha (α)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:${bt.jensenAlphaPct >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+              ${bt.jensenAlphaPct >= 0 ? '+' : ''}${bt.jensenAlphaPct}%
+            </div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Excés sobre Benchmark</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Beta vs Mercat (β)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-primary);">${bt.beta.toFixed(2)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Sensibilitat S&P 500</div>
+          </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Ràtio Omega</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-primary);">${bt.omegaRatio.toFixed(2)}</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Guanys vs Pèrdues Ponderats</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Guanys vs Pèrdues</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Gain-to-Pain Ratio</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-success);">${bt.gainToPainRatio.toFixed(2)}</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Fórmula Jack Schwager</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Jack Schwager</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Tail Ratio (P95 / |P5|)</div>
@@ -569,17 +584,12 @@ export function renderTradingAnalytics(): HTMLElement {
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Ulcer Index (UI)</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:${bt.ulcerIndex > 10 ? 'var(--color-warning)' : 'var(--color-success)'};">${bt.ulcerIndex.toFixed(2)}%</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Volatilitat de Drawdowns</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Volatilitat Drawdowns</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Underwater Màxim</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--text-primary);">${bt.maxDrawdownDurationDays} dies</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Temps màxim en Drawdown</div>
-          </div>
-          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
-            <div style="font-size:0.75rem; color:var(--text-muted);">K-Ratio (Suavitat)</div>
-            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-info);">${bt.kRatio.toFixed(2)}</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Regressió Lineal Equitat</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Temps en Drawdown</div>
           </div>
         </div>
       </div>
@@ -615,6 +625,30 @@ export function renderTradingAnalytics(): HTMLElement {
           ${renderBacktestEquityCurveSvg(bt.equityCurve)}
         </div>
       </div>
+
+      <!-- Distribució Empírica de R-Multiples -->
+      ${bt.rMultipleDistribution.length > 0 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md);">
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>📊 Distribució Empírica de Rendibilitat R-Multiple (Asimetria de Risc)</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              Compara com l'estratègia talla les cues perdedores (< -2R) i potencia els guanys asimètrics (> +3R)
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; text-align:center;">
+            ${bt.rMultipleDistribution.map(b => `
+              <div style="background:var(--bg-surface-elevated); padding:10px 8px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+                <div style="font-size:0.7rem; font-weight:700; color:var(--text-secondary); margin-bottom:4px;">${b.label}</div>
+                <div style="font-size:1.4rem; font-weight:900; font-family:var(--font-mono); color:var(--color-primary);">${b.simulatedCount}</div>
+                <div style="font-size:0.65rem; color:var(--text-muted);">Real: <strong>${b.actualCount}</strong> | <strong>${b.simulatedPct}%</strong></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Matriu de Rendibilitat Mensual & Anual -->
       ${bt.monthlyReturnMatrix.length > 0 ? `
@@ -828,6 +862,7 @@ export function renderTradingAnalytics(): HTMLElement {
                     <td>
                       <strong>${t.concept}</strong>
                       ${t.wasModifiedByStrategy ? '<span class="badge badge--primary" style="font-size:0.65rem; margin-left:4px;">Modificat</span>' : ''}
+                      ${t.isWashSaleSuspect ? '<span class="badge badge--warning" style="font-size:0.65rem; margin-left:4px;" title="Pèrdua suspesa per recompra en 2 mesos (Art. 33.5 LIRPF)">Wash Sale</span>' : ''}
                     </td>
                     <td>
                       <div style="font-size:0.75rem;">${t.entryDate} → ${t.exitDate}</div>
@@ -1427,7 +1462,7 @@ export function renderTradingAnalytics(): HTMLElement {
     });
   }
 
-  // ── EXPORTACIÓ CSV DEL BACKTEST ─────────────────────────────────────────────
+  // ── EXPORTACIÓ CSV & JSON DEL BACKTEST ──────────────────────────────────────
   function exportBacktestCsv(bt: BacktestReport) {
     const headers = [
       'Trade #',
@@ -1444,6 +1479,8 @@ export function renderTradingAnalytics(): HTMLElement {
       'Motiu Sortida',
       'Modificat per Model',
       'R-Multiple',
+      'Wash Sale Suspect (Art 33.5)',
+      'Pèrdua Suspesa (€)',
       'Fase Walk-Forward',
       'Slippage (€)',
       'Comissions (€)'
@@ -1464,6 +1501,8 @@ export function renderTradingAnalytics(): HTMLElement {
       t.exitReason,
       t.wasModifiedByStrategy ? 'SI' : 'NO',
       t.rMultiple,
+      t.isWashSaleSuspect ? 'SI' : 'NO',
+      t.deferredLossEUR,
       t.isOutOfSample ? 'Out-of-Sample' : 'In-Sample',
       t.slippageEUR,
       t.commissionEUR,
@@ -1479,6 +1518,19 @@ export function renderTradingAnalytics(): HTMLElement {
     link.click();
     link.remove();
     showToast('Informe CSV de Backtest descarregat amb èxit!', 'success');
+  }
+
+  function exportBacktestJson(bt: BacktestReport) {
+    const jsonContent = JSON.stringify(bt, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `informe_quant_backtest_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Informe JSON quantitatiu descarregat per a Python / Pandas!', 'success');
   }
 
   // ── ATTACH LISTENERS ───────────────────────────────────────────────────────
@@ -1543,9 +1595,13 @@ export function renderTradingAnalytics(): HTMLElement {
       });
     });
 
-    // Export CSV Backtest
+    // Export CSV & JSON Backtest
     container.querySelector('#btn-export-backtest-csv')?.addEventListener('click', () => {
       exportBacktestCsv(btReport);
+    });
+
+    container.querySelector('#btn-export-backtest-json')?.addEventListener('click', () => {
+      exportBacktestJson(btReport);
     });
 
     // Sliders i controls de Backtest

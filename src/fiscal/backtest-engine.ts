@@ -1,7 +1,7 @@
 /**
  * @module fiscal/backtest-engine
  * Motor Institucional de Backtesting, Optimització Paramètrica (Grid Search),
- * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional (SQN, K-Ratio, Omega, Ulcer, Kelly).
+ * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional (SQN, K-Ratio, Omega, Ulcer, Jensen's Alpha, Treynor, Kelly).
  * 100% connectat a les dades reals d'operativa del declarant sense hipòtesis sintètiques.
  */
 
@@ -38,6 +38,7 @@ export interface BacktestParameters {
   slippageBps: number;            // ex: 10 basis points = 0.10% per transacció
   commissionPerTradeEUR: number;  // ex: 2.50 € per operació
   enforce2MonthWashSale: boolean; // Simula l'impacte de la regla dels 2 mesos (Art. 33.5 LIRPF)
+  reinvestProfits: boolean;       // Reinversió de beneficis (Compounding) vs Capital fix
   walkForwardSplitPercent: number;// ex: 70 (70% In-Sample / 30% Out-of-Sample)
 }
 
@@ -56,6 +57,8 @@ export interface BacktestTradeResult {
   rMultiple: number;
   exitReason: 'TAKE_PROFIT' | 'STOP_LOSS' | 'TRAILING_STOP' | 'TIME_EXIT' | 'ORIGINAL_EXIT';
   wasModifiedByStrategy: boolean;
+  isWashSaleSuspect: boolean;
+  deferredLossEUR: number;
   slippageEUR: number;
   commissionEUR: number;
   isWin: boolean;
@@ -95,6 +98,14 @@ export interface AssetClassBacktestPerformance {
   simulatedPnL: number;
   actualPnL: number;
   edgeEUR: number;
+}
+
+export interface RMultipleBucket {
+  bucket: string;
+  label: string;
+  actualCount: number;
+  simulatedCount: number;
+  simulatedPct: number;
 }
 
 export interface BacktestReport {
@@ -138,9 +149,17 @@ export interface BacktestReport {
   monteCarloPValue: number;       // Significació estadística de l'edge (p < 0.05)
   isEdgeStatisticallySignificant: boolean;
   
-  // Fricció i Fiscalitat
+  // Ràtios de Descomposició de Risc & Benchmark (CAPM)
+  beta: number;                   // Beta de mercat vs S&P 500
+  jensenAlphaPct: number;         // Jensen's Alpha anualitzat (%)
+  treynorRatio: number;           // Ràtio de Treynor
+  informationRatio: number;       // Information Ratio (Active Return / Tracking Error)
+  
+  // Fricció i Fiscalitat IRPF
   totalSlippageEUR: number;
   totalCommissionsEUR: number;
+  totalWashSaleDeferredLossEUR: number; // Pèrdues suspeses temporalment per Art. 33.5 LIRPF
+  washSaleTradesCount: number;
   estimatedTaxIRPF: number;
   netCapitalAfterTax: number;
   
@@ -186,6 +205,7 @@ export interface BacktestReport {
   sensitivityMatrix: SensitivityMatrixCell[];
   monthlyReturnMatrix: MonthlyReturnRow[];
   assetClassPerformance: AssetClassBacktestPerformance[];
+  rMultipleDistribution: RMultipleBucket[];
 }
 
 export const BACKTEST_PRESETS = {
@@ -200,6 +220,7 @@ export const BACKTEST_PRESETS = {
       riskPerTradePercent: 1.0,
       slippageBps: 8,
       commissionPerTradeEUR: 2.0,
+      reinvestProfits: true,
       walkForwardSplitPercent: 70,
     },
   },
@@ -214,6 +235,7 @@ export const BACKTEST_PRESETS = {
       riskPerTradePercent: 1.5,
       slippageBps: 10,
       commissionPerTradeEUR: 2.5,
+      reinvestProfits: true,
       walkForwardSplitPercent: 70,
     },
   },
@@ -228,6 +250,7 @@ export const BACKTEST_PRESETS = {
       riskPerTradePercent: 2.0,
       slippageBps: 15,
       commissionPerTradeEUR: 3.0,
+      reinvestProfits: true,
       walkForwardSplitPercent: 65,
     },
   },
@@ -242,6 +265,7 @@ export const BACKTEST_PRESETS = {
       riskPerTradePercent: 2.0,
       slippageBps: 5,
       commissionPerTradeEUR: 1.5,
+      reinvestProfits: true,
       walkForwardSplitPercent: 75,
     },
   },
@@ -260,6 +284,7 @@ export const DEFAULT_BACKTEST_PARAMETERS: BacktestParameters = {
   slippageBps: 10,
   commissionPerTradeEUR: 2.50,
   enforce2MonthWashSale: true,
+  reinvestProfits: true,
   walkForwardSplitPercent: 70,
 };
 
@@ -286,8 +311,9 @@ export function runInstitutionalBacktest(
   const totalTrades = sorted.length;
   const inSampleThreshold = Math.max(1, Math.floor((totalTrades * params.walkForwardSplitPercent) / 100));
 
-  // Determinar el capital inicial real del compte a partir de les posicions
+  // Capital actiu i acumuladors
   let currentCapital = params.initialCapitalEUR;
+  let baseSizingCapital = params.initialCapitalEUR;
   let simulatedCumulativePnL = 0;
   let actualCumulativePnL = 0;
   let benchmarkCumulativePnL = 0;
@@ -310,6 +336,8 @@ export function runInstitutionalBacktest(
 
   let totalSlippageEUR = 0;
   let totalCommissionsEUR = 0;
+  let totalWashSaleDeferredLossEUR = 0;
+  let washSaleTradesCount = 0;
 
   let isWinsCount = 0;
   let isLossesCount = 0;
@@ -321,13 +349,15 @@ export function runInstitutionalBacktest(
   let oosGrossProfit = 0;
   let oosGrossLoss = 0;
 
-  // Variables per calcular la durada màxima del Drawdown (Underwater days)
+  // Underwater Duration
   let peakDateMs = new Date(sorted[0].transferDate || sorted[0].acquisitionDate || '2024-01-01').getTime();
   let maxDrawdownDurationDays = 0;
 
   const tradeReturnsR: number[] = [];
   const simulatedTrades: BacktestTradeResult[] = [];
   const squaredDrawdownsPct: number[] = [];
+  const pnlReturns: number[] = [];
+  const benchmarkReturns: number[] = [];
 
   const equityCurve: BacktestReport['equityCurve'] = [
     {
@@ -370,30 +400,33 @@ export function runInstitutionalBacktest(
       }
     }
 
-    // Dimensionament de posició (Position Sizing) connectat al model
+    // Capital de referència segons si es reinverteixen beneficis o és fix
+    const equityBase = params.reinvestProfits ? currentCapital : baseSizingCapital;
+
+    // Dimensionament de posició (Position Sizing)
     let positionSizeEUR = actualAcq;
     if (params.sizingModel === 'fixed_eur') {
       positionSizeEUR = params.fixedTradeAmountEUR;
     } else if (params.sizingModel === 'fixed_fractional') {
-      const riskAllowed = currentCapital * (params.riskPerTradePercent / 100);
+      const riskAllowed = equityBase * (params.riskPerTradePercent / 100);
       const slFraction = params.stopLossPercent / 100;
-      positionSizeEUR = slFraction > 0 ? Math.min(currentCapital * 0.4, riskAllowed / slFraction) : currentCapital * 0.1;
+      positionSizeEUR = slFraction > 0 ? Math.min(equityBase * 0.4, riskAllowed / slFraction) : equityBase * 0.1;
     } else if (params.sizingModel === 'half_kelly' || params.sizingModel === 'full_kelly') {
       const winRateEst = Math.max(0.40, Math.min(0.75, (winningTrades / Math.max(1, idx)) || 0.55));
       const payoffEst = Math.max(1.1, (grossProfit / Math.max(1, grossLoss)) || 1.8);
       const rawKelly = (winRateEst * payoffEst - (1 - winRateEst)) / payoffEst;
       const appliedKelly = params.sizingModel === 'half_kelly' ? rawKelly / 2 : rawKelly;
       const clampedKelly = Math.max(0.02, Math.min(0.30, appliedKelly));
-      positionSizeEUR = currentCapital * clampedKelly;
+      positionSizeEUR = equityBase * clampedKelly;
     } else if (params.sizingModel === 'volatility_parity') {
       const volFactor = Math.max(0.5, Math.min(2.0, 30 / holdingDays));
-      positionSizeEUR = currentCapital * 0.10 * volFactor;
+      positionSizeEUR = equityBase * 0.10 * volFactor;
     } else {
-      // actual_trade_capital: Utilitza la mida real desplegada per l'usuari
+      // actual_trade_capital
       positionSizeEUR = actualAcq;
     }
 
-    positionSizeEUR = Math.max(100, Math.min(Math.max(actualAcq * 3, currentCapital * 0.6), positionSizeEUR));
+    positionSizeEUR = Math.max(100, Math.min(Math.max(actualAcq * 3, equityBase * 0.6), positionSizeEUR));
 
     // Modelització de regles de sortida (Stop Loss / Take Profit / Trailing Stop / Time Exit)
     let simulatedReturnPct = rawReturnPct;
@@ -429,6 +462,33 @@ export function runInstitutionalBacktest(
     const riskUnit1R = positionSizeEUR * (params.stopLossPercent / 100);
     const rMultiple = riskUnit1R > 0 ? roundCurrency(simulatedPnL / riskUnit1R) : 0;
     tradeReturnsR.push(rMultiple);
+    pnlReturns.push(simulatedReturnPct);
+
+    // Detecció de Regla dels 2 Mesos (Art. 33.5 LIRPF)
+    let isWashSaleSuspect = false;
+    let deferredLossEUR = 0;
+    if (params.enforce2MonthWashSale && simulatedPnL < 0) {
+      const currentTransDate = new Date(item.transferDate || '2024-01-01').getTime();
+      const currentConcept = (item.description || (item as unknown as { concept?: string }).concept || '').toLowerCase();
+      
+      // Comprovar si hi ha una altra compra homogènia en l'interval de +- 60 dies
+      for (let j = 0; j < totalTrades; j++) {
+        if (j === idx) continue;
+        const otherItem = sorted[j];
+        const otherConcept = (otherItem.description || (otherItem as unknown as { concept?: string }).concept || '').toLowerCase();
+        if (otherConcept === currentConcept && currentConcept.length > 2) {
+          const otherAcqDate = new Date(otherItem.acquisitionDate || '2024-01-01').getTime();
+          const diffDays = Math.abs(otherAcqDate - currentTransDate) / (1000 * 60 * 60 * 24);
+          if (diffDays <= 60) {
+            isWashSaleSuspect = true;
+            deferredLossEUR = Math.abs(simulatedPnL);
+            totalWashSaleDeferredLossEUR = roundCurrency(totalWashSaleDeferredLossEUR + deferredLossEUR);
+            washSaleTradesCount++;
+            break;
+          }
+        }
+      }
+    }
 
     simulatedCumulativePnL = roundCurrency(simulatedCumulativePnL + simulatedPnL);
     currentCapital = roundCurrency(currentCapital + simulatedPnL);
@@ -437,6 +497,7 @@ export function runInstitutionalBacktest(
     const benchmarkTradeRate = (holdingDays / 365) * ANNUAL_BENCHMARK_RATE;
     const benchmarkTradePnL = roundCurrency(positionSizeEUR * benchmarkTradeRate);
     benchmarkCumulativePnL = roundCurrency(benchmarkCumulativePnL + benchmarkTradePnL);
+    benchmarkReturns.push(benchmarkTradeRate * 100);
 
     const currentDateMs = new Date(item.transferDate || item.acquisitionDate || '2024-01-01').getTime();
 
@@ -496,6 +557,8 @@ export function runInstitutionalBacktest(
       rMultiple,
       exitReason,
       wasModifiedByStrategy,
+      isWashSaleSuspect,
+      deferredLossEUR,
       slippageEUR,
       commissionEUR,
       isWin,
@@ -574,7 +637,6 @@ export function runInstitutionalBacktest(
   const calmarRatio = maxDrawdownPercent > 0 ? roundCurrency(annualReturnPct / maxDrawdownPercent) : 5.0;
 
   // Sharpe i Sortino
-  const pnlReturns = simulatedTrades.map(t => t.simulatedReturnPct);
   const avgRet = pnlReturns.length > 0 ? pnlReturns.reduce((a, b) => a + b, 0) / pnlReturns.length : 0;
   const retStd = Math.sqrt(pnlReturns.reduce((s, r) => s + Math.pow(r - avgRet, 2), 0) / Math.max(1, pnlReturns.length - 1)) || 1;
   const sharpeRatio = roundCurrency(avgRet / retStd);
@@ -582,6 +644,26 @@ export function runInstitutionalBacktest(
   const downReturns = pnlReturns.filter(r => r < 0);
   const downStd = Math.sqrt(downReturns.reduce((s, r) => s + Math.pow(r, 2), 0) / Math.max(1, downReturns.length)) || 1;
   const sortinoRatio = roundCurrency(avgRet / downStd);
+
+  // Beta & Jensen's Alpha vs Benchmark (CAPM)
+  const avgBenchRet = benchmarkReturns.length > 0 ? benchmarkReturns.reduce((a, b) => a + b, 0) / benchmarkReturns.length : 0;
+  let covPortBench = 0;
+  let varBench = 0;
+  for (let i = 0; i < pnlReturns.length; i++) {
+    const diffP = pnlReturns[i] - avgRet;
+    const diffB = benchmarkReturns[i] - avgBenchRet;
+    covPortBench += diffP * diffB;
+    varBench += diffB * diffB;
+  }
+  const beta = varBench > 0 ? roundCurrency(covPortBench / varBench) : 1.0;
+  const jensenAlphaPct = roundCurrency(avgRet - (beta * avgBenchRet));
+  const treynorRatio = beta !== 0 ? roundCurrency(avgRet / beta) : avgRet;
+
+  // Tracking Error & Information Ratio
+  const trackingDiffs = pnlReturns.map((r, i) => r - (benchmarkReturns[i] || 0));
+  const avgTrackDiff = trackingDiffs.reduce((a, b) => a + b, 0) / Math.max(1, trackingDiffs.length);
+  const trackStd = Math.sqrt(trackingDiffs.reduce((s, d) => s + Math.pow(d - avgTrackDiff, 2), 0) / Math.max(1, trackingDiffs.length - 1)) || 1;
+  const informationRatio = roundCurrency(avgTrackDiff / trackStd);
 
   // Omega Ratio & Gain-to-Pain Ratio (Jack Schwager)
   const sumPosRets = pnlReturns.filter(r => r > 0).reduce((a, b) => a + b, 0);
@@ -611,8 +693,10 @@ export function runInstitutionalBacktest(
   const monteCarloPValue = calculateMonteCarloPermutationPValue(simulatedTrades.map(t => t.simulatedPnL));
   const isEdgeStatisticallySignificant = monteCarloPValue < 0.05;
 
-  // Fiscalitat IRPF (Escala de l'Estalvi 19%-28%)
-  const estimatedTaxIRPF = calculateSavingsTaxEUR(Math.max(0, simulatedCumulativePnL));
+  // Fiscalitat IRPF (Escala de l'Estalvi 19%-28%) amb compensació de pèrdues
+  // Si hi ha wash sales, restem les pèrdues suspeses de la compensació de l'any actual
+  const taxableBase = Math.max(0, simulatedCumulativePnL + totalWashSaleDeferredLossEUR);
+  const estimatedTaxIRPF = calculateSavingsTaxEUR(taxableBase);
   const netCapitalAfterTax = roundCurrency(currentCapital - estimatedTaxIRPF);
 
   // Walk-Forward Metrics
@@ -652,6 +736,9 @@ export function runInstitutionalBacktest(
   // 6. Rendiment per Classe d'Actiu en el Backtest
   const assetClassPerformance = generateAssetClassPerformance(simulatedTrades);
 
+  // 7. Distribució de R-Multiples
+  const rMultipleDistribution = generateRMultipleDistribution(tradeReturnsR, sorted);
+
   return {
     params,
     initialCapital: params.initialCapitalEUR,
@@ -690,8 +777,14 @@ export function runInstitutionalBacktest(
     riskOfRuinPercent,
     monteCarloPValue,
     isEdgeStatisticallySignificant,
+    beta,
+    jensenAlphaPct,
+    treynorRatio,
+    informationRatio,
     totalSlippageEUR,
     totalCommissionsEUR,
+    totalWashSaleDeferredLossEUR,
+    washSaleTradesCount,
     estimatedTaxIRPF,
     netCapitalAfterTax,
     realTradingPnL: actualCumulativePnL,
@@ -721,7 +814,46 @@ export function runInstitutionalBacktest(
     sensitivityMatrix,
     monthlyReturnMatrix,
     assetClassPerformance,
+    rMultipleDistribution,
   };
+}
+
+/**
+ * Genera la distribució per intervals d'R-Multiple.
+ */
+function generateRMultipleDistribution(simulatedR: number[], realItems: GainItem[]): RMultipleBucket[] {
+  const bucketsDef = [
+    { key: 'lt_neg2', label: '< -2R (Catàstrofe)', min: -Infinity, max: -2.01 },
+    { key: 'neg2_to_neg1', label: '-2R a -1R (Excés de risc)', min: -2.0, max: -1.01 },
+    { key: 'neg1', label: '-1R (Stop Loss Estàndard)', min: -1.0, max: -0.99 },
+    { key: 'neg05_to_0', label: '-0.5R a 0R (Pèrdua Menor)', min: -0.98, max: -0.01 },
+    { key: '0_to_1', label: '0R a +1R (Guany Menor)', min: 0.0, max: 1.0 },
+    { key: '1_to_2', label: '+1R a +2R (Take Profit Est.)', min: 1.01, max: 2.0 },
+    { key: '2_to_3', label: '+2R a +3R (Bon Retorn)', min: 2.01, max: 3.0 },
+    { key: 'gt_3', label: '> +3R (Runners / Màxims)', min: 3.01, max: Infinity },
+  ];
+
+  const total = simulatedR.length || 1;
+
+  return bucketsDef.map(b => {
+    const simCount = simulatedR.filter(r => r >= b.min && r <= b.max).length;
+    // Càlcul real basat en 1R aproximat al 5%
+    const actCount = realItems.filter(item => {
+      const acq = Number(item.acquisitionValue) || 1000;
+      const trans = Number(item.transferValue) || 1000;
+      const pnl = trans - acq - (Number(item.expenses) || 0);
+      const r = (acq * 0.05 > 0) ? pnl / (acq * 0.05) : 0;
+      return r >= b.min && r <= b.max;
+    }).length;
+
+    return {
+      bucket: b.key,
+      label: b.label,
+      actualCount: actCount,
+      simulatedCount: simCount,
+      simulatedPct: roundCurrency((simCount / total) * 100),
+    };
+  });
 }
 
 /**
@@ -933,8 +1065,14 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     riskOfRuinPercent: 0,
     monteCarloPValue: 1.0,
     isEdgeStatisticallySignificant: false,
+    beta: 1.0,
+    jensenAlphaPct: 0,
+    treynorRatio: 0,
+    informationRatio: 0,
     totalSlippageEUR: 0,
     totalCommissionsEUR: 0,
+    totalWashSaleDeferredLossEUR: 0,
+    washSaleTradesCount: 0,
     estimatedTaxIRPF: 0,
     netCapitalAfterTax: params.initialCapitalEUR,
     realTradingPnL: 0,
@@ -952,5 +1090,6 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     sensitivityMatrix: [],
     monthlyReturnMatrix: [],
     assetClassPerformance: [],
+    rMultipleDistribution: [],
   };
 }
