@@ -28,27 +28,27 @@ const numberFormatter = new Intl.NumberFormat('es-ES', {
   maximumFractionDigits: 2,
 });
 
-/** Format a number as EUR currency string */
+/** Format a number as EUR currency string (fast-pathed to bypass Intl V8 bridge on zero/falsy) */
 export function formatCurrency(value: number): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,00 €';
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return '0,00 €';
   return currencyFormatter.format(value);
 }
 
 /** Format a number as EUR currency string without decimals for clean summary cards */
 export function formatCurrencyNoDecimals(value: number): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '0 €';
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return '0 €';
   return currencyNoDecimalsFormatter.format(value);
 }
 
 /** Format a number as percentage (0.19 → "19,0 %") */
 export function formatPercent(value: number): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,0 %';
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return '0,0 %';
   return percentFormatter.format(value);
 }
 
 /** Format a number with 2 decimal places */
 export function formatNumber(value: number): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '0,00';
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return '0,00';
   return numberFormatter.format(value);
 }
 

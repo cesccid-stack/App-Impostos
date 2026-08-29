@@ -46,7 +46,7 @@ export class DefiTaxEngine {
         let amountToSell = tx.amountIn;
         const totalSellValue = tx.fiatValueInEUR; // Valor fiat obtingut per la venda
         
-        let pool = inventory[assetSold] || [];
+        const pool = inventory[assetSold] || [];
         
         while (amountToSell > 0 && pool.length > 0) {
           const firstIn = pool[0]; // FIFO

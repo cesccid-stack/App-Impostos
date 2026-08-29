@@ -333,7 +333,7 @@ export function renderIVA(): HTMLElement {
   /* TAB 2: LIQUIDACIONS MODEL 303 (CASELLES OFICIALS)           */
   /* ─────────────────────────────────────────────────────────── */
   function renderModel303Tab(
-    quarters: Record<FiscalQuarter, any>,
+    quarters: Record<FiscalQuarter, Model303QuarterResult>,
     selectedQuarter: FiscalQuarter,
     year: number
   ): string {
@@ -1235,7 +1235,7 @@ export function renderIVA(): HTMLElement {
   /* ─────────────────────────────────────────────────────────── */
   /* GESTIÓ D'EVENTS I MODALS INTERACTIUS                        */
   /* ─────────────────────────────────────────────────────────── */
-  function bindEvents(ivaData: IVAData, quarters: Record<FiscalQuarter, any>, year: number) {
+  function bindEvents(ivaData: IVAData, quarters: Record<FiscalQuarter, Model303QuarterResult>, year: number) {
     // 0. Selector d'Any Fiscal i Trimestre de Capçalera
     page.querySelector('#btn-open-iva-compliance')?.addEventListener('click', () => {
       openComplianceModal(() => {

@@ -164,8 +164,13 @@ export interface WorkIncomeData {
   // Rendiments irregulars o generats en més de 2 anys (Art. 18.2 LIRPF - Reducció 30%)
   irregularIncomeAmount?: number;
 
+  // Despeses deduïbles específiques del treball (Art. 19.2 LIRPF)
+  professionalCollegeFees?: number; // Cuotes col·legis professionals obligatoris (màx 500 € - Art. 19.2.d LIRPF)
+  legalDefenseFees?: number;        // Despeses de defensa jurídica laboral vs ocupador (màx 300 € - Art. 19.2.e LIRPF)
+
   // Indemnitzacions per acomiadament laboral (Art. 7.e LIRPF - Exempció màx. 180.000 €)
   severancePay?: number;
+  severanceMandatoryLegalLimit?: number; // Límit legal indemnització obligatòria ET
 }
 
 /** Rendiments del capital */
@@ -297,6 +302,10 @@ export interface FiscalResult {
   workIncomeReduction: number;
   irregularWorkReduction?: number; // Reducció 30% Art. 18.2
   foreignWorkExemptionApplied?: number; // Exempció 7.p
+  professionalCollegeDeduction?: number; // Despesa deduïble col·legis (Art. 19.2.d - màx 500 €)
+  legalDefenseDeduction?: number;        // Despesa defensa jurídica (Art. 19.2.e - màx 300 €)
+  exemptSeverancePay?: number;           // Indemnització acomiadament exempta (Art. 7.e)
+  taxableSeverancePay?: number;          // Excess indemnització tributable
   pensionReduction: number;
   jointTaxationReduction?: number; // Reducció per tributació conjunta (3.400€ o 2.150€)
   totalReductions: number;
@@ -363,6 +372,7 @@ export interface Route {
   label: string;
   icon: string;
   section?: string;
+  load?: () => Promise<unknown>;
   render: () => HTMLElement | Promise<HTMLElement>;
 }
 

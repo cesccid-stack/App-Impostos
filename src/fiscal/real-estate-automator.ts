@@ -75,11 +75,11 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
     }
 
     // Extreure NIF si existeix (ex: B12345678, 12345678Z)
-    let nifMatch = line.match(/\b([A-Z]\d{8}|\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\b/i);
+    const nifMatch = line.match(/\b([A-Z]\d{8}|\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\b/i);
     const supplierNif = nifMatch ? nifMatch[1].toUpperCase() : '';
 
     // Extreure número de factura si existeix (ex: F-2024-012, FAC/1234, Factura 987)
-    let invoiceMatch = line.match(/(?:factura|fac|fra|f-)\s*[:#]?\s*([a-z0-9\-\/]+)/i);
+    const invoiceMatch = line.match(/(?:factura|fac|fra|f-)\s*[:#]?\s*([a-z0-9\-\/]+)/i);
     const invoiceNumber = invoiceMatch ? invoiceMatch[1].toUpperCase() : `REC-${dateStr.replace(/-/g, '')}-${i + 1}`;
 
     // Netejar concepte
@@ -404,7 +404,7 @@ export function calculateRentAdjustment(
   legalRecommendation: string;
 } {
   // Límit Llei 12/2023 pel Dret a l'Habitatge: 3% màxim per al 2024
-  let legalMaxRate = fiscalYear <= 2024 ? 3.0 : 2.8;
+  const legalMaxRate = fiscalYear <= 2024 ? 3.0 : 2.8;
   let appliedRate = legalMaxRate;
 
   if (indexationType === 'custom' && customRate !== undefined) {
@@ -417,7 +417,7 @@ export function calculateRentAdjustment(
   const newMonthlyRent = currentRent + monthlyIncrease;
   const annualExtraGrossIncome = monthlyIncrease * 12;
 
-  let legalRecommendation = `Increment conforme amb l'Art. 46 del RDL 6/2022 i la Llei 12/2023 (Límit legal màxim: ${legalMaxRate}%). Cal notificar a l'arrendatari amb 30 dies d'antelació a la data d'aniversari del contracte.`;
+  const legalRecommendation = `Increment conforme amb l'Art. 46 del RDL 6/2022 i la Llei 12/2023 (Límit legal màxim: ${legalMaxRate}%). Cal notificar a l'arrendatari amb 30 dies d'antelació a la data d'aniversari del contracte.`;
 
   return {
     previousMonthlyRent: currentRent,
@@ -465,17 +465,17 @@ export function calculateFourYearCarryoverPlan(
   let remainingCapacity = Math.max(0, currentGross - currentRepairMortgage);
   
   // Ordre de deducció FIFO: primer s'absorbeix el més antic (N-4) per evitar que caduqui
-  let n4Absorbed = Math.min(remainingCapacity, history.yearMinus4 || 0);
+  const n4Absorbed = Math.min(remainingCapacity, history.yearMinus4 || 0);
   remainingCapacity -= n4Absorbed;
   const expiringCarryoverLost = Math.max(0, (history.yearMinus4 || 0) - n4Absorbed);
 
-  let n3Absorbed = Math.min(remainingCapacity, history.yearMinus3 || 0);
+  const n3Absorbed = Math.min(remainingCapacity, history.yearMinus3 || 0);
   remainingCapacity -= n3Absorbed;
 
-  let n2Absorbed = Math.min(remainingCapacity, history.yearMinus2 || 0);
+  const n2Absorbed = Math.min(remainingCapacity, history.yearMinus2 || 0);
   remainingCapacity -= n2Absorbed;
 
-  let n1Absorbed = Math.min(remainingCapacity, history.yearMinus1 || 0);
+  const n1Absorbed = Math.min(remainingCapacity, history.yearMinus1 || 0);
   remainingCapacity -= n1Absorbed;
 
   const totalPriorAbsorbed = n4Absorbed + n3Absorbed + n2Absorbed + n1Absorbed;

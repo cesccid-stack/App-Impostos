@@ -148,6 +148,73 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
     });
   }
 
+  // 7. Quotes a Col·legis Professionals (Art. 19.2.d LIRPF)
+  const profFees = result.professionalCollegeDeduction || 0;
+  if (profFees > 0) {
+    justifications.push({
+      boxNumber: '0015',
+      concept: 'Quotes satisfetes a col·legis professionals de caràcter obligatori',
+      declaredAmount: profFees,
+      legalBasis: 'Art. 19.2.d LIRPF i Art. 10 del Reglament de l’IRPF (Límit de 500,00 €)',
+      requiredDocuments: [
+        'Certificat de col·legiació vigent',
+        'Justificant de quotes anuals abonades',
+        'Acreditació de la necessitat de col·legiació per a l’exercici del lloc de treball',
+      ],
+      riskLevel: 'low',
+    });
+  }
+
+  // 8. Despeses de Defensa Jurídica Laboral (Art. 19.2.e LIRPF)
+  const legalFees = result.legalDefenseDeduction || 0;
+  if (legalFees > 0) {
+    justifications.push({
+      boxNumber: '0016',
+      concept: 'Despeses de defensa jurídica en litigis laborals contra l’ocupador',
+      declaredAmount: legalFees,
+      legalBasis: 'Art. 19.2.e LIRPF (Límit màxim de 300,00 €)',
+      requiredDocuments: [
+        'Factura d’honoraris de l’advocat i/o aranzels de procurador',
+        'Papeleta de conciliació laboral al CMAC o demanda davant el Jutjat Social',
+      ],
+      riskLevel: 'low',
+    });
+  }
+
+  // 9. Amortització d'Immobles amb Despeses d'Adquisició (Jurisprudència STS 1130/2021)
+  const propsWithAcqExp = (data.properties || []).filter(p => (p.acquisitionExpenses || 0) > 0 && p.grossRentalIncome > 0);
+  if (propsWithAcqExp.length > 0) {
+    const totalAcqExp = propsWithAcqExp.reduce((s, p) => s + (p.acquisitionExpenses || 0), 0);
+    justifications.push({
+      boxNumber: '0081',
+      concept: 'Còmput de tributs i despeses inherents en el cost d’adquisició amortitzable',
+      declaredAmount: totalAcqExp,
+      legalBasis: 'Jurisprudència Vinculant del Tribunal Suprem STS 1130/2021 (Rec. 5664/2019) i Art. 23.1.b LIRPF',
+      requiredDocuments: [
+        'Escriptura pública de compravenda o títol d’adquisició',
+        'Autoliquidació de l’ITP/AJD o factura amb IVA satisfet no deduïble',
+        'Factures de notaria, registre de la propietat, gestoria i taxació hipotecària',
+      ],
+      riskLevel: 'low',
+    });
+  }
+
+  // 10. Maternitat i Guarderies (Jurisprudència STS 8/2024)
+  if ((result.maternityDeductionAmount || 0) > 0) {
+    justifications.push({
+      boxNumber: '0611+',
+      concept: 'Deducció per maternitat i despeses de custòdia en guarderies',
+      declaredAmount: result.maternityDeductionAmount,
+      legalBasis: 'Art. 81 LIRPF i Jurisprudència del Tribunal Suprem STS 8/2024',
+      requiredDocuments: [
+        'Llibre de família o certificat de naixement del registre civil',
+        'Factures emeses per la guarderia o centre d’educació infantil autoritzat',
+        'Justificant de permanència en situació d’alta laboral o prestació contributiva',
+      ],
+      riskLevel: 'low',
+    });
+  }
+
   // Checklist de documents
   const documentationChecklist = [
     {
@@ -174,12 +241,21 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
       legalObligation: 'Art. 76 Reglament IRPF',
       isMandatory: (data.capitalIncome?.dividends || 0) > 0 || (data.capitalIncome?.interests || 0) > 0,
     },
+    {
+      documentType: 'Factures de Despeses d’Adquisició d’Immobles (STS 1130/2021)',
+      description: 'Factures d’ITP, notaria, registre i gestoria que incrementen el cost d’adquisició amortitzable.',
+      legalObligation: 'STS 1130/2021 i Art. 23.1.b LIRPF',
+      isMandatory: propsWithAcqExp.length > 0,
+    },
   ];
 
-  // Arguments de defensa jurídica
+  // Arguments de defensa jurídica blindats amb jurisprudència
   const defenseArguments = [
     'Tots els ingressos han estat declarats d’acord amb el principi d’exigibilitat i meritació establerts a l’Art. 14 LIRPF.',
     'Les despeses deduïdes compleixen els tres requisits jurisprudencials del Tribunal Suprem: correlació amb els ingressos, suport documental mitjançant factura completa i registre en els llibres oficials.',
+    'L’amortització dels immobles arrendats s’ha determinat incorporant el cost d’adquisició satisfet incloent els tributs i despeses inherents, d’acord amb la jurisprudència consolidada de la Sala Tercera del Tribunal Suprem (Sentència STS 1130/2021).',
+    'Les despeses de custòdia en guarderies s’ajusten a la doctrina del Tribunal Suprem (STS 8/2024), que reconeix el dret a la deducció a tots els centres amb llicència municipal d’activitat.',
+    'Les despeses de col·legiació obligatòria i defensa laboral s’han contingut estrictament dins dels límits de 500 € i 300 € de l’Art. 19.2 LIRPF.',
     discrepancies.length === 0
       ? 'Conciliació creuada perfecta amb els models trimestrals de l’AEAT (Models 303, 130, 111) sense cap discrepància detectada.'
       : `Es constaten ${discrepancies.length} alertes de conciliació que requereixen revisió prèvia a la presentació.`,

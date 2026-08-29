@@ -39,7 +39,7 @@ export function renderExport(): HTMLElement {
         const json = JSON.stringify(dossier, null, 2);
         downloadFile(json, `dossier_defensa_aeat_${dossier.taxpayerNif}_${data.year}.json`, 'application/json');
         showToast('Dossier de Defensa Tributària descarregat correctament', 'success');
-      } catch (e) {
+      } catch {
         showToast('Error en generar el Dossier de Defensa', 'error');
       }
     },
@@ -59,7 +59,7 @@ export function renderExport(): HTMLElement {
         const json = JSON.stringify(report, null, 2);
         downloadFile(json, `informe_didactic_renda_${data.year}.json`, 'application/json');
         showToast('Informe didàctic descarregat correctament', 'success');
-      } catch (e) {
+      } catch {
         showToast('Error en generar l\'informe didàctic', 'error');
       }
     },
@@ -78,7 +78,7 @@ export function renderExport(): HTMLElement {
         const guideText = generateRentaWebGuide(data, result);
         downloadFile(guideText, `guia_renta_web_${data.year}.txt`, 'text/plain');
         showToast('Guia Renta Web descarregada', 'success');
-      } catch (e) {
+      } catch {
         showToast('Error en generar la guia', 'error');
       }
     },
@@ -141,7 +141,7 @@ export function renderExport(): HTMLElement {
         const csv = generateCSV(data, result);
         downloadFile(csv, `renta_${data.year}_desglossament.csv`, 'text/csv');
         showToast('CSV descarregat correctament', 'success');
-      } catch (e) {
+      } catch {
         showToast('Error en generar el CSV', 'error');
       }
     },
@@ -159,7 +159,7 @@ export function renderExport(): HTMLElement {
         const data = store.getData();
         downloadFile(json, `renta_backup_${data.year}.json`, 'application/json');
         showToast('Backup descarregat correctament', 'success');
-      } catch (e) {
+      } catch {
         showToast('Error en generar el backup', 'error');
       }
     },

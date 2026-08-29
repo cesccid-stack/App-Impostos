@@ -52,7 +52,9 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
     constructionPercentage = Math.min(1, Math.max(0.1, p.constructionCadastralValue / p.totalCadastralValue));
   }
 
-  const acquisitionWithoutLand = (p.acquisitionCost || 0) * constructionPercentage;
+  // Conforme a la Sentència del Tribunal Suprem STS 1130/2021, el cost d'adquisició satisfet inclou el preu + tributs i despeses inherents
+  const effectiveAcquisitionCost = (p.acquisitionCost || 0) + (p.acquisitionExpenses || 0);
+  const acquisitionWithoutLand = effectiveAcquisitionCost * constructionPercentage;
   const cadastralConstruction = p.constructionCadastralValue || 0;
   const constructionBase = Math.max(cadastralConstruction, acquisitionWithoutLand);
   const buildingAmortization = constructionBase * 0.03 * ownRatio * rentalTimeRatio;
@@ -188,6 +190,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
     managementFees,
     badDebts,
     totalCurrentExpenses,
+    effectiveAcquisitionCost,
     constructionBase,
     constructionPercentage: constructionPercentage * 100,
     buildingAmortization,
@@ -205,7 +208,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
   };
 
   // Càlcul de rendibilitats financeres
-  const acquisitionCost = p.acquisitionCost || p.totalCadastralValue || 1;
+  const acquisitionCost = effectiveAcquisitionCost || p.totalCadastralValue || 1;
   const grossYield = acquisitionCost > 0 ? (grossIncome / acquisitionCost) * 100 : 0;
   const operatingExpenses = totalCurrentExpenses + repairExpenses + mortgageInterests;
   const noi = grossIncome - operatingExpenses;

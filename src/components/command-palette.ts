@@ -9,7 +9,6 @@ import { store } from '../store.ts';
 import { calculateIRPF } from '../fiscal/irpf.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from './toast.ts';
-import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { openComplianceModal } from './compliance-modal.ts';
 import { openToolManagerModal } from './tool-manager-modal.ts';
 import type { AppTheme } from '../types.ts';
@@ -471,12 +470,15 @@ function buildCommandItems(): CommandItem[] {
       icon: '📄',
       keywords: ['pdf', 'descarregar', 'informe', 'imprimir', 'exportar pdf', 'model 100'],
       action: () => {
-        try {
-          generateModel100PDF(state, irpf);
-          showToast('Informe PDF generat correctament!', 'success');
-        } catch {
-          showToast('Error en generar el PDF', 'error');
-        }
+        // Lazily loaded so jsPDF stays out of the initial bundle.
+        void import('../utils/pdf-generator.ts')
+          .then(({ generateModel100PDF }) => {
+            generateModel100PDF(state, irpf);
+            showToast('Informe PDF generat correctament!', 'success');
+          })
+          .catch(() => {
+            showToast('Error en generar el PDF', 'error');
+          });
       },
     },
     {

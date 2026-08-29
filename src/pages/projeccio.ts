@@ -32,8 +32,8 @@ export function renderProjeccioPage(): HTMLElement {
   let inflationRate = 2.5;          // % inflació
   let investmentReturnRate = 6.0;   // % rendibilitat anual inversions
   let annualPensionContribution = 1500; // € aportació pla pensions
-  let rentalGrowthRate = 2.0;       // % increment lloguers
-  let horizonYears = 5;
+  const rentalGrowthRate = 2.0;       // % increment lloguers
+  const horizonYears = 5;
 
   function render() {
     const data = store.getData();

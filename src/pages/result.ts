@@ -13,7 +13,6 @@ import {
 } from '../fiscal/constants.ts';
 import { formatCurrency, formatPercent } from '../utils/currency.ts';
 import { createStackedBar } from '../components/chart.ts';
-import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { showToast } from '../components/toast.ts';
 import { calculateComplementaryIRPF } from '../fiscal/complementary-engine.ts';
 import { createTaxJourneyVisualizer } from '../components/tax-journey-visualizer.ts';
@@ -435,12 +434,15 @@ export function renderResult(): HTMLElement {
     // BINDING D'EVENTS INTERACTIUS AMB RE-RENDER
     // ═════════════════════════════════════════════════════════════
     page.querySelector('#btn-download-pdf')?.addEventListener('click', () => {
-      try {
-        generateModel100PDF(data, result);
-        showToast('PDF del Model 100 generat correctament', 'success');
-      } catch {
-        showToast('Error en generar el PDF', 'error');
-      }
+      // Lazily loaded so jsPDF stays out of the initial bundle.
+      void import('../utils/pdf-generator.ts')
+        .then(({ generateModel100PDF }) => {
+          generateModel100PDF(data, result);
+          showToast('PDF del Model 100 generat correctament', 'success');
+        })
+        .catch(() => {
+          showToast('Error en generar el PDF', 'error');
+        });
     });
 
     page.querySelector('#btn-toggle-complementary')?.addEventListener('click', () => {
@@ -495,7 +497,7 @@ export function renderResult(): HTMLElement {
         if (reconciled.iva) store.updateIVA(reconciled.iva);
         showToast('Cuadre automàtic completat: models tributaris 100% homogenis', 'success');
         render();
-      } catch (err) {
+      } catch {
         showToast('Error en executar el cuadre automàtic', 'error');
       }
     });

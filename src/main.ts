@@ -9,6 +9,48 @@ import { initCommandPaletteShortcut } from './components/command-palette.ts';
 import { createLiveTaxHUD } from './components/live-tax-hud.ts';
 import type { Route } from './types.ts';
 
+/**
+ * Memoizes a dynamic module import so that predictive prefetch (`load`) and
+ * page rendering (`render`) share a single in-flight fetch per page chunk.
+ */
+function lazy<T>(loader: () => Promise<T>): () => Promise<T> {
+  let promise: Promise<T> | null = null;
+  return () => (promise ??= loader());
+}
+
+/** Lazily-loaded page modules, one per route. */
+const activitiesPage = lazy(() => import('./pages/activities.ts'));
+const advisorPage = lazy(() => import('./pages/advisor.ts'));
+const calendariPage = lazy(() => import('./pages/calendari.ts'));
+const capitalPage = lazy(() => import('./pages/capital.ts'));
+const casellesPage = lazy(() => import('./pages/caselles.ts'));
+const comparatorPage = lazy(() => import('./pages/comparator.ts'));
+const cryptoTaxesPage = lazy(() => import('./pages/crypto-taxes.ts'));
+const dashboardPage = lazy(() => import('./pages/dashboard.ts'));
+const deductionsPage = lazy(() => import('./pages/deductions.ts'));
+const documentIngestionPage = lazy(() => import('./pages/document-ingestion.ts'));
+const exportPage = lazy(() => import('./pages/export.ts'));
+const foreignAssetsPage = lazy(() => import('./pages/foreign-assets.ts'));
+const gainsPage = lazy(() => import('./pages/gains.ts'));
+const importPage = lazy(() => import('./pages/import.ts'));
+const inheritanceTaxPage = lazy(() => import('./pages/inheritance-tax.ts'));
+const ivaPage = lazy(() => import('./pages/iva.ts'));
+const personalPage = lazy(() => import('./pages/personal.ts'));
+const professionalCompliancePage = lazy(() => import('./pages/professional-compliance.ts'));
+const projeccioPage = lazy(() => import('./pages/projeccio.ts'));
+const propertiesPage = lazy(() => import('./pages/properties.ts'));
+const quarterlyTaxesPage = lazy(() => import('./pages/quarterly-taxes.ts'));
+const realEstateTaxesPage = lazy(() => import('./pages/real-estate-taxes.ts'));
+const resultPage = lazy(() => import('./pages/result.ts'));
+const simulatorPage = lazy(() => import('./pages/simulator.ts'));
+const strategicAdvisorPage = lazy(() => import('./pages/strategic-advisor.ts'));
+const taxReconciliationPage = lazy(() => import('./pages/tax-reconciliation.ts'));
+const tradingAnalyticsPage = lazy(() => import('./pages/trading-analytics.ts'));
+const usersPage = lazy(() => import('./pages/users.ts'));
+const wealthTaxPage = lazy(() => import('./pages/wealth-tax.ts'));
+const wizardPage = lazy(() => import('./pages/wizard.ts'));
+const workIncomePage = lazy(() => import('./pages/work-income.ts'));
+
 /** All application routes configured with code-splitting dynamic imports */
 const routes: Route[] = [
   {
@@ -16,217 +58,248 @@ const routes: Route[] = [
     label: 'Dashboard',
     icon: '📊',
     section: '',
-    render: async () => (await import('./pages/dashboard.ts')).renderDashboard(),
+    load: dashboardPage,
+    render: async () => (await dashboardPage()).renderDashboard(),
   },
   {
     path: '/usuaris',
     label: 'Gestió de Declarants',
     icon: '👥',
     section: 'Configuració',
-    render: async () => (await import('./pages/users.ts')).renderUsersPage(),
+    load: usersPage,
+    render: async () => (await usersPage()).renderUsersPage(),
   },
   {
     path: '/caselles',
     label: 'Mapa Caselles AEAT',
     icon: '🗺️',
     section: 'Fiscal',
-    render: async () => (await import('./pages/caselles.ts')).renderCasellesPage(),
+    load: casellesPage,
+    render: async () => (await casellesPage()).renderCasellesPage(),
   },
   {
     path: '/calendari',
     label: 'Calendari Fiscal AEAT',
     icon: '📅',
     section: 'Fiscal',
-    render: async () => (await import('./pages/calendari.ts')).renderCalendariPage(),
+    load: calendariPage,
+    render: async () => (await calendariPage()).renderCalendariPage(),
   },
   {
     path: '/iva',
     label: 'Gestió de l\'IVA (303/390)',
     icon: '🧾',
     section: 'Fiscal',
-    render: async () => (await import('./pages/iva.ts')).renderIVA(),
+    load: ivaPage,
+    render: async () => (await ivaPage()).renderIVA(),
   },
   {
     path: '/trimestrals',
     label: 'Trimestrals (130, 111, 347)',
     icon: '🗓️',
     section: 'Fiscal',
-    render: async () => (await import('./pages/quarterly-taxes.ts')).renderQuarterlyTaxes(),
+    load: quarterlyTaxesPage,
+    render: async () => (await quarterlyTaxesPage()).renderQuarterlyTaxes(),
   },
   {
     path: '/projeccio',
     label: 'Projecció Multianual',
     icon: '🔮',
     section: 'Eines',
-    render: async () => (await import('./pages/projeccio.ts')).renderProjeccioPage(),
+    load: projeccioPage,
+    render: async () => (await projeccioPage()).renderProjeccioPage(),
   },
   {
     path: '/trading',
     label: 'Trading & Backtesting',
     icon: '📈',
     section: 'Eines',
-    render: async () => (await import('./pages/trading-analytics.ts')).renderTradingAnalytics(),
+    load: tradingAnalyticsPage,
+    render: async () => (await tradingAnalyticsPage()).renderTradingAnalytics(),
   },
   {
     path: '/patrimoni',
     label: 'Impost Patrimoni (714)',
     icon: '🏰',
     section: 'Fiscal',
-    render: async () => (await import('./pages/wealth-tax.ts')).renderWealthTax(),
+    load: wealthTaxPage,
+    render: async () => (await wealthTaxPage()).renderWealthTax(),
   },
   {
     path: '/model720',
     label: 'Béns a l\'Estranger (720/721)',
     icon: '🌍',
     section: 'Fiscal',
-    render: async () => (await import('./pages/foreign-assets.ts')).renderForeignAssets(),
+    load: foreignAssetsPage,
+    render: async () => (await foreignAssetsPage()).renderForeignAssets(),
   },
   {
     path: '/sucesiones',
     label: 'Sucesiones y Donaciones (650)',
     icon: '⚰️',
     section: 'Patrimonial',
-    render: async () => (await import('./pages/inheritance-tax.ts')).renderInheritanceTax(),
+    load: inheritanceTaxPage,
+    render: async () => (await inheritanceTaxPage()).renderInheritanceTax(),
   },
   {
     path: '/itp-plusvalia',
     label: 'ITP y Plusvalía Municipal (600)',
     icon: '🏢',
     section: 'Patrimonial',
-    render: async () => (await import('./pages/real-estate-taxes.ts')).renderRealEstateTaxes(),
+    load: realEstateTaxesPage,
+    render: async () => (await realEstateTaxesPage()).renderRealEstateTaxes(),
   },
   {
     path: '/estratega',
     label: 'Assessorament Estratègic',
     icon: '🧠',
     section: 'Optimització',
-    render: async () => (await import('./pages/strategic-advisor.ts')).renderStrategicAdvisor(),
+    load: strategicAdvisorPage,
+    render: async () => (await strategicAdvisorPage()).renderStrategicAdvisor(),
   },
   {
     path: '/cripto',
     label: 'Criptomonedes i DeFi (721)',
     icon: '₿',
     section: 'Patrimonial',
-    render: async () => (await import('./pages/crypto-taxes.ts')).renderCryptoTaxes(),
+    load: cryptoTaxesPage,
+    render: async () => (await cryptoTaxesPage()).renderCryptoTaxes(),
   },
   {
     path: '/ingesta',
     label: 'Bústia Intel·ligent OCR',
     icon: '🤖',
     section: 'Sistema',
-    render: async () => (await import('./pages/document-ingestion.ts')).renderDocumentIngestion(),
+    load: documentIngestionPage,
+    render: async () => (await documentIngestionPage()).renderDocumentIngestion(),
   },
   {
     path: '/compliance',
     label: 'Compliance Veri*Factu',
     icon: '🏛️',
     section: 'Sistema',
-    render: async () => (await import('./pages/professional-compliance.ts')).renderProfessionalCompliance(),
+    load: professionalCompliancePage,
+    render: async () => (await professionalCompliancePage()).renderProfessionalCompliance(),
   },
   {
     path: '/conciliacio',
     label: 'Conciliació & Cuadre Inter-Model',
     icon: '⚖️',
     section: 'Fiscal & Normativa',
-    render: async () => (await import('./pages/tax-reconciliation.ts')).renderTaxReconciliation(),
+    load: taxReconciliationPage,
+    render: async () => (await taxReconciliationPage()).renderTaxReconciliation(),
   },
   {
     path: '/wizard',
     label: 'Assistent Guiat',
     icon: '🧙',
     section: 'Eines',
-    render: async () => (await import('./pages/wizard.ts')).renderWizard(),
+    load: wizardPage,
+    render: async () => (await wizardPage()).renderWizard(),
   },
   {
     path: '/assessor',
     label: 'Fiscal Advisor (Estalvi)',
     icon: '💡',
     section: 'Eines',
-    render: async () => (await import('./pages/advisor.ts')).renderAdvisor(),
+    load: advisorPage,
+    render: async () => (await advisorPage()).renderAdvisor(),
   },
   {
     path: '/comparador',
     label: 'Individual vs Conjunta',
     icon: '⚖️',
     section: 'Eines',
-    render: async () => (await import('./pages/comparator.ts')).renderComparator(),
+    load: comparatorPage,
+    render: async () => (await comparatorPage()).renderComparator(),
   },
   {
     path: '/treball',
     label: 'Rendiments del treball',
     icon: '💼',
     section: 'Ingressos',
-    render: async () => (await import('./pages/work-income.ts')).renderWorkIncome(),
+    load: workIncomePage,
+    render: async () => (await workIncomePage()).renderWorkIncome(),
   },
   {
     path: '/capital',
     label: 'Rendiments del capital',
     icon: '🏦',
     section: 'Ingressos',
-    render: async () => (await import('./pages/capital.ts')).renderCapital(),
+    load: capitalPage,
+    render: async () => (await capitalPage()).renderCapital(),
   },
   {
     path: '/immobles',
     label: 'Immobles en lloguer',
     icon: '🏠',
     section: 'Ingressos',
-    render: async () => (await import('./pages/properties.ts')).renderProperties(),
+    load: propertiesPage,
+    render: async () => (await propertiesPage()).renderProperties(),
   },
   {
     path: '/activitats',
     label: 'Activitats econòmiques',
     icon: '🏢',
     section: 'Ingressos',
-    render: async () => (await import('./pages/activities.ts')).renderActivities(),
+    load: activitiesPage,
+    render: async () => (await activitiesPage()).renderActivities(),
   },
   {
     path: '/guanys',
     label: 'Guanys patrimonials',
     icon: '📊',
     section: 'Ingressos',
-    render: async () => (await import('./pages/gains.ts')).renderGains(),
+    load: gainsPage,
+    render: async () => (await gainsPage()).renderGains(),
   },
   {
     path: '/personal',
     label: 'Situació Personal',
     icon: '👤',
     section: 'Fiscal',
-    render: async () => (await import('./pages/personal.ts')).renderPersonal(),
+    load: personalPage,
+    render: async () => (await personalPage()).renderPersonal(),
   },
   {
     path: '/deduccions',
     label: 'Deduccions',
     icon: '🎯',
     section: 'Fiscal',
-    render: async () => (await import('./pages/deductions.ts')).renderDeductions(),
+    load: deductionsPage,
+    render: async () => (await deductionsPage()).renderDeductions(),
   },
   {
     path: '/resultat',
     label: 'Resultat & Radar Risc',
     icon: '🧮',
     section: 'Fiscal',
-    render: async () => (await import('./pages/result.ts')).renderResult(),
+    load: resultPage,
+    render: async () => (await resultPage()).renderResult(),
   },
   {
     path: '/simulador',
     label: 'Simulador Llei Beckham',
     icon: '⚖️',
     section: 'Eines',
-    render: async () => (await import('./pages/simulator.ts')).renderSimulator(),
+    load: simulatorPage,
+    render: async () => (await simulatorPage()).renderSimulator(),
   },
   {
     path: '/importar',
     label: 'Importar Operacions',
     icon: '📥',
     section: 'Eines',
-    render: async () => (await import('./pages/import.ts')).renderImport(),
+    load: importPage,
+    render: async () => (await importPage()).renderImport(),
   },
   {
     path: '/exportar',
     label: 'Exportar / Còpies',
     icon: '💾',
     section: 'Eines',
-    render: async () => (await import('./pages/export.ts')).renderExport(),
+    load: exportPage,
+    render: async () => (await exportPage()).renderExport(),
   },
 ];
 

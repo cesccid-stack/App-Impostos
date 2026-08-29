@@ -245,13 +245,49 @@ export const AUTONOMIC_COMMUNITIES_REGISTRY: Record<SpanishAutonomousCommunity, 
 };
 
 /**
+ * Mapatge de codis curts oficials de 3 lletres de CCAA a les claus del registre.
+ */
+const CCAA_CODE_MAP: Record<string, SpanishAutonomousCommunity> = {
+  cat: 'catalunya',
+  mad: 'madrid',
+  and: 'andalucia',
+  val: 'valencia',
+  gal: 'galicia',
+  ara: 'aragon',
+  ast: 'asturias',
+  bal: 'baleares',
+  can: 'canarias',
+  ctb: 'cantabria',
+  cant: 'cantabria',
+  clm: 'castilla_la_mancha',
+  cyl: 'castilla_y_leon',
+  ext: 'extremadura',
+  mur: 'murcia',
+  rio: 'rioja',
+  nav: 'navarra',
+  pva: 'pais_vasco',
+  ceu: 'ceuta_melilla',
+  mel: 'ceuta_melilla',
+};
+
+/**
  * Retorna l'escala autonòmica aplicable segons la Comunitat Autònoma.
+ * Accepta tant noms complets ('catalunya', 'madrid', 'andalucia') com codis curts ('CAT', 'MAD', 'AND', etc.).
  */
 export function getAutonomicBrackets(ccaa: string = 'catalunya'): readonly TaxBracket[] {
-  const normalized = ccaa.toLowerCase().trim() as SpanishAutonomousCommunity;
-  const info = AUTONOMIC_COMMUNITIES_REGISTRY[normalized];
-  if (info) {
-    return info.brackets;
+  if (!ccaa) return CATALUNYA_GENERAL_TAX_BRACKETS;
+  const raw = ccaa.toLowerCase().trim();
+  
+  // 1. Cercar directament al registre
+  if (AUTONOMIC_COMMUNITIES_REGISTRY[raw as SpanishAutonomousCommunity]) {
+    return AUTONOMIC_COMMUNITIES_REGISTRY[raw as SpanishAutonomousCommunity].brackets;
   }
+  
+  // 2. Cercar a través del mapatge de codis de 3 lletres
+  const mappedKey = CCAA_CODE_MAP[raw];
+  if (mappedKey && AUTONOMIC_COMMUNITIES_REGISTRY[mappedKey]) {
+    return AUTONOMIC_COMMUNITIES_REGISTRY[mappedKey].brackets;
+  }
+
   return CATALUNYA_GENERAL_TAX_BRACKETS;
 }

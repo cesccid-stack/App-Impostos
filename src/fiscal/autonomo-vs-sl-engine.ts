@@ -1,3 +1,4 @@
+import { calculateSavingsTaxEUR } from './investment-cockpit-engine.ts';
 import type { AutonomoVsSLData } from '../types-strategy.ts';
 
 export class AutonomoVsSLEngine {
@@ -77,11 +78,6 @@ export class AutonomoVsSLEngine {
   }
 
   private static estimarTipusEstalvi(base: number): number {
-    if (base <= 0) return 0;
-    if (base <= 6000) return base * 0.19;
-    if (base <= 50000) return (6000 * 0.19) + ((base - 6000) * 0.21);
-    if (base <= 200000) return (6000 * 0.19) + (44000 * 0.21) + ((base - 50000) * 0.23);
-    if (base <= 300000) return (6000 * 0.19) + (44000 * 0.21) + (150000 * 0.23) + ((base - 200000) * 0.27);
-    return (6000 * 0.19) + (44000 * 0.21) + (150000 * 0.23) + (100000 * 0.27) + ((base - 300000) * 0.28);
+    return calculateSavingsTaxEUR(base);
   }
 }

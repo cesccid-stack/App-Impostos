@@ -33,7 +33,7 @@ export class Model130Engine {
     const minoracion = 0;
     
     // 5. Resultat final abans de minoracions
-    let netTax = grossTax - deductionHomeLoan - minoracion - accumulatedWithholdings - previousFractionalPayments;
+    const netTax = grossTax - deductionHomeLoan - minoracion - accumulatedWithholdings - previousFractionalPayments;
     
     // Si és negatiu, és a deduir en trimestres posteriors o a tornar a final d'any, normalment s'indica 0 si s'arrossega.
     // Per al model 130 es pot presentar amb resultat negatiu.

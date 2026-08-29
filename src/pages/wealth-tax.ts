@@ -19,7 +19,7 @@ export function renderWealthTax(): HTMLElement {
   const irpfResult = calculateIRPF(data);
 
   // Carregar estat existent del magatzem o auto-inicialitzar amb immobles i accions de la renda
-  let currentWealth: WealthTaxData = data.wealth && data.wealth.assets && data.wealth.assets.length > 0
+  const currentWealth: WealthTaxData = data.wealth && data.wealth.assets && data.wealth.assets.length > 0
     ? data.wealth
     : initializeWealthFromIRPF(data);
 

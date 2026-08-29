@@ -6,6 +6,8 @@
 
 import type { DeclaracionData } from '../types.ts';
 import { calculateIRPF } from './irpf.ts';
+import { applyTaxBracketsExact, exactAdd, exactSub, round2 } from '../utils/exact-math.ts';
+import { STATE_SAVINGS_TAX_BRACKETS, AUTONOMIC_SAVINGS_TAX_BRACKETS } from './constants.ts';
 
 export interface BeckhamComparisonResult {
   ordinaryTax: number;             // Quota IRPF règim ordinari
@@ -22,42 +24,44 @@ export interface BeckhamComparisonResult {
 }
 
 /**
- * Compara la tributació sota el règim general de l'IRPF vs el Règim Especial d'Impatriats (Llei Beckham).
+ * Escala estatal de l'estalvi aplicable als impatriats (IRNR / Art. 93 LIRPF - Model 151).
+ * Els tipus són idèntics a l'escala de l'estalvi agregada (19%, 21%, 23%, 27%, 28%).
+ */
+const BECKHAM_SAVINGS_BRACKETS = STATE_SAVINGS_TAX_BRACKETS.map((b, i) => ({
+  upTo: b.upTo,
+  rate: round2(b.rate + (AUTONOMIC_SAVINGS_TAX_BRACKETS[i]?.rate || 0)),
+}));
+
+/**
+ * Compara la tributació sota el règim general de l'IRPF vs el Règim Especial d'Impatriats (Llei Beckham / Art. 93 LIRPF).
  */
 export function compareBeckhamRegime(data: DeclaracionData): BeckhamComparisonResult {
   const ordinaryResult = calculateIRPF(data);
   const ordinaryTax = ordinaryResult.netTax;
 
   // Càlcul Llei Beckham (Art. 93 LIRPF / Model 151)
-  // 1. Salari brut del treball a Espanya
-  let totalSpanishSalary = (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  // 1. Salari brut del treball a Espanya (tipus fix 24% fins a 600.000 €, 47% per l'excés)
+  const totalSpanishSalary = (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
 
   let beckhamWorkTax = 0;
   if (totalSpanishSalary <= 600_000) {
-    beckhamWorkTax = totalSpanishSalary * 0.24;
+    beckhamWorkTax = round2(totalSpanishSalary * 0.24);
   } else {
-    beckhamWorkTax = (600_000 * 0.24) + ((totalSpanishSalary - 600_000) * 0.47);
+    beckhamWorkTax = round2(exactAdd(600_000 * 0.24, (totalSpanishSalary - 600_000) * 0.47));
   }
 
   // 2. Rendiments de capital mobiliari i guanys a Espanya (escala de l'estalvi estatal)
-  const spanishSavingsBase = (data.capitalIncome?.interests || 0) + (data.capitalIncome?.dividends || 0);
-  let beckhamSavingsTax = 0;
-  if (spanishSavingsBase > 0) {
-    if (spanishSavingsBase <= 6000) beckhamSavingsTax = spanishSavingsBase * 0.19;
-    else if (spanishSavingsBase <= 50000) beckhamSavingsTax = (6000 * 0.19) + ((spanishSavingsBase - 6000) * 0.21);
-    else if (spanishSavingsBase <= 200000) beckhamSavingsTax = (6000 * 0.19) + (44000 * 0.21) + ((spanishSavingsBase - 50000) * 0.23);
-    else if (spanishSavingsBase <= 300000) beckhamSavingsTax = (6000 * 0.19) + (44000 * 0.21) + (150000 * 0.23) + ((spanishSavingsBase - 200000) * 0.27);
-    else beckhamSavingsTax = (6000 * 0.19) + (44000 * 0.21) + (150000 * 0.23) + (100000 * 0.27) + ((spanishSavingsBase - 300000) * 0.28);
-  }
+  const spanishSavingsBase = exactAdd(data.capitalIncome?.interests || 0, data.capitalIncome?.dividends || 0);
+  const beckhamSavingsTax = applyTaxBracketsExact(spanishSavingsBase, BECKHAM_SAVINGS_BRACKETS).totalTax;
 
-  // Les rendes i guanys internacionals (foreignDividends, etc.) tributen a 0 a Espanya sota la Llei Beckham!
-  const beckhamTotalTax = Math.max(0, beckhamWorkTax + beckhamSavingsTax);
+  // Les rendes i guanys internacionals (foreignDividends, plusvàlues estrangeres) tributen al 0% a Espanya sota la Llei Beckham!
+  const beckhamTotalTax = Math.max(0, exactAdd(beckhamWorkTax, beckhamSavingsTax));
 
-  const totalIncome = totalSpanishSalary + spanishSavingsBase + (data.capitalIncome?.foreignDividends || 0);
-  const ordinaryEffectiveRate = totalIncome > 0 ? (ordinaryTax / totalIncome) * 100 : 0;
-  const beckhamEffectiveRate = totalIncome > 0 ? (beckhamTotalTax / totalIncome) * 100 : 0;
+  const totalIncome = exactAdd(totalSpanishSalary, spanishSavingsBase, data.capitalIncome?.foreignDividends || 0);
+  const ordinaryEffectiveRate = totalIncome > 0 ? round2((ordinaryTax / totalIncome) * 100) : 0;
+  const beckhamEffectiveRate = totalIncome > 0 ? round2((beckhamTotalTax / totalIncome) * 100) : 0;
 
-  const taxDifference = ordinaryTax - beckhamTotalTax; // Positiu = estalvi amb Beckham
+  const taxDifference = round2(exactSub(ordinaryTax, beckhamTotalTax)); // Positiu = estalvi amb Beckham
   const isBeckhamBetter = taxDifference > 0;
 
   let explanation = '';

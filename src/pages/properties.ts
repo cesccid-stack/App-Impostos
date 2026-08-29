@@ -1158,6 +1158,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     totalCadastralValue: 0,
     constructionCadastralValue: 0,
     acquisitionCost: 0,
+    acquisitionExpenses: 0,
     inventory: [],
     improvements: [],
     furniture: [],
@@ -1341,18 +1342,22 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
 
       <!-- 5. Amortització de l'Immoble -->
       <fieldset style="border:1px solid var(--border-default); border-radius:var(--radius-md); padding:var(--space-md);">
-        <legend style="font-weight:600; padding:0 var(--space-xs);">5. Amortització de l'Immoble (Construcció 3%)</legend>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-md);">
+        <legend style="font-weight:600; padding:0 var(--space-xs);">5. Amortització de l'Immoble (Construcció 3% - Art. 23.1.b LIRPF & STS 1130/2021)</legend>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-md);">
           <div>
-            <label class="form-label">Cost Adquisició (€)</label>
-            <input type="number" step="0.01" class="form-input" id="prop-acq-cost" value="${p.acquisitionCost}" placeholder="Compra + ITP + notaria">
+            <label class="form-label">Preu Compra / Adjudicació (€)</label>
+            <input type="number" step="0.01" class="form-input" id="prop-acq-cost" value="${p.acquisitionCost}" placeholder="Preu escriptura">
+          </div>
+          <div>
+            <label class="form-label">Despeses i Tributs Compra (€)</label>
+            <input type="number" step="0.01" class="form-input" id="prop-acq-expenses" value="${p.acquisitionExpenses || 0}" placeholder="ITP, notaria, registre" title="Jurisprudència STS 1130/2021: augmenta la base d'amortització">
           </div>
           <div>
             <label class="form-label">Valor Cadastral Total (€)</label>
             <input type="number" step="0.01" class="form-input" id="prop-cad-total" value="${p.totalCadastralValue}">
           </div>
           <div>
-            <label class="form-label">Valor Cadastral Construcció (€)</label>
+            <label class="form-label">Cadastral Construcció (€)</label>
             <input type="number" step="0.01" class="form-input" id="prop-cad-const" value="${p.constructionCadastralValue}">
           </div>
         </div>
@@ -1443,6 +1448,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     p.badDebts = parseFloat((modal.querySelector('#prop-debts') as HTMLInputElement).value) || 0;
 
     p.acquisitionCost = parseFloat((modal.querySelector('#prop-acq-cost') as HTMLInputElement).value) || 0;
+    p.acquisitionExpenses = parseFloat((modal.querySelector('#prop-acq-expenses') as HTMLInputElement)?.value) || 0;
     p.totalCadastralValue = parseFloat((modal.querySelector('#prop-cad-total') as HTMLInputElement).value) || 0;
     p.constructionCadastralValue = parseFloat((modal.querySelector('#prop-cad-const') as HTMLInputElement).value) || 0;
 
@@ -1873,7 +1879,7 @@ function openInvoiceBreakdownModal(p: RentalProperty, page: HTMLElement, onSave?
   const data = store.getData();
   const fiscalYear = data.year || 2024;
 
-  let invoiceLines: Array<{
+  const invoiceLines: Array<{
     id: string;
     concept: string;
     category: AEATAssetGroupId;

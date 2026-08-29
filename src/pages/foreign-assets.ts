@@ -15,7 +15,7 @@ export function renderForeignAssets(): HTMLElement {
 
   const data = store.getData();
 
-  let foreignState: ForeignAssetsData = data.foreignAssets && data.foreignAssets.accounts && data.foreignAssets.accounts.length > 0
+  const foreignState: ForeignAssetsData = data.foreignAssets && data.foreignAssets.accounts && data.foreignAssets.accounts.length > 0
     ? data.foreignAssets
     : {
         accounts: [

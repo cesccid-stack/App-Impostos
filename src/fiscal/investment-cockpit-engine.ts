@@ -8,6 +8,7 @@
 
 import type { GainItem } from '../types.ts';
 import { roundCurrency } from '../utils/math.ts';
+import { applyTaxBracketsExact } from '../utils/exact-math.ts';
 
 export type InvestmentAssetClass = 'shares' | 'crypto' | 'funds' | 'etf' | 'derivatives' | 'other';
 export type TradingHoldingStyle = 'scalping' | 'swing' | 'positional' | 'long_term';
@@ -34,6 +35,8 @@ export interface EnrichedTradeItem extends GainItem {
   month: number;
   dayOfWeek: number; // 0 (Diumenge) a 6 (Dissabte)
   dateStr: string;
+  transferDateMs?: number;
+  acquisitionDateMs?: number;
   isWashSaleSuspect?: boolean;
   
   // Metadades de Trading Journal
@@ -317,31 +320,20 @@ export function inferEmotionTag(item: GainItem, pnl: number): string {
   return 'Execució Estàndard';
 }
 
+const TOTAL_SAVINGS_BRACKETS = [
+  { upTo: 6000, rate: 0.19 },
+  { upTo: 50000, rate: 0.21 },
+  { upTo: 200000, rate: 0.23 },
+  { upTo: 300000, rate: 0.27 },
+  { upTo: Infinity, rate: 0.28 },
+] as const;
+
 /**
- * Calcula l'escala de l'estalvi d'IRPF sobre la base imposable de guanys patrimonials.
+ * Calcula l'escala de l'estalvi d'IRPF sobre la base imposable de guanys patrimonials amb precisió exacta AEAT.
  */
 export function calculateSavingsTaxEUR(base: number): number {
   if (base <= 0) return 0;
-  let tax = 0;
-  let remaining = base;
-  if (remaining > 300000) {
-    tax += (remaining - 300000) * 0.28;
-    remaining = 300000;
-  }
-  if (remaining > 200000) {
-    tax += (remaining - 200000) * 0.27;
-    remaining = 200000;
-  }
-  if (remaining > 50000) {
-    tax += (remaining - 50000) * 0.23;
-    remaining = 50000;
-  }
-  if (remaining > 6000) {
-    tax += (remaining - 6000) * 0.21;
-    remaining = 6000;
-  }
-  tax += remaining * 0.19;
-  return roundCurrency(tax);
+  return applyTaxBracketsExact(base, TOTAL_SAVINGS_BRACKETS).totalTax;
 }
 
 /**
@@ -370,18 +362,23 @@ export function analyzeInvestmentCockpit(
     let dayOfWeek = 3;
     let dateStr = '2024-01-01';
 
+    let transferDateMs = 0;
+    let acquisitionDateMs = 0;
+
     if (item.transferDate) {
       dateStr = item.transferDate;
       const transDate = new Date(item.transferDate);
-      if (!isNaN(transDate.getTime())) {
+      transferDateMs = transDate.getTime();
+      if (!isNaN(transferDateMs)) {
         year = transDate.getFullYear();
         month = transDate.getMonth() + 1;
         dayOfWeek = transDate.getDay();
       }
       if (item.acquisitionDate) {
         const acqDate = new Date(item.acquisitionDate);
-        if (!isNaN(acqDate.getTime()) && !isNaN(transDate.getTime())) {
-          const diffTime = transDate.getTime() - acqDate.getTime();
+        acquisitionDateMs = acqDate.getTime();
+        if (!isNaN(acquisitionDateMs) && !isNaN(transferDateMs)) {
+          const diffTime = transferDateMs - acquisitionDateMs;
           holdingDays = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
         }
       }
@@ -413,6 +410,8 @@ export function analyzeInvestmentCockpit(
       month,
       dayOfWeek,
       dateStr,
+      transferDateMs,
+      acquisitionDateMs,
       isWashSaleSuspect: item.isNonComputableLoss || false,
       setup,
       emotionTag,
@@ -433,15 +432,16 @@ export function analyzeInvestmentCockpit(
 
   for (const [, group] of tradesByConcept.entries()) {
     if (group.length <= 1) continue;
-    group.sort((a, b) => new Date(a.transferDate || '').getTime() - new Date(b.transferDate || '').getTime());
+    group.sort((a, b) => (a.transferDateMs || 0) - (b.transferDateMs || 0));
     for (let i = 0; i < group.length; i++) {
       const current = group[i];
       if (current.isLoss) {
-        const curDate = new Date(current.transferDate || '').getTime();
+        const curDate = current.transferDateMs || 0;
+        if (!curDate) continue;
         for (let j = 0; j < group.length; j++) {
           if (i === j) continue;
-          const otherAcq = new Date(group[j].acquisitionDate || group[j].transferDate || '').getTime();
-          if (!isNaN(curDate) && !isNaN(otherAcq)) {
+          const otherAcq = group[j].acquisitionDateMs || group[j].transferDateMs || 0;
+          if (otherAcq) {
             const diffDays = Math.abs(curDate - otherAcq) / (1000 * 60 * 60 * 24);
             if (diffDays <= 60 && current.assetClass === 'shares') {
               current.isWashSaleSuspect = true;
@@ -468,12 +468,8 @@ export function analyzeInvestmentCockpit(
     filtered = filtered.filter(t => t.setup === filterSetup);
   }
 
-  // Ordenar cronològicament per a la corba d'equitat
-  filtered.sort((a, b) => {
-    const dateA = new Date(a.transferDate || '2024-01-01').getTime();
-    const dateB = new Date(b.transferDate || '2024-01-01').getTime();
-    return dateA - dateB;
-  });
+  // Ordenar cronològicament per a la corba d'equitat emprant timestamps precomputats
+  filtered.sort((a, b) => (a.transferDateMs || 0) - (b.transferDateMs || 0));
 
   // 4. Mètriques quantitatives bàsiques
   const totalTrades = filtered.length;

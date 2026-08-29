@@ -23,12 +23,21 @@ export function calculateFIFO(trades: TradeRecord[]): {
   const matches: FIFOMatch[] = [];
   const summariesMap: Record<string, AssetSummary> = {};
 
-  // Sort trades by date ascending (FIFO requirement)
-  const sortedTrades = [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Pre-parse timestamps to avoid repetitive new Date allocations in sorting and matching
+  const indexedTrades = trades.map(t => ({
+    ...t,
+    dateMs: new Date(t.date).getTime(),
+  }));
 
-  for (const trade of sortedTrades) {
+  // Sort trades by date ascending (FIFO requirement)
+  indexedTrades.sort((a, b) => a.dateMs - b.dateMs);
+
+  // Buy index for ultra-fast wash-sale detection O(B_asset) instead of scanning all trades O(N)
+  const buysByAsset = new Map<string, Array<{ id: string; dateMs: number; quantity: number }>>();
+
+  for (const trade of indexedTrades) {
     // Homogeneity key: ISIN is primary, fallback to Symbol
-    const assetId = trade.isin?.trim() || trade.symbol?.trim();
+    const assetId = trade.isin?.trim() || trade.symbol?.trim() || 'UNKNOWN';
 
     if (!summariesMap[assetId]) {
       summariesMap[assetId] = {
@@ -58,12 +67,21 @@ export function calculateFIFO(trades: TradeRecord[]): {
         symbol: trade.symbol,
         isin: trade.isin || '',
         remainingQty: trade.quantity,
-        priceEUR: trade.totalEUR / trade.quantity, // Price per unit in EUR including buy commission
+        priceEUR: trade.quantity > 0 ? trade.totalEUR / trade.quantity : 0, // Price per unit in EUR including buy commission
         date: trade.date,
         broker: trade.broker,
       });
       summary.totalBought += trade.totalEUR;
       summary.openPosition += trade.quantity;
+
+      if (!buysByAsset.has(assetId)) {
+        buysByAsset.set(assetId, []);
+      }
+      buysByAsset.get(assetId)!.push({
+        id: trade.id,
+        dateMs: trade.dateMs,
+        quantity: trade.quantity,
+      });
     } else if (trade.type === 'sell') {
       const lots = openLotsByAsset[assetId] || [];
       let remainingToSell = trade.quantity;
@@ -73,7 +91,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
       let totalGainForThisSale = 0;
 
       // Sell price per unit in EUR (net of sell commission)
-      const sellPriceEURPerUnit = trade.totalEUR / trade.quantity;
+      const sellPriceEURPerUnit = trade.quantity > 0 ? trade.totalEUR / trade.quantity : 0;
 
       while (remainingToSell > 0 && lots.length > 0) {
         const currentLot = lots[0];
@@ -114,7 +132,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
       let computedGainLossEUR = totalGainForThisSale;
 
       if (totalGainForThisSale < 0) {
-        const sellDate = new Date(trade.date);
+        const sellDate = new Date(trade.dateMs);
         
         // Determinar finestra temporal: 2 mesos per mercat regulat UE, 1 any per la resta
         const isRegulatedEU = trade.marketType !== 'unregulated_or_foreign';
@@ -122,19 +140,22 @@ export function calculateFIFO(trades: TradeRecord[]): {
 
         const windowStart = new Date(sellDate);
         windowStart.setMonth(windowStart.getMonth() - windowMonths);
+        const windowStartMs = windowStart.getTime();
+
         const windowEnd = new Date(sellDate);
         windowEnd.setMonth(windowEnd.getMonth() + windowMonths);
+        const windowEndMs = windowEnd.getTime();
 
-        // Sumar compres del mateix valor homogeni (ISIN) en la finestra
-        const nearbyBuys = sortedTrades.filter(t => 
-          t.type === 'buy' && 
-          (t.isin === trade.isin || (!t.isin && t.symbol === trade.symbol)) &&
-          new Date(t.date) >= windowStart && 
-          new Date(t.date) <= windowEnd &&
-          t.id !== trade.id
-        );
-
-        repurchasedQuantity = nearbyBuys.reduce((sum, b) => sum + b.quantity, 0);
+        // Recerca directa sobre compres de l'actiu homogeni O(B_asset)
+        const candidateBuys = buysByAsset.get(assetId);
+        if (candidateBuys && candidateBuys.length > 0) {
+          for (let bIdx = 0; bIdx < candidateBuys.length; bIdx++) {
+            const b = candidateBuys[bIdx];
+            if (b.id !== trade.id && b.dateMs >= windowStartMs && b.dateMs <= windowEndMs) {
+              repurchasedQuantity += b.quantity;
+            }
+          }
+        }
 
         if (repurchasedQuantity > 0) {
           antiApplicationApplied = true;
@@ -151,8 +172,8 @@ export function calculateFIFO(trades: TradeRecord[]): {
       // Dies de tinença (basats en el lot més antic casat)
       let holdingDays = 0;
       if (matchedLotsForThisSale.length > 0) {
-        const oldestLotDate = new Date(matchedLotsForThisSale[0].lot.date);
-        holdingDays = Math.floor((new Date(trade.date).getTime() - oldestLotDate.getTime()) / (1000 * 60 * 60 * 24));
+        const oldestLotDateMs = new Date(matchedLotsForThisSale[0].lot.date).getTime();
+        holdingDays = Math.floor((trade.dateMs - oldestLotDateMs) / (1000 * 60 * 60 * 24));
       }
 
       matches.push({

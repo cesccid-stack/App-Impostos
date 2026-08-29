@@ -91,7 +91,7 @@ export async function parseGeneric(
     if (!dateStr) continue;
 
     // Normalització de formats de dates (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, ISO amb hora)
-    let isoDate = normalizeDate(dateStr);
+    const isoDate = normalizeDate(dateStr);
 
     // Tipus d'operació (Compra / Venda)
     const typeStr = row[mapping.typeIdx]?.trim().toLowerCase() || '';

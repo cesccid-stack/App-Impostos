@@ -169,7 +169,7 @@ export function compareIndividualVsJoint(
   const resultDiff = sumIndividualsResult - jointResult.result; // > 0 -> Conjunta és millor (pagues menys o et tornen més)
 
   let recommendedOption: 'joint' | 'individual' | 'equal' = 'equal';
-  let savingsAmount = Math.abs(resultDiff);
+  const savingsAmount = Math.abs(resultDiff);
   let reasoning = '';
 
   if (resultDiff > 0.01) {

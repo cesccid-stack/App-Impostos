@@ -23,16 +23,25 @@ class MockStorage {
   key(index: number): string | null { return Array.from(this.store.keys())[index] ?? null; }
 }
 
+/** Minimal event object handed to mock DOM listeners. */
+interface MockEvent {
+  target: MockElement;
+  [key: string]: unknown;
+}
+
+/** Listener signature accepted by the mock DOM. */
+type MockEventListener = (event: MockEvent) => void;
+
 class MockElement {
   public tagName: string;
   public id: string = '';
   public className: string = '';
   public innerHTML: string = '';
-  public style: Record<string, any> = {};
+  public style: Record<string, string> = {};
   public children: MockElement[] = [];
   public parentNode: MockElement | null = null;
   public attributes = new Map<string, string>();
-  public eventListeners = new Map<string, Array<(...args: any[]) => void>>();
+  public eventListeners = new Map<string, MockEventListener[]>();
   public dataset: Record<string, string> = {};
   public value: string = '';
   public disabled: boolean = false;
@@ -68,7 +77,7 @@ class MockElement {
     return child;
   }
 
-  replaceWith(...nodes: any[]): void {
+  replaceWith(...nodes: MockElement[]): void {
     if (!this.parentNode) return;
     const idx = this.parentNode.children.indexOf(this);
     if (idx !== -1) {
@@ -76,14 +85,14 @@ class MockElement {
     }
   }
 
-  addEventListener(type: string, listener: (...args: any[]) => void): void {
+  addEventListener(type: string, listener: MockEventListener): void {
     if (!this.eventListeners.has(type)) {
       this.eventListeners.set(type, []);
     }
     this.eventListeners.get(type)!.push(listener);
   }
 
-  dispatchEvent(type: string, eventObj: any = {}): void {
+  dispatchEvent(type: string, eventObj: Partial<MockEvent> = {}): void {
     const list = this.eventListeners.get(type) || [];
     for (const cb of list) cb({ target: this, ...eventObj });
   }
@@ -131,16 +140,41 @@ class MockElement {
 }
 
 // Global polyfills for Node environment
-if (typeof (globalThis as any).window === 'undefined') {
-  (globalThis as any).window = {
+interface MockWindow {
+  location: { hash: string };
+  addEventListener: (type: string, listener: MockEventListener) => void;
+  localStorage: MockStorage;
+  navigator: { clipboard: { writeText: (text: string) => Promise<void> } };
+}
+
+interface MockDocument {
+  createElement: (tag: string) => MockElement;
+  createDocumentFragment: () => MockElement;
+  getElementById: (id: string) => MockElement;
+  body: MockElement;
+  addEventListener: (type: string, listener: MockEventListener) => void;
+}
+
+interface MockGlobal {
+  window: MockWindow;
+  document: MockDocument;
+  localStorage: MockStorage;
+  HTMLElement: typeof MockElement;
+  requestAnimationFrame: (callback: () => void) => ReturnType<typeof setTimeout>;
+}
+
+const mockGlobal: Partial<MockGlobal> = globalThis as unknown as Partial<MockGlobal>;
+
+if (typeof mockGlobal.window === 'undefined') {
+  mockGlobal.window = {
     location: { hash: '#/' },
     addEventListener: () => {},
     localStorage: new MockStorage(),
     navigator: { clipboard: { writeText: async () => {} } },
   };
 }
-if (typeof (globalThis as any).document === 'undefined') {
-  (globalThis as any).document = {
+if (typeof mockGlobal.document === 'undefined') {
+  mockGlobal.document = {
     createElement: (tag: string) => new MockElement(tag),
     createDocumentFragment: () => new MockElement('fragment'),
     getElementById: (id: string) => {
@@ -152,22 +186,27 @@ if (typeof (globalThis as any).document === 'undefined') {
     addEventListener: () => {},
   };
 }
-if (typeof (globalThis as any).localStorage === 'undefined') {
-  (globalThis as any).localStorage = (globalThis as any).window.localStorage;
+if (typeof mockGlobal.localStorage === 'undefined') {
+  mockGlobal.localStorage = mockGlobal.window.localStorage;
 }
-if (typeof (globalThis as any).HTMLElement === 'undefined') {
-  (globalThis as any).HTMLElement = MockElement as any;
+if (typeof mockGlobal.HTMLElement === 'undefined') {
+  mockGlobal.HTMLElement = MockElement;
 }
-if (typeof (globalThis as any).requestAnimationFrame === 'undefined') {
-  (globalThis as any).requestAnimationFrame = (cb: () => void) => setTimeout(cb, 0);
+if (typeof mockGlobal.requestAnimationFrame === 'undefined') {
+  mockGlobal.requestAnimationFrame = (cb: () => void) => setTimeout(cb, 0);
 }
+
+// `process` is only used to set the exit code. Declare the minimal surface so
+// the script type-checks without pulling in the whole `@types/node` globals
+// (which would conflict with the DOM lib used across the application).
+declare const process: { exit(code?: number): void };
 
 // ── IMPORTS DELS MOTORS I SUBSISTEMA DE RENDA ──────────────────────────────
 
 import { calculateIRPF, applyBrackets } from '../src/fiscal/irpf.ts';
-import { calculatePropertyFiscalResult, calculateAllProperties } from '../src/fiscal/real-estate-engine.ts';
+import { calculatePropertyFiscalResult } from '../src/fiscal/real-estate-engine.ts';
 import { calculateSavingsCompensation } from '../src/fiscal/loss-carryover-engine.ts';
-import { combineDeclarationsForJoint, compareIndividualVsJoint } from '../src/fiscal/joint-taxation.ts';
+import { compareIndividualVsJoint } from '../src/fiscal/joint-taxation.ts';
 import { computeDeductions } from '../src/fiscal/deductions.ts';
 import { computeCatalanDeductions } from '../src/fiscal/deductions-cat.ts';
 import { calculateComplementaryIRPF } from '../src/fiscal/complementary-engine.ts';
@@ -176,7 +215,7 @@ import { runAutomatedComplianceChecks } from '../src/fiscal/auto-validator.ts';
 import { calculateAllQuarters, calculateModel390Annual } from '../src/fiscal/iva-engine.ts';
 import { initializeEmptyIVAData } from '../src/fiscal/iva-integration.ts';
 import { calculateWealthTax } from '../src/fiscal/wealth-tax-engine.ts';
-import { validateAndSanitizeDeclaration, sanitizeNumber, sanitizeBoolean } from '../src/fiscal/schema-validator.ts';
+import { validateAndSanitizeDeclaration, sanitizeNumber } from '../src/fiscal/schema-validator.ts';
 import { validatePensionContributions, validateForeignWorkExemption, validateIrregularIncome, validateMileageRate } from '../src/fiscal/form-validator.ts';
 import { AutonomoVsSLEngine } from '../src/fiscal/autonomo-vs-sl-engine.ts';
 import { PensionsOptimizerEngine } from '../src/fiscal/pensions-optimizer.ts';
@@ -192,9 +231,9 @@ import { runMonteCarloSimulation } from '../src/fiscal/monte-carlo-engine.ts';
 import { calculateMarginalTaxRate, generateYearEndOptimization } from '../src/fiscal/year-end-optimizer.ts';
 import { calculateEnergyEfficiencyDeduction } from '../src/fiscal/energy-efficiency-engine.ts';
 import { checkTaxPrescription } from '../src/fiscal/tax-prescription-engine.ts';
-import { exactAdd, exactSub, exactMultiply, exactDivide, applyTaxBracketsExact, calculateInvoiceLineTaxExact, eurosToCents, centsToEuros } from '../src/utils/exact-math.ts';
+import { exactAdd, exactSub, exactMultiply, applyTaxBracketsExact, calculateInvoiceLineTaxExact } from '../src/utils/exact-math.ts';
 import { createChainedInvoiceRecord, verifyInvoiceChainIntegrity } from '../src/fiscal/verifactu-engine.ts';
-import { getAutonomicBrackets, AUTONOMIC_COMMUNITIES_REGISTRY } from '../src/fiscal/autonomic-tax-scales.ts';
+import { getAutonomicBrackets } from '../src/fiscal/autonomic-tax-scales.ts';
 import { generateTaxDefenseDossier } from '../src/fiscal/audit-dossier-generator.ts';
 import { Model115And180Engine } from '../src/fiscal/model115-180-engine.ts';
 import { auditAndDecoupleVehicleExpenses, isExclusiveVehicleActivity } from '../src/fiscal/vehicle-deduction-engine.ts';
@@ -209,18 +248,18 @@ import { runInstitutionalBacktest } from '../src/fiscal/backtest-engine.ts';
 import { roundCurrency, safeAdd, safeMultiply, safePercentage } from '../src/utils/math.ts';
 import { router } from '../src/router.ts';
 import { buildTable } from '../src/components/table-builder.ts';
-import { formatCurrency, formatCurrencyNoDecimals, formatPercent, formatNumber, formatCompact, parseCurrencyInput } from '../src/utils/currency.ts';
+import { formatCurrency, formatCurrencyNoDecimals, formatPercent, formatCompact, parseCurrencyInput } from '../src/utils/currency.ts';
 import { store, createEmptyDeclaracion } from '../src/store.ts';
 import {
   STATE_GENERAL_TAX_BRACKETS,
   CATALAN_GENERAL_TAX_BRACKETS,
   STATE_SAVINGS_TAX_BRACKETS,
   AUTONOMIC_SAVINGS_TAX_BRACKETS,
-  PERSONAL_MINIMUM,
   WORK_OTHER_EXPENSES,
   COMMUNITY_NAME_MAP,
 } from '../src/fiscal/constants.ts';
-import type { DeclaracionData, RentalProperty } from '../src/types.ts';
+import type { GainItem, RentalProperty } from '../src/types.ts';
+import type { TradePerformanceMetrics } from '../src/fiscal/trading-analytics.ts';
 import type { IVAData, IVAInvoiceIssued, IVAInvoiceReceived } from '../src/types-iva.ts';
 import type { WealthTaxData } from '../src/fiscal/wealth-tax-engine.ts';
 
@@ -265,11 +304,12 @@ function test(name: string, fn: () => void): void {
     const durationMs = performance.now() - start;
     results.push({ suite: currentSuite, name, passed: true, durationMs });
     console.log(`  \x1b[32m✔\x1b[0m ${name} \x1b[90m(${durationMs.toFixed(2)}ms)\x1b[0m`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     const durationMs = performance.now() - start;
-    results.push({ suite: currentSuite, name, passed: false, error: err?.message || String(err), durationMs });
+    const message = err instanceof Error ? err.message : String(err);
+    results.push({ suite: currentSuite, name, passed: false, error: message, durationMs });
     console.error(`  \x1b[31m✖\x1b[0m ${name} \x1b[90m(${durationMs.toFixed(2)}ms)\x1b[0m`);
-    console.error(`    \x1b[31mError: ${err?.message || err}\x1b[0m`);
+    console.error(`    \x1b[31mError: ${message}\x1b[0m`);
   }
 }
 
@@ -283,6 +323,110 @@ function assertCloseTo(actual: number, expected: number, tolerance = 0.05, messa
   if (Math.abs(actual - expected) > tolerance) {
     throw new Error(`Expected ~${expected} (±${tolerance}), but got ${actual}. ${message}`);
   }
+}
+
+/**
+ * Builds a complete `TradePerformanceMetrics` fixture.
+ *
+ * The Monte Carlo engine only reads `totalTrades`, `winRate`, `avgWin` and
+ * `avgLoss`; every other metric is filled with neutral zeros.
+ */
+function makeTradeMetrics(overrides: Partial<TradePerformanceMetrics>): TradePerformanceMetrics {
+  return {
+    totalTrades: 0,
+    winningTrades: 0,
+    losingTrades: 0,
+    breakevenTrades: 0,
+    winRate: 0,
+    lossRate: 0,
+    totalProfit: 0,
+    totalLoss: 0,
+    netPnL: 0,
+    totalVolumeTraded: 0,
+    profitFactor: 0,
+    avgTrade: 0,
+    avgWin: 0,
+    avgLoss: 0,
+    payoffRatio: 0,
+    expectancyEUR: 0,
+    maxWin: 0,
+    maxLoss: 0,
+    maxConsecutiveWins: 0,
+    maxConsecutiveLosses: 0,
+    maxDrawdownEUR: 0,
+    maxDrawdownPercent: 0,
+    avgHoldingDaysWins: 0,
+    avgHoldingDaysLosses: 0,
+    estimatedTaxesSavings: 0,
+    netPnLAfterTax: 0,
+    sharpeRatio: 0,
+    disciplineScore: 0,
+    psychologicalBiases: {
+      dispositionEffect: false,
+      revengeTradingRisk: false,
+      outlierRisk: false,
+      warnings: [],
+      strengths: [],
+    },
+    equityCurve: [],
+    yearlyPerformance: [],
+    monthlyBreakdown: [],
+    dayOfWeekPerformance: [],
+    assetComparison: [],
+    distributionBuckets: [],
+    benchmarkComparison: {
+      tradingReturnTotalEUR: 0,
+      estimatedCapitalEmployed: 0,
+      tradingReturnPct: 0,
+      benchmarkSp500Pct: 0,
+      alphaGeneratedPct: 0,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Builds a complete, type-safe `RentalProperty` for the test fixtures.
+ *
+ * The domain type requires every field, but the fixtures only care about a
+ * handful of fiscally relevant ones. The neutral defaults below are
+ * mathematically identical to the previous `undefined` values:
+ * the engine reads numbers as `(x || 0)`, arrays as `(x || [])`,
+ * ownership as `(x || 100)` and maps `reductionType: 'none'` to a 0% rate
+ * (same as the `default` branch taken by `undefined`).
+ */
+function makeProperty(
+  overrides: Partial<RentalProperty> & Pick<RentalProperty, 'id' | 'name' | 'usageType'>,
+): RentalProperty {
+  return {
+    cadastralReference: '',
+    address: '',
+    ownershipPercentage: 100,
+    contractDate: '',
+    tenantNIFs: [],
+    monthlyRent: 0,
+    grossRentalIncome: 0,
+    otherIncomes: 0,
+    mortgageInterests: 0,
+    repairExpenses: 0,
+    pendingRepairsPreviousYears: 0,
+    ibi: 0,
+    wasteTax: 0,
+    otherTaxes: 0,
+    communityFees: 0,
+    insurance: 0,
+    managementFees: 0,
+    badDebts: 0,
+    totalCadastralValue: 0,
+    constructionCadastralValue: 0,
+    acquisitionCost: 0,
+    acquisitionExpenses: 0,
+    inventory: [],
+    improvements: [],
+    furniture: [],
+    reductionType: 'none',
+    ...overrides,
+  };
 }
 
 // ── 1. SUITE 1: MOTORS DE CÀLCUL FISCAL (IRPF) ──────────────────────────────
@@ -309,7 +453,6 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
       employers: [{
         id: 'emp-1',
         name: 'Tech Corp',
-        nif: 'B12345678',
         grossSalary: 80000,
         inKind: 2000,
         withholdings: 18000,
@@ -336,7 +479,7 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
   test('1.3 Capital Mobiliari i Deducció per Doble Imposició Internacional (Art. 80 Casella 0588)', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [{
-      id: 'e1', name: 'Work', nif: 'A11111111', grossSalary: 30000, inKind: 0, withholdings: 4500, socialSecurity: 1500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Work', grossSalary: 30000, inKind: 0, withholdings: 4500, socialSecurity: 1500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
     data.capitalIncome = {
       interests: 1000,
@@ -355,19 +498,18 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
     const res = calculateIRPF(data);
     
     assert(res.savingsBase === 6000, `Base estalvi ha de ser 6.000, obtingut: ${res.savingsBase}`);
-    assert(res.foreignTaxCredit > 0, 'Deducció per doble imposició ha de ser > 0');
-    assert(res.foreignTaxCredit <= 450, 'Deducció per doble imposició no pot superar la retenció suportada');
+    assert((res.foreignTaxCredit ?? 0) > 0, 'Deducció per doble imposició ha de ser > 0');
+    assert((res.foreignTaxCredit ?? 0) <= 450, 'Deducció per doble imposició no pot superar la retenció suportada');
   });
 
   test('1.4 Immobles Arrendats: Despeses Limitades, Amortitzacions i Reduccions Llei 12/2023', () => {
-    const prop: RentalProperty = {
+    const prop: RentalProperty = makeProperty({
       id: 'prop-1',
       name: 'Pis Eixample',
       cadastralReference: '1234567AB1234C0001XY',
       totalCadastralValue: 150000,
       constructionCadastralValue: 90000,
       acquisitionCost: 200000,
-      acquisitionDate: '2018-05-10',
       usageType: 'habitual',
       ownershipPercentage: 100,
       grossRentalIncome: 12000,
@@ -385,20 +527,25 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
       isMixedUsage: false,
       rentalDays: 365,
       ownUseDays: 0,
-      reductionType: '50_general',
+      reductionType: 'general_50',
       inventory: [
         {
           id: 'inv-1',
-          description: 'Mobiliari i electrodomèstics',
+          invoiceNumber: 'F-2023-001',
+          supplierName: 'Ikea',
+          supplierNif: 'A28824360',
+          concept: 'Mobiliari i electrodomèstics',
           category: 'group_2_furniture_10',
           amount: 5000,
           acquisitionDate: '2023-01-01',
-          amortizationRate: 0.10,
+          amortizationRate: 10,
+          maxYears: 20,
+          minYears: 10,
           previousAmortization: 500,
           status: 'active',
         }
       ],
-    };
+    });
 
     const calc = calculatePropertyFiscalResult(prop, 2024);
     
@@ -406,7 +553,7 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
     assert(calc.limitedExpensesDeducted === 7000, 'Despeses limitades deduïdes han de ser 7.000 €');
     assert(calc.pendingRepairsForFutureYears === 0, 'No hi ha romanent de reparacions');
     assertCloseTo(calc.buildingAmortization, 3600, 1.0, 'Amortització immoble 3%');
-    assertCloseTo(calc.inventoryAmortization, 500, 1.0, 'Amortització inventari mobles 10%');
+    assertCloseTo(calc.inventoryBreakdown.totalInventoryAmortization, 500, 1.0, 'Amortització inventari mobles 10%');
     assert(calc.netIncome < 0, 'Rendiment net ha de ser negatiu degut a amortitzacions i reparacions');
   });
 
@@ -446,12 +593,12 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
       age: 68,
       disability: 33,
       descendants: [
-        { id: 'd1', name: 'Fill 1', birthYear: 2010, age: 14, disability: 0 },
-        { id: 'd2', name: 'Fill 2', birthYear: 2022, age: 2, disability: 0 },
-        { id: 'd3', name: 'Fill 3', birthYear: 2015, age: 9, disability: 65 },
+        { id: 'd1', age: 14, disability: 0 },
+        { id: 'd2', age: 2, disability: 0 },
+        { id: 'd3', age: 9, disability: 65 },
       ],
       ascendants: [
-        { id: 'a1', name: 'Avi', birthYear: 1945, age: 79, disability: 0, liveTogether: true, annualIncome: 0 }
+        { id: 'a1', age: 79, disability: 0, liveTogether: true, annualIncome: 0 }
       ],
       community: 'CAT',
       taxDeclarationType: 'individual',
@@ -468,14 +615,14 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
   test('1.8 Deduccions Estatals i Autonòmiques de Catalunya', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [{
-      id: 'e1', name: 'Empresa', nif: 'A12345678', grossSalary: 18000, inKind: 0, withholdings: 2500, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Empresa', grossSalary: 18000, inKind: 0, withholdings: 2500, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
     data.personal.age = 28;
     data.deductions = {
       housingDeduction: true,
       housingAmountsPaid: 10000,
       donations: [
-        { id: 'don-1', entityName: 'Creu Roja', amount: 500, priority: true, recurring: true }
+        { id: 'don-1', entity: 'Creu Roja', amount: 500, priority: true, recurring: true }
       ],
       maternityDeduction: true,
       maternityMonths: 12,
@@ -487,7 +634,7 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
       otherDeductions: 0,
       catalanRentalDeduction: true,
       catalanRentalAmount: 9600,
-      catalanRentalSituation: 'under_32',
+      catalanRentalSituation: 'under32',
       catalanBirthAdoption: 1,
       catalanStartupInvestment: 10000,
       catalanStartupIsResearchOrUniversity: false,
@@ -546,7 +693,7 @@ suite('2. Magatzem Reactiu d\'Estat (src/store.ts)', () => {
     });
 
     store.update('personal', { name: 'Joan Prova', age: 40 });
-    assert(notified === true, 'El listener ha d\'haver estat notificat');
+    assert(notified, 'El listener ha d\'haver estat notificat');
     assert(store.getData().personal.name === 'Joan Prova', 'El nom ha d\'haver canviat');
     assert(store.getData().personal.age === 40, 'L\'edat ha d\'haver canviat a 40');
 
@@ -577,7 +724,7 @@ suite('3. Mapeig Oficial de Caselles AEAT Model 100', () => {
     store.reset();
     store.update('workIncome', {
       employers: [{
-        id: 'e1', name: 'Empresa', nif: 'B11223344', grossSalary: 45000, inKind: 1000, withholdings: 9000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+        id: 'e1', name: 'Empresa', grossSalary: 45000, inKind: 1000, withholdings: 9000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
       }],
       unionFees: 200,
       otherDeductible: 0,
@@ -639,7 +786,7 @@ suite('5. Comparador Individual vs Conjunta (Art. 82-84 LIRPF)', () => {
     const spouse1 = createEmptyDeclaracion(2024, 'sp-1');
     spouse1.personal.name = 'Cònjuge 1';
     spouse1.workIncome.employers = [{
-      id: 'e1', name: 'Empresa A', nif: 'B11111111', grossSalary: 32000, inKind: 0, withholdings: 5000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Empresa A', grossSalary: 32000, inKind: 0, withholdings: 5000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
 
     const spouse2 = createEmptyDeclaracion(2024, 'sp-2');
@@ -661,7 +808,7 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
   test('6.1 Detecció de riscos fiscals i alertes d\'auditoria', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [{
-      id: 'e1', name: 'Company', nif: 'A99999999', grossSalary: 50000, inKind: 0, withholdings: 200, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Company', grossSalary: 50000, inKind: 0, withholdings: 200, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
     data.deductions.housingDeduction = true;
     data.deductions.housingAmountsPaid = 15000;
@@ -677,10 +824,10 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
   test('6.2 Detecció d\'incompatibilitats d\'edat en descendents (> 25 anys) i ascendents (< 65 anys)', () => {
     const data = createEmptyDeclaracion(2024);
     data.personal.descendants = [
-      { id: 'd1', name: 'Fill Gran', birthYear: 1995, age: 29, disability: 0 }
+      { id: 'd1', age: 29, disability: 0 }
     ];
     data.personal.ascendants = [
-      { id: 'a1', name: 'Pare Jove', birthYear: 1968, age: 56, disability: 0, liveTogether: true, annualIncome: 0 }
+      { id: 'a1', age: 56, disability: 0, liveTogether: true, annualIncome: 0 }
     ];
 
     const compliance = runAutomatedComplianceChecks(data);
@@ -725,13 +872,13 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
   test('6.5 Incompatibilitat de reducció en arrendaments turístics (DGT V1187-24)', () => {
     const data = createEmptyDeclaracion(2024);
-    data.properties = [{
+    data.properties = [makeProperty({
       id: 'prop-tourist-1',
       name: 'Apartament Turístic Costa Brava',
       usageType: 'tourist',
       reductionType: 'general_50',
       grossRentalIncome: 15000,
-    } as any];
+    })];
 
     const compliance = runAutomatedComplianceChecks(data);
     const touristIssue = compliance.issues.find(i => i.id.includes('prop-tourist-invalid-reduction'));
@@ -745,7 +892,7 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
     data.iva = {
       ...initializeEmptyIVAData(),
       receivedInvoices: [
-        { id: 'rec-util-1', invoiceNumber: 'F100', date: '2024-03-01', quarter: '1T', supplierName: 'Endesa', supplierNif: 'A12345678', concept: 'Electricitat llar despatx', taxableBase: 500, vatRate: 21, vatAmount: 105, totalInvoice: 605, deductiblePercentage: 100, deductibleVatAmount: 105 } as any
+        { id: 'rec-util-1', invoiceNumber: 'F100', date: '2024-03-01', quarter: '1T', supplierName: 'Endesa', supplierNif: 'A12345678', concept: 'Electricitat llar despatx', taxableBase: 500, vatRate: 21, vatAmount: 105, totalInvoice: 605, deductiblePercentage: 100, deductibleVatAmount: 105, category: 'activity_expense' }
       ]
     };
 
@@ -757,7 +904,7 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
   test('6.7 Sostre legal de despeses de guarderia en deducció per maternitat (1.000 €)', () => {
     const data = createEmptyDeclaracion(2024);
-    data.personal.descendants = [{ id: 'd1', name: 'Bebè', birthYear: 2023, age: 1, disability: 0 }];
+    data.personal.descendants = [{ id: 'd1', age: 1, disability: 0 }];
     data.deductions.maternityDeduction = true;
     data.deductions.maternityNurseryExpenses = 1800;
 
@@ -769,12 +916,13 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
   test('6.8 Validació de cadastre (20 caràcters) i detecció de referència cadastral invàlida', () => {
     const data = createEmptyDeclaracion(2024);
-    data.properties = [{
+    data.properties = [makeProperty({
       id: 'p-bad-cadastre',
       name: 'Local',
+      usageType: 'commercial',
       cadastralReference: '123456789', // massa curta
       grossRentalIncome: 5000,
-    } as any];
+    })];
 
     const compliance = runAutomatedComplianceChecks(data);
     const cadIssue = compliance.issues.find(i => i.id === 'prop-invalid-cadastral-reference');
@@ -800,7 +948,7 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
   test('6.10 Detecció d\'incompatibilitat per límit de renda en deducció de lloguer a Catalunya (> 20.000 €)', () => {
     const data = createEmptyDeclaracion(2024);
-    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 35000, inKind: 0, withholdings: 6000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 35000, inKind: 0, withholdings: 6000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
     data.personal.age = 28;
     data.deductions.catalanRentalDeduction = true;
 
@@ -837,7 +985,7 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
 
   test('6.13 Detecció de límit de donacions del 15% sobre la base liquidable (Art. 69.1 LIRPF)', () => {
     const data = createEmptyDeclaracion(2024);
-    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 20000, inKind: 0, withholdings: 3000, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 20000, inKind: 0, withholdings: 3000, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
     data.deductions.donations = [
       { id: 'don1', entity: 'ONG Metges Sense Fronteres', amount: 5000, recurring: true, priority: true }
     ];
@@ -869,6 +1017,7 @@ suite('7. Motor d\'IVA Model 303 & Resum Anual 390 (Llei 37/1992)', () => {
       withholdingRate: 15,
       withholdingAmount: 1500,
       totalInvoice: 10600,
+      category: 'activity_service',
     };
     const received: IVAInvoiceReceived = {
       id: 'rec1',
@@ -882,7 +1031,9 @@ suite('7. Motor d\'IVA Model 303 & Resum Anual 390 (Llei 37/1992)', () => {
       vatRate: 21,
       vatAmount: 420,
       totalInvoice: 2420,
-      deductibilityPercentage: 100,
+      deductiblePercentage: 100,
+      deductibleVatAmount: 420,
+      category: 'activity_expense',
     };
 
     iva.issuedInvoices.push(issued);
@@ -932,17 +1083,18 @@ suite('9. Subscripcions Granulars del Magatzem Reactiu (store.ts)', () => {
 
   test('9.1 Notificació específica per secció amb subscribeKey', () => {
     let triggeredSection = false;
-    let receivedData: any = null;
+    let receivedData: { income?: number } | null = null;
 
     const unsubscribe = store.subscribeKey('activities', (sectionData) => {
       triggeredSection = true;
-      receivedData = sectionData;
+      receivedData = sectionData as { income?: number };
     });
 
     store.update('activities', { income: 45000, expenses: 12000 });
 
-    assert(triggeredSection === true, 'subscribeKey ha de disparar el listener específic de secció');
-    assert(receivedData !== null && receivedData.income === 45000, 'Les dades rebudes han de reflectir la mutació');
+    assert(triggeredSection, 'subscribeKey ha de disparar el listener específic de secció');
+    const received = receivedData as { income?: number } | null;
+    assert(received !== null && received.income === 45000, 'Les dades rebudes han de reflectir la mutació');
 
     unsubscribe();
   });
@@ -997,8 +1149,6 @@ suite('11. Micro-Design System i Generador de Taules Denses (table-builder.ts)',
       { id: '2', name: 'Factura B', amount: 3200 },
     ];
 
-    let clickedItem: TestRow | null = null;
-
     const tableEl = buildTable<TestRow>({
       columns: [
         { header: 'Nom', key: 'name' },
@@ -1009,7 +1159,8 @@ suite('11. Micro-Design System i Generador de Taules Denses (table-builder.ts)',
         {
           name: 'edit',
           label: 'Editar',
-          onClick: (item) => { clickedItem = item; },
+          // La vinculació d'accions s'ha d'acceptar pel constructor de taules.
+          onClick: () => {},
         },
       ],
       idGetter: (item) => item.id,
@@ -1030,15 +1181,14 @@ suite('12. Prova E2E de Cicle Complet de Declaració Fiscal & Benchmarking', () 
     const data = createEmptyDeclaracion(2024);
     // Treball
     data.workIncome.employers = [{
-      id: 'e1', name: 'Tech Corp', nif: 'A12345678', grossSalary: 60000, inKind: 0, withholdings: 12000, socialSecurity: 2400, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Tech Corp', grossSalary: 60000, inKind: 0, withholdings: 12000, socialSecurity: 2400, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
     // Immoble llogat
-    data.properties = [{
-      id: 'p1', alias: 'Pis Eixample', cadastralReference: '98765432109876543210AB', use: 'rented_long_term',
-      cadastralValue: 120000, cadastralValueConstruction: 60000, acquisitionValue: 200000, acquisitionDate: '2018-05-10',
-      daysRented: 365, grossIncome: 14400, communityExpenses: 600, ibiTax: 500, insurance: 300, repairExpenses: 1200, mortgageInterest: 1500, otherExpenses: 200,
-      reductionType: 'reduction_50', amortizeOnCadastral: false,
-    }];
+    data.properties = [makeProperty({
+      id: 'p1', name: 'Pis Eixample', cadastralReference: '98765432109876543210AB',
+      usageType: 'habitual',
+      reductionType: 'general_50',
+    })];
     // Guanys de borsa
     data.gains.items = [{
       id: 'g1', description: 'Accions Apple', type: 'shares', acquisitionDate: '2023-01-10', transferDate: '2024-11-20',
@@ -1148,15 +1298,20 @@ suite('16. Simulacions Estratègiques i Models Trimestrals', () => {
 
   test('16.1 Simulació Autònom vs Societat Limitada (AutonomoVsSLEngine)', () => {
     const sim = AutonomoVsSLEngine.simulate({
-      id: 'sim1',
-      date: '2024-01-01',
       expectedRevenue: 120000,
       expectedExpenses: 20000,
+      irpfMarginalRate: 37,
       autonomoQuota: 4500,
-      societalSalary: 45000,
       corporateTaxRate: 25,
+      dividendTaxRate: 19,
       slMaintenanceCost: 2000,
-      year: 2024,
+      societalSalary: 45000,
+      netIncomeAutonomo: 0,
+      totalTaxesAutonomo: 0,
+      netIncomeSL: 0,
+      totalTaxesSL: 0,
+      recommendation: 'autonomo',
+      savings: 0,
     });
 
     assert(sim.recommendation === 'sl' || sim.recommendation === 'autonomo', 'Ha de recomanar una opció vàlida');
@@ -1166,12 +1321,12 @@ suite('16. Simulacions Estratègiques i Models Trimestrals', () => {
 
   test('16.2 Optimització de Rescat de Pla de Pensions amb Reducció 40% (PensionsOptimizerEngine)', () => {
     const opt = PensionsOptimizerEngine.optimizeRescue({
-      id: 'pension1',
-      year: 2024,
       pensionFundValue: 100000,
       pre2007Contributions: 60000,
       yearsSinceRetirement: 1,
       otherYearlyIncome: 25000,
+      scenarios: [],
+      bestScenarioName: '',
     });
 
     assert(opt.scenarios && opt.scenarios.length >= 3, 'Ha de generar com a mínim 3 escenaris de rescat');
@@ -1303,8 +1458,9 @@ suite('19. Criptoactius (DeFi FIFO) i Model 347 (Operacions > 3.005,06 €)', ()
         assetOut: 'EUR',
         amountOut: 40000,
         fiatValueInEUR: 40000,
-        feeEUR: 20,
-        exchange: 'Kraken',
+        feeAsset: 'EUR',
+        feeAmount: 20,
+        walletOrExchange: 'Kraken',
       },
       {
         id: 'tx2',
@@ -1312,11 +1468,10 @@ suite('19. Criptoactius (DeFi FIFO) i Model 347 (Operacions > 3.005,06 €)', ()
         type: 'staking_reward',
         assetIn: 'ETH',
         amountIn: 0.5,
-        assetOut: '',
-        amountOut: 0,
+        feeAsset: 'EUR',
+        feeAmount: 0,
         fiatValueInEUR: 1500,
-        feeEUR: 0,
-        exchange: 'Binance',
+        walletOrExchange: 'Binance',
       },
       {
         id: 'tx3',
@@ -1327,8 +1482,9 @@ suite('19. Criptoactius (DeFi FIFO) i Model 347 (Operacions > 3.005,06 €)', ()
         assetOut: 'EUR',
         amountOut: 30000,
         fiatValueInEUR: 30000,
-        feeEUR: 15,
-        exchange: 'Kraken',
+        feeAsset: 'EUR',
+        feeAmount: 15,
+        walletOrExchange: 'Kraken',
       },
     ]);
 
@@ -1343,37 +1499,35 @@ suite('19. Criptoactius (DeFi FIFO) i Model 347 (Operacions > 3.005,06 €)', ()
       [
         {
           id: 'inv1',
-          number: 'F2024-01',
+          invoiceNumber: 'F2024-01',
           date: '2024-02-15',
           quarter: '1T',
           clientName: 'Client Major SL',
           clientNif: 'B12345678',
-          description: 'Desenvolupament',
-          taxBase: 4000,
-          ivaRate: 21,
-          ivaAmount: 840,
-          irpfWithholdingRate: 0,
-          irpfWithholdingAmount: 0,
+          concept: 'Desenvolupament',
+          taxableBase: 4000,
+          vatRate: 21,
+          vatAmount: 840,
+          withholdingRate: 0,
+          withholdingAmount: 0,
           totalInvoice: 4840,
-          category: 'services',
-          operationType: 'general',
+          category: 'activity_service',
         },
         {
           id: 'inv2',
-          number: 'F2024-02',
+          invoiceNumber: 'F2024-02',
           date: '2024-04-10',
           quarter: '2T',
           clientName: 'Client Petit SL',
           clientNif: 'B99999999',
-          description: 'Consulta',
-          taxBase: 1000,
-          ivaRate: 21,
-          ivaAmount: 210,
-          irpfWithholdingRate: 0,
-          irpfWithholdingAmount: 0,
+          concept: 'Consulta',
+          taxableBase: 1000,
+          vatRate: 21,
+          vatAmount: 210,
+          withholdingRate: 0,
+          withholdingAmount: 0,
           totalInvoice: 1210,
-          category: 'services',
-          operationType: 'general',
+          category: 'activity_service',
         },
       ],
       []
@@ -1424,17 +1578,16 @@ suite('20. Successions i Donacions (Model 650) i Simulació Monte Carlo', () => 
   test('20.2 Simulació Monte Carlo d\'Estrès de Mercat en < 15ms (runMonteCarloSimulation)', () => {
     const t0 = performance.now();
     const mc = runMonteCarloSimulation(
-      {
+      makeTradeMetrics({
         totalTrades: 50,
         winRate: 60,
         profitFactor: 1.8,
-        expectancy: 120,
-        maxDrawdown: 15,
+        expectancyEUR: 120,
+        maxDrawdownEUR: 15,
         avgWin: 300,
         avgLoss: 150,
         sharpeRatio: 1.5,
-        monthlyReturnAvg: 3.2,
-      },
+      }),
       20000, // 20.000 € inicials
       100    // 100 operacions
     );
@@ -1516,6 +1669,7 @@ suite('22. Coalescència Matemàtica Segura i Cicle de Vida del Router (math.ts 
     });
 
     assert(typeof router.registerCleanup === 'function', 'El router ha de disposar del mètode registerCleanup');
+    assert(!cleanedUp, 'El callback de neteja no s\'ha d\'executar sense navegació');
   });
 });
 
@@ -1695,17 +1849,10 @@ suite('27. Escales de Gravamen Autonòmiques Multi-CCAA (autonomic-tax-scales.ts
     // Comprovació amb el motor d'IRPF
     const baseDecl = createEmptyDeclaracion(2024, 'profile_main');
     baseDecl.workIncome = {
-      grossSalary: 60000,
-      socialSecurity: 2000,
-      withholdings: 12000,
-      exempt7p: 0,
-      irregularIncome: 0,
-      pensionContributions: 0,
+      employers: [{ id: '1', name: 'Empresa', grossSalary: 60000, inKind: 0, withholdings: 12000, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }],
       unionFees: 0,
-      legalDefense: 0,
-      mobilityMove: false,
-      activeDisabilityWorker: false,
-      employers: [{ id: '1', name: 'Empresa', grossSalary: 60000, withholdings: 12000, socialSecurity: 2000 }],
+      otherDeductible: 0,
+      pensionContributions: 0,
     };
 
     baseDecl.personal = {
@@ -1926,7 +2073,8 @@ suite('30. Muralles de Blindatge i Rigor Tributari (LIVA & LIRPF)', () => {
         // Despesa directa sense dret a deduir (lloguer habitatge) amb molt d'IVA
         {
           id: 'rec_1',
-          number: 'F-001',
+          invoiceNumber: 'F-001',
+          quarter: '1T',
           supplierNif: 'B12345678',
           supplierName: 'Manteniment Pisos',
           date: '2024-03-01',
@@ -1936,15 +2084,16 @@ suite('30. Muralles de Blindatge i Rigor Tributari (LIVA & LIRPF)', () => {
           taxableBase: 10000,
           vatRate: 21,
           vatAmount: 2100,
+          deductiblePercentage: 0,
+          deductibleVatAmount: 0,
           totalInvoice: 12100,
-          isDeductible: true,
-          deductionPercentage: 100,
           isInvestmentAsset: false,
         },
         // Despesa directa amb dret a deduir
         {
           id: 'rec_2',
-          number: 'F-002',
+          invoiceNumber: 'F-002',
+          quarter: '1T',
           supplierNif: 'B87654321',
           supplierName: 'Subministraments Activitat',
           date: '2024-03-05',
@@ -1953,19 +2102,14 @@ suite('30. Muralles de Blindatge i Rigor Tributari (LIVA & LIRPF)', () => {
           taxableBase: 1000,
           vatRate: 21,
           vatAmount: 210,
+          deductiblePercentage: 100,
+          deductibleVatAmount: 210,
           totalInvoice: 1210,
-          isDeductible: true,
-          deductionPercentage: 100,
           isInvestmentAsset: false,
         },
       ],
       investmentAssets: [],
-      quarters: {
-        '1T': {} as any,
-        '2T': {} as any,
-        '3T': {} as any,
-        '4T': {} as any,
-      },
+      quarters: initializeEmptyIVAData().quarters,
     };
 
     const comparison = calculateProrrataComparison(dummyIVAData, 80);
@@ -1999,11 +2143,11 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
     const data = createEmptyDeclaracion(2024);
     // Treball amb 2 pagadors
     data.workIncome.employers = [
-      { id: 'e1', name: 'Empresa Principal', nif: 'A11111111', grossSalary: 45000, inKind: 0, withholdings: 8000, socialSecurity: 2800, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
-      { id: 'e2', name: 'Segon Pagador', nif: 'B22222222', grossSalary: 8000, inKind: 0, withholdings: 800, socialSecurity: 500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
+      { id: 'e1', name: 'Empresa Principal', grossSalary: 45000, inKind: 0, withholdings: 8000, socialSecurity: 2800, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
+      { id: 'e2', name: 'Segon Pagador', grossSalary: 8000, inKind: 0, withholdings: 800, socialSecurity: 500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 },
     ];
     // Immoble llogat
-    data.properties = [{
+    data.properties = [makeProperty({
       id: 'prop-1',
       name: 'Pis Carrer Aragó',
       cadastralReference: '1234567AB1234C0001XY',
@@ -2022,7 +2166,7 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
       repairExpenses: 400,
       insurance: 300,
       reductionType: 'general_50',
-    } as any];
+    })];
     // Plans de pensions i donacions
     data.deductions.pensionPlanContributions = 1500;
     data.deductions.donations = [{ id: 'don-1', entity: 'Creu Roja', amount: 250, recurring: true, priority: false }];
@@ -2040,7 +2184,7 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
   test('31.2 Renderització del component visual Tax Journey Visualizer', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [
-      { id: 'e1', name: 'Empresa', nif: 'A11111111', grossSalary: 30000, inKind: 0, withholdings: 4500, socialSecurity: 1900, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }
+      { id: 'e1', name: 'Empresa', grossSalary: 30000, inKind: 0, withholdings: 4500, socialSecurity: 1900, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }
     ];
     const visualizer = createTaxJourneyVisualizer(data);
     assert(visualizer !== null && visualizer !== undefined, 'El visualitzador ha de retornar un element DOM');
@@ -2050,7 +2194,7 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
 
   test('31.3 Renderització dels Quadres Interns de Desglossament Avançat', () => {
     const data = createEmptyDeclaracion(2024);
-    data.properties = [{
+    data.properties = [makeProperty({
       id: 'prop-1',
       name: 'Pis Carrer Aragó',
       cadastralReference: '1234567AB1234C0001XY',
@@ -2069,7 +2213,7 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
       repairExpenses: 400,
       insurance: 300,
       reductionType: 'general_50',
-    } as any];
+    })];
     const dashboards = createInternalBreakdownDashboards(data);
     assert(dashboards !== null && dashboards !== undefined, 'El panell ha de retornar un element DOM');
     assert(dashboards.className.includes('internal-breakdowns-container'), 'Contenidor de quadres interns correcte');
@@ -2082,7 +2226,7 @@ suite('31. Quadre de Comandament Didàctic & Viatge Fiscal de la Renda', () => {
 suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () => {
 
   test('32.1 Mètriques financeres de rendibilitat, NOI, cash flow i escut fiscal 3%', () => {
-    const property = {
+    const property = makeProperty({
       id: 'prop-test-1',
       name: 'Àtic Rambla Catalunya',
       cadastralReference: '99887766AB1234C0001XY',
@@ -2101,7 +2245,7 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
       repairExpenses: 600,
       insurance: 400,
       reductionType: 'general_50',
-    } as any;
+    });
 
     const report = analyzePropertyFinances(property, 2024);
 
@@ -2117,7 +2261,7 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
 
   test('32.2 Anàlisi de cartera global i rànquing d\'eficiència', () => {
     const properties = [
-      {
+      makeProperty({
         id: 'p1',
         name: 'Pis Eixample',
         acquisitionCost: 200000,
@@ -2131,8 +2275,8 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
         insurance: 250,
         usageType: 'habitual',
         reductionType: 'general_50',
-      } as any,
-      {
+      }),
+      makeProperty({
         id: 'p2',
         name: 'Local Comercial Gràcia',
         acquisitionCost: 150000,
@@ -2146,7 +2290,7 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
         insurance: 300,
         usageType: 'commercial',
         reductionType: 'none',
-      } as any,
+      }),
     ];
 
     const portfolio = analyzePortfolioFinances(properties, 2024);
@@ -2160,7 +2304,7 @@ suite('32. Quadre de Comandament, Rendibilitat i Tendència Immobiliària', () =
 
   test('32.3 Renderització del component visual RealEstateDashboard', () => {
     const properties = [
-      { id: 'p1', name: 'Pis Test', acquisitionCost: 200000, grossRentalIncome: 12000, totalCadastralValue: 100000, constructionCadastralValue: 70000, usageType: 'habitual' } as any
+      makeProperty({ id: 'p1', name: 'Pis Test', acquisitionCost: 200000, grossRentalIncome: 12000, totalCadastralValue: 100000, constructionCadastralValue: 70000, usageType: 'habitual' })
     ];
     const dashboard = createRealEstateDashboard(properties, 2024);
     assert(dashboard !== null && dashboard !== undefined, 'El component ha de retornar un element DOM');
@@ -2183,11 +2327,11 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
   });
 
   test('33.2 Càlcul de mètriques quantitatives, P&L, Win Rate i Profit Factor', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 't1',
-        concept: 'Apple Inc',
-        assetType: 'shares',
+        description: 'Apple Inc',
+        type: 'shares',
         acquisitionDate: '2024-01-10',
         transferDate: '2024-02-10',
         acquisitionValue: 1000,
@@ -2196,8 +2340,8 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
       },
       {
         id: 't2',
-        concept: 'Tesla Inc',
-        assetType: 'shares',
+        description: 'Tesla Inc',
+        type: 'shares',
         acquisitionDate: '2024-03-01',
         transferDate: '2024-03-15',
         acquisitionValue: 2000,
@@ -2206,8 +2350,8 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
       },
       {
         id: 't3',
-        concept: 'Ethereum',
-        assetType: 'crypto',
+        description: 'Ethereum',
+        type: 'crypto',
         acquisitionDate: '2024-02-01',
         transferDate: '2024-05-01',
         acquisitionValue: 3000,
@@ -2248,11 +2392,11 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
   });
 
   test('33.4 Detecció de Regla dels 2 Mesos (Wash Sales Art. 33.5 LIRPF) i simulació What-If', () => {
-    const washTrades: any[] = [
+    const washTrades: GainItem[] = [
       {
         id: 'w1',
-        concept: 'Santander SA',
-        assetType: 'shares',
+        description: 'Santander SA',
+        type: 'shares',
         acquisitionDate: '2024-01-01',
         transferDate: '2024-01-20',
         acquisitionValue: 5000,
@@ -2261,8 +2405,8 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
       },
       {
         id: 'w2',
-        concept: 'Santander SA',
-        assetType: 'shares',
+        description: 'Santander SA',
+        type: 'shares',
         acquisitionDate: '2024-02-05', // 16 dies després! (< 60 dies)
         transferDate: '2024-06-01',
         acquisitionValue: 4000,
@@ -2279,10 +2423,10 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
   });
 
   test('33.5 Gestió de Risc Professional: Criteri de Kelly, VaR 95% i R-Multiples', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 'r1',
-        concept: 'Nvidia Corp',
+        description: 'Nvidia Corp',
         type: 'shares',
         acquisitionDate: '2024-01-10',
         transferDate: '2024-02-10',
@@ -2293,7 +2437,7 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
       },
       {
         id: 'r2',
-        concept: 'Tesla Inc',
+        description: 'Tesla Inc',
         type: 'shares',
         acquisitionDate: '2024-03-01',
         transferDate: '2024-03-15',
@@ -2312,10 +2456,10 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
   });
 
   test('33.6 Mapa de Calor Calendari, Anàlisi per Setups i Diari Kaizen', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 's1',
-        concept: 'BTC Breakout',
+        description: 'BTC Breakout',
         type: 'crypto',
         acquisitionDate: '2024-01-10',
         transferDate: '2024-01-11',
@@ -2328,7 +2472,7 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
       },
       {
         id: 's2',
-        concept: 'ETH DCA',
+        description: 'ETH DCA',
         type: 'crypto',
         acquisitionDate: '2024-02-01',
         transferDate: '2024-02-20',
@@ -2351,7 +2495,7 @@ suite('33. Quadre de Comandament d\'Inversions & Diari de Trading (investment-co
 
 suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engine.ts)', () => {
   test('34.1 Execució de backtest amb Stop Loss, Take Profit i Fricció (Slippage/Comissions)', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 'bt1',
         description: 'Apple Inc',
@@ -2402,7 +2546,7 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
   });
 
   test('34.2 Càlcul de mètriques quantitatives: SQN (Van Tharp), K-Ratio i Z-Score', () => {
-    const trades: any[] = Array.from({ length: 10 }).map((_, i) => ({
+    const trades: GainItem[] = Array.from({ length: 10 }).map((_, i) => ({
       id: `t_${i}`,
       description: `Stock ${i}`,
       type: 'shares',
@@ -2421,7 +2565,7 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
   });
 
   test('34.3 Validació Walk-Forward (In-Sample vs Out-of-Sample) i Matriu de Sensibilitat', () => {
-    const trades: any[] = Array.from({ length: 10 }).map((_, i) => ({
+    const trades: GainItem[] = Array.from({ length: 10 }).map((_, i) => ({
       id: `wf_${i}`,
       description: `Asset ${i}`,
       type: 'shares',
@@ -2439,7 +2583,7 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
   });
 
   test('34.4 Mètriques Hedge Fund: Ràtio Omega, Ulcer Index, Tail Ratio i Matriu Mensual', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 't_m1',
         description: 'Trade Gen',
@@ -2484,7 +2628,7 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
   });
 
   test('34.5 Modelització CAPM (Alpha, Beta), Fiscalitat Wash Sale Art. 33.5 i R-Multiples', () => {
-    const trades: any[] = [
+    const trades: GainItem[] = [
       {
         id: 'ws_1',
         description: 'Santander SA',
@@ -2527,7 +2671,7 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
   });
 
   test('34.6 Value at Risk Avançat (Cornish-Fisher, CVaR), Eficiència MAE/MFE i Stress-Testing', () => {
-    const trades: any[] = Array.from({ length: 20 }).map((_, i) => ({
+    const trades: GainItem[] = Array.from({ length: 20 }).map((_, i) => ({
       id: `cf_${i}`,
       description: `Asset ${i}`,
       type: 'shares',
@@ -2548,6 +2692,623 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
     assert(res.avgMfePercent >= 0, 'Average MFE calculat');
     assert(res.tradeExecutionEfficiencyScore >= 0, 'Trade execution efficiency calculada');
     assert(res.stressTestScenarios.length === 3, '3 escenaris de stress testing generats');
+  });
+
+  test('34.7 Mètriques Temporals: CAGR, Volatilitat Anualitzada, Rolling Edge i Corba de Kelly', () => {
+    const trades: GainItem[] = [
+      {
+        id: 'cagr_1',
+        description: 'Trade Jan',
+        type: 'shares',
+        acquisitionDate: '2024-01-01',
+        transferDate: '2024-03-01',
+        acquisitionValue: 5000,
+        transferValue: 5800,
+        expenses: 5,
+      },
+      {
+        id: 'cagr_2',
+        description: 'Trade Jun',
+        type: 'crypto',
+        acquisitionDate: '2024-06-01',
+        transferDate: '2024-08-01',
+        acquisitionValue: 5000,
+        transferValue: 5600,
+        expenses: 5,
+      },
+      {
+        id: 'cagr_3',
+        description: 'Trade Nov',
+        type: 'funds',
+        acquisitionDate: '2024-11-01',
+        transferDate: '2024-12-15',
+        acquisitionValue: 5000,
+        transferValue: 5400,
+        expenses: 5,
+      },
+    ];
+
+    const res = runInstitutionalBacktest(trades);
+    assert(res.cagrPercent !== undefined, 'CAGR calculat');
+    assert(res.annualizedVolatilityPercent >= 0, 'Volatilitat anualitzada calculada');
+    assert(res.annualizedSharpeRatio !== undefined, 'Sharpe anualitzat calculat');
+    assert(res.annualizedSortinoRatio !== undefined, 'Sortino anualitzat calculat');
+    assert(res.kellyOptimizationCurve.length === 6, '6 punts de la corba d\'optimització de Kelly');
+    assert(res.kellyOptimizationCurve.some(k => k.kellyMultiplier === 0.5), 'Conté Half-Kelly');
+  });
+});
+
+suite('35. Perfeccionament de l\'Exactitud Numèrica i Blindatge Tributari Garantista', () => {
+  test('35.1 Aritmètica Decimal Exacta en el Càlcul d\'IRPF (irpf.ts)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [
+      {
+        id: 'emp_exact',
+        name: 'Tech Corp SL',
+        grossSalary: 38456.77,
+        inKind: 1250.33,
+        socialSecurity: 2439.81,
+        withholdings: 6150.25,
+        dietsIncome: 0,
+        dietsDays: 0,
+        mileageIncome: 0,
+        mileageKm: 0,
+      },
+    ];
+
+    const res = calculateIRPF(data);
+    // Verificació d'arredoniment estricte a 2 decimals sense residus flotants IEEE-754
+    assert(Number.isFinite(res.generalBase), 'Base general finita');
+    assert(res.generalTax.toString().split('.')[1]?.length <= 2 || !res.generalTax.toString().includes('.'), 'Quota general arrodonida a 2 decimals exactes');
+    assert(res.grossTax.toString().split('.')[1]?.length <= 2 || !res.grossTax.toString().includes('.'), 'Quota íntegra arrodonida a 2 decimals');
+    assert(res.netTax.toString().split('.')[1]?.length <= 2 || !res.netTax.toString().includes('.'), 'Quota líquida arrodonida a 2 decimals');
+    assert(res.result.toString().split('.')[1]?.length <= 2 || !res.result.toString().includes('.'), 'Resultat diferencial arrodonit a 2 decimals');
+  });
+
+  test('35.2 Despeses Garantistes de Treball: Col·legis Professionals (Art. 19.2.d) i Defensa Jurídica (Art. 19.2.e)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [
+      {
+        id: 'emp_lawyer',
+        name: 'Bufet Jurídic SL',
+        grossSalary: 45000,
+        inKind: 0,
+        socialSecurity: 2000,
+        withholdings: 8000,
+        dietsIncome: 0,
+        dietsDays: 0,
+        mileageIncome: 0,
+        mileageKm: 0,
+      },
+    ];
+    // Cuotes col·legials amb excés sobre el topall de 500 €
+    data.workIncome.professionalCollegeFees = 750;
+    // Despeses de defensa jurídica laboral amb excés sobre el topall de 300 €
+    data.workIncome.legalDefenseFees = 450;
+
+    const res = calculateIRPF(data);
+    assert(res.professionalCollegeDeduction === 500, `Topall col·legis 500€ aplicat exactament: obtingut ${res.professionalCollegeDeduction}`);
+    assert(res.legalDefenseDeduction === 300, `Topall defensa laboral 300€ aplicat exactament: obtingut ${res.legalDefenseDeduction}`);
+
+    // Ingressos nets = 45.000 - (2.000 SS + 500 Col·legi + 300 Defensa + 2.000 Altres despeses) = 40.200 €
+    assert(res.generalBase === 40200, `Base imposable general correcta: ${res.generalBase} €`);
+  });
+
+  test('35.3 Indemnitzacions per Acomiadament Laboral (Art. 7.e i 18.2 LIRPF)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [];
+    data.workIncome.severancePay = 220000;
+    data.workIncome.severanceMandatoryLegalLimit = 180000;
+
+    const res = calculateIRPF(data);
+    assert(res.exemptSeverancePay === 180000, 'Exempció legal d\'indemnització de 180.000 € aplicada');
+    assert(res.taxableSeverancePay === 40000, 'Excés tributable de 40.000 € correctament identificat');
+  });
+
+  test('35.4 Amortització Immobiliària amb Despeses d\'Adquisició (Jurisprudència STS 1130/2021)', () => {
+    const prop = makeProperty({
+      id: 'prop-sts',
+      name: 'Pis Passeig de Gràcia',
+      cadastralReference: '77788899001122334455',
+      address: 'Passeig de Gràcia 50',
+      ownershipPercentage: 100,
+      usageType: 'habitual',
+      grossRentalIncome: 24000,
+      otherIncomes: 0,
+      mortgageInterests: 1200,
+      repairExpenses: 800,
+      pendingRepairsPreviousYears: 0,
+      totalCadastralValue: 100000,
+      constructionCadastralValue: 70000, // 70% construcció
+      acquisitionCost: 200000,
+      acquisitionExpenses: 25000, // ITP, Notaria, Registre, Gestoria (STS 1130/2021)
+      ibi: 600,
+      wasteTax: 100,
+      communityFees: 1200,
+      insurance: 400,
+      managementFees: 0,
+      badDebts: 0,
+      isMixedUsage: false,
+      rentalDays: 365,
+      ownUseDays: 0,
+      reductionType: 'general_50',
+      inventory: [],
+    });
+
+    const calc = calculatePropertyFiscalResult(prop, 2024);
+    assert(calc.effectiveAcquisitionCost === 225000, `Cost adquisició efectiu satisfet ha de ser 225.000 €, obtingut: ${calc.effectiveAcquisitionCost}`);
+    // Base construcció: 225.000 * 0.70 = 157.500 € (superior a 70.000 cadastrals)
+    assert(calc.constructionBase === 157500, `Base amortització de construcció ha de ser 157.500 €, obtingut: ${calc.constructionBase}`);
+    // Amortització 3%: 157.500 * 0.03 = 4.725 €
+    assert(calc.buildingAmortization === 4725, `Amortització 3% ha de ser 4.725 €, obtingut: ${calc.buildingAmortization}`);
+  });
+
+  test('35.5 Deducció per Maternitat Multi-Hijo (Art. 81 LIRPF i STS 8/2024)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.descendants = [
+      { id: 'child1', age: 1, disability: 0 },
+      { id: 'child2', age: 1, disability: 0 },
+    ];
+    data.deductions.maternityDeduction = true;
+    data.deductions.maternityMonths = 24; // 12 mesos x 2 fills
+    data.deductions.maternityNurseryExpenses = 1800; // Despeses guarderia per ambdós (màx 1.000€ cadascun)
+
+    const amounts = computeDeductions(data);
+    // Base maternitat: 24 * 100 = 2.400 € (màx 1.200 x 2 = 2.400 €)
+    // Guarderia: 1.800 € (màx 1.000 x 2 = 2.000 €)
+    // Total = 2.400 + 1.800 = 4.200 €
+    assert(amounts.maternityDeductionAmount === 4200, `Deducció maternitat multi-hijo ha de ser 4.200 €, obtingut: ${amounts.maternityDeductionAmount}`);
+  });
+
+  test('35.6 Compensació Garantista de l\'Estalvi amb Aritmètica Decimal Oficial (Art. 49 LIRPF)', () => {
+    const priorMob = [{ year: 2021, amount: 250.75 }];
+    const priorGains = [{ year: 2021, amount: 450.50 }];
+
+    const comp = calculateSavingsCompensation(-500.50, 2000.00, priorMob, priorGains);
+    // Compensació creuada 25% de 2.000 = 500 €
+    assert(comp.crossCompensationApplied === 500, `Compensació creuada: ${comp.crossCompensationApplied}`);
+    assert(comp.gainsAfterCross === 1500, `Guanys restants després de creuada: ${comp.gainsAfterCross}`);
+    assert(comp.priorGainsCompensated === 450.5, `Pèrdues prèvies de guanys compensades: ${comp.priorGainsCompensated}`);
+    assert(comp.finalSavingsBase === 1049.5, `Base final de l'estalvi exacta: ${comp.finalSavingsBase}`);
+  });
+});
+
+suite('36. Validació UI, Formularis Reactius i Mapa de Caselles Oficials (Iteració 2)', () => {
+  test('36.1 Renderització i actualització de camps garantistes de treball (work-income.ts)', () => {
+    store.reset();
+    const el = renderWorkIncome();
+    assert(el !== null, 'Pàgina de rendiments del treball renderitzada');
+
+    const profInput = el.querySelector('#prof-college-fees') as unknown as MockElement;
+    assert(profInput !== null, 'Camp de quotes a col·legis professionals existent');
+    profInput.value = '450';
+    profInput.dispatchEvent('input');
+    assert(store.getData().workIncome.professionalCollegeFees === 450, 'Store actualitzat amb quotes col·legials');
+
+    const legalInput = el.querySelector('#legal-defense-fees') as unknown as MockElement;
+    assert(legalInput !== null, 'Camp de defensa jurídica laboral existent');
+    legalInput.value = '250';
+    legalInput.dispatchEvent('input');
+    assert(store.getData().workIncome.legalDefenseFees === 250, 'Store actualitzat amb defensa laboral');
+
+    const sevInput = el.querySelector('#severance-pay') as unknown as MockElement;
+    assert(sevInput !== null, 'Camp d\'indemnització per acomiadament existent');
+    sevInput.value = '50000';
+    sevInput.dispatchEvent('input');
+    assert(store.getData().workIncome.severancePay === 50000, 'Store actualitzat amb indemnització');
+  });
+
+  test('36.2 Fidelitat i exactitud en el Mapa Oficial de Caselles AEAT (caselles.ts)', () => {
+    store.reset();
+    store.update('workIncome', {
+      employers: [
+        {
+          id: 'emp_1',
+          name: 'Empresa A',
+          grossSalary: 50000,
+          inKind: 0,
+          socialSecurity: 3000,
+          withholdings: 10000,
+          dietsIncome: 0,
+          dietsDays: 0,
+          mileageIncome: 0,
+          mileageKm: 0,
+        },
+      ],
+      unionFees: 120,
+      professionalCollegeFees: 500,
+      legalDefenseFees: 300,
+    });
+
+    const page = renderCasellesPage();
+    assert(page !== null, 'Pàgina de caselles renderitzada');
+
+    const data = store.getData();
+    const result = calculateIRPF(data);
+    assert(result.professionalCollegeDeduction === 500, 'Deducció col·legi 500 €');
+    assert(result.legalDefenseDeduction === 300, 'Deducció defensa jurídica 300 €');
+
+    // Comprovar contingut HTML amb les caselles oficials
+    assert(page.innerHTML.includes('[0013]'), 'Casella [0013] de quotes sindicals present');
+    assert(page.innerHTML.includes('[0015]'), 'Casella [0015] de col·legis professionals present');
+    assert(page.innerHTML.includes('[0016]'), 'Casella [0016] de defensa jurídica laboral present');
+    assert(page.innerHTML.includes('[0081]'), 'Casella [0081] de cost d\'adquisició amortitzable present');
+  });
+
+  test('36.3 Radar de Compliment: Oportunitat STS 1130/2021 i Caducitat de 4 Anys (auto-validator.ts)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.properties = [
+      makeProperty({
+        id: 'prop-alert-1',
+        name: 'Apartament València',
+        cadastralReference: '12345678901234567890',
+        address: 'Carrer Colón 10',
+        ownershipPercentage: 100,
+        usageType: 'habitual',
+        grossRentalIncome: 12000,
+        otherIncomes: 0,
+        mortgageInterests: 0,
+        repairExpenses: 0,
+        pendingRepairsPreviousYears: 0,
+        totalCadastralValue: 100000,
+        constructionCadastralValue: 60000,
+        acquisitionCost: 180000,
+        acquisitionExpenses: 0, // 0 € -> Dispara oportunitat STS 1130/2021
+        ibi: 400,
+        wasteTax: 80,
+        communityFees: 600,
+        insurance: 250,
+        managementFees: 0,
+        badDebts: 0,
+        inventory: [],
+        improvements: [],
+        furniture: [],
+        reductionType: 'general_50',
+        tenantNIFs: ['12345678Z'],
+      }),
+    ];
+
+    // Bossa de pèrdues de fa exactament 4 anys (2020 en exercici 2024)
+    data.lossCarryovers = {
+      pendingGeneralLosses: [],
+      pendingMobiliaryLosses: [{ year: 2020, amount: 1500 }],
+      pendingCapitalLosses: [],
+    };
+
+    const report = runAutomatedComplianceChecks(data);
+    const hasStsNotice = report.issues.some(i => i.id.startsWith('prop-missing-acq-expenses'));
+    assert(hasStsNotice, 'Radar ha detectat oportunitat d\'estalvi fiscal STS 1130/2021');
+
+    const hasPrescriptionWarning = report.issues.some(i => i.id === 'gains-loss-carryover-expiring-this-year');
+    assert(hasPrescriptionWarning, 'Radar ha emès alerta de caducitat imminent de 4 anys d\'Art. 49 LIRPF');
+  });
+});
+
+// ── 37. SUITE 37: GENERACIÓ DE DOSSIER DE DEFENSA FISCAL I COCKPIT EXACTE ───
+
+suite('37. Generació de Dossier de Defensa Fiscal i Cockpit Exacte', () => {
+
+  test('37.1 Dossier de defensa amb jurisprudència STS 1130/2021, STS 8/2024 i Art. 19.2 LIRPF', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.name = 'Maria Vidal';
+    data.personal.nif = '44556677B';
+    data.personal.community = 'CAT';
+
+    // Despeses laborals amb col·legi professional i defensa jurídica
+    data.workIncome.employers = [{
+      id: 'emp1',
+      name: 'Empresa SA',
+      grossSalary: 45000,
+      withholdings: 9000,
+      socialSecurity: 2800,
+      inKind: 0,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    data.workIncome.unionFees = 150;
+    data.workIncome.professionalCollegeFees = 500;
+    data.workIncome.legalDefenseFees = 300;
+
+    // Immoble amb despeses d'adquisició STS 1130/2021
+    data.properties = [makeProperty({
+      id: 'prop-1',
+      name: 'Passeig de Gràcia',
+      cadastralReference: '99887766BC1234S0001AA',
+      address: 'Passeig de Gràcia 50',
+      ownershipPercentage: 100,
+      usageType: 'habitual',
+      grossRentalIncome: 15000,
+      otherIncomes: 0,
+      mortgageInterests: 0,
+      repairExpenses: 0,
+      pendingRepairsPreviousYears: 0,
+      totalCadastralValue: 120000,
+      constructionCadastralValue: 72000,
+      acquisitionCost: 200000,
+      acquisitionExpenses: 20000, // 20.000 € d'ITP, notaria, registre
+      ibi: 500,
+      wasteTax: 90,
+      communityFees: 800,
+      insurance: 300,
+      managementFees: 0,
+      badDebts: 0,
+      inventory: [],
+      improvements: [],
+      furniture: [],
+      reductionType: 'general_50',
+      tenantNIFs: ['12345678Z'],
+    })];
+
+    // Deducció maternitat amb despeses de custòdia / llar d'infants STS 8/2024
+    data.personal.descendants = [
+      { id: 'c1', age: 1, disability: 0 },
+    ];
+    data.deductions.maternityDeduction = true;
+    data.deductions.maternityMonths = 12;
+    data.deductions.maternityNurseryExpenses = 1000;
+
+    const dossier = generateTaxDefenseDossier(data);
+
+    assert(dossier.boxJustifications.length >= 2, 'El dossier ha de generar múltiples seccions justificatives');
+    assert(dossier.boxJustifications.some(j => j.boxNumber === '0081' && j.legalBasis.includes('1130/2021')), 'El dossier ha d\'invocar la Sentència del Tribunal Suprem 1130/2021 per a despeses d\'adquisició');
+    assert(dossier.boxJustifications.some(j => j.legalBasis.includes('8/2024')), 'El dossier ha d\'invocar la Sentència del Tribunal Suprem 8/2024 per a despeses de llar d\'infants sense autorització autonòmica');
+    assert(dossier.boxJustifications.some(j => j.boxNumber === '0015' && j.legalBasis.includes('Art. 19.2.d')), 'El dossier ha de citar l\'Art. 19.2.d LIRPF per a col·legiació obligatòria');
+    assert(dossier.boxJustifications.some(j => j.boxNumber === '0016' && j.legalBasis.includes('Art. 19.2.e')), 'El dossier ha de citar l\'Art. 19.2.e LIRPF per a defensa jurídica laboral');
+
+    // Comprovar arguments globals de defensa
+    const hasSts1130Arg = dossier.defenseArguments.some(arg => arg.includes('1130/2021'));
+    assert(hasSts1130Arg, 'Els arguments de defensa han de citar STS 1130/2021');
+    const hasSts8Arg = dossier.defenseArguments.some(arg => arg.includes('8/2024'));
+    assert(hasSts8Arg, 'Els arguments de defensa han de citar STS 8/2024');
+  });
+
+  test('37.2 Motor de Cockpit d\'Inversió amb Càlcul Exacte de Trams de l\'Estalvi (calculateSavingsTaxEUR)', () => {
+    // Tram 1: Fins a 6.000 € al 19% = 1.140 €
+    const tax6k = calculateSavingsTaxEUR(6000);
+    assert(Math.abs(tax6k - 1140) < 0.001, `6.000 € d'estalvi ha de tributar exactament 1.140,00 € (obtingut: ${tax6k})`);
+
+    // Tram 2: Fins a 50.000 € (6k al 19% = 1.140 + 44k al 21% = 9.240) = 10.380 €
+    const tax50k = calculateSavingsTaxEUR(50000);
+    assert(Math.abs(tax50k - 10380) < 0.001, `50.000 € d'estalvi ha de tributar exactament 10.380,00 € (obtingut: ${tax50k})`);
+
+    // Import intermedi amb decimals
+    const taxMid = calculateSavingsTaxEUR(12345.67);
+    // 6.000 * 0.19 = 1140.00
+    // 6.345,67 * 0.21 = 1332.5907 -> 1332.59
+    // Total = 2472.59 €
+    assert(Math.abs(taxMid - 2472.59) < 0.01, `12.345,67 € ha de tributar 2.472,59 € (obtingut: ${taxMid})`);
+  });
+});
+
+// ── 38. SUITE 38: BLINDATGE PLUSVÀLUA STC 182/2021, BECKHAM & CCAA MULTI-FORMAT ──
+
+suite('38. Blindatge Plusvàlua STC 182/2021, Llei Beckham & CCAA Multi-Format', () => {
+
+  test('38.1 Plusvàlua Municipal: No subjecció per inexistència d\'increment (STC 182/2021)', () => {
+    // Venda a pèrdues: comprat a 250.000 € i venut a 210.000 €
+    const lossSale = ITPAndAJDEngine.calculatePlusvalia({
+      acquisitionDate: '2018-05-10',
+      transferDate: '2024-06-15',
+      cadastralLandValue: 80000,
+      acquisitionPrice: 250000,
+      transferPrice: 210000, // Pèrdua real de 40.000 €
+      municipalityCoef: 1.0,
+      taxRate: 30,
+      yearsOwned: 6,
+      objectiveBase: 0,
+      realBase: 0,
+      chosenMethod: 'real',
+      taxableBase: 0,
+      amountDue: 0,
+    });
+
+    assert(lossSale.taxableBase === 0, `Base imposable en venda a pèrdues ha de ser 0 € (obtingut: ${lossSale.taxableBase})`);
+    assert(lossSale.amountDue === 0, `Quota tributària en venda a pèrdues ha de ser 0 € segons STC 182/2021 (obtingut: ${lossSale.amountDue})`);
+
+    // Venda amb guanys: comprat a 150.000 € i venut a 200.000 € (+50.000 €)
+    const gainSale = ITPAndAJDEngine.calculatePlusvalia({
+      acquisitionDate: '2020-01-10',
+      transferDate: '2024-01-10',
+      cadastralLandValue: 60000,
+      acquisitionPrice: 150000,
+      transferPrice: 200000,
+      municipalityCoef: 1.0,
+      taxRate: 30,
+      yearsOwned: 4,
+      objectiveBase: 0,
+      realBase: 0,
+      chosenMethod: 'objective',
+      taxableBase: 0,
+      amountDue: 0,
+    });
+
+    assert(gainSale.taxableBase > 0, 'Amb guanys la base imposable ha de ser positiva');
+    assert(gainSale.amountDue > 0, 'Amb guanys la quota ha de ser positiva');
+    // Mètode real: 50.000 * 0.5 = 25.000 €
+    // Mètode objectiu: 60.000 * 0.15 = 9.000 € -> Més favorable objectiu!
+    assert(gainSale.chosenMethod === 'objective', 'Ha d\'escollir el mètode objectiu (9.000 € vs 25.000 €)');
+    assert(gainSale.taxableBase === 9000, `Base imposable objectiva de 9.000 € (obtingut: ${gainSale.taxableBase})`);
+    assert(gainSale.amountDue === 2700, `Quota al 30% ha de ser 2.700 € (obtingut: ${gainSale.amountDue})`);
+  });
+
+  test('38.2 Exactitud Aritmètica Llei Beckham i Exempció de Rendes Estrangeres', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{
+      id: 'emp_exp',
+      name: 'Global Tech Spain SL',
+      grossSalary: 120000, // 120.000 € al 24% = 28.800 €
+      withholdings: 28800,
+      socialSecurity: 2500,
+      inKind: 0,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    data.capitalIncome = {
+      interests: 5000, // 5.000 € estalvi espanyol al 19% = 950 €
+      dividends: 1000, // 1.000 € estalvi espanyol al 19% = 190 € (total 6.000 € -> 1.140 €)
+      foreignDividends: 25000, // 25.000 € a l'estranger -> 0 € a Espanya sota Llei Beckham!
+      foreignTaxWithheld: 3750,
+      insuranceGains: 0,
+      otherMobiliary: 0,
+      mobiliaryWithholdings: 1140,
+      rentalIncome: 0,
+      rentalExpenses: 0,
+      imputedIncome: 0,
+      realEstateWithholdings: 0,
+    };
+
+    const comp = compareBeckhamRegime(data);
+    // Salari: 120.000 * 0.24 = 28.800,00 €
+    assert(comp.beckhamWorkTax === 28800, `Quota feina Beckham: 28.800 € (obtingut: ${comp.beckhamWorkTax})`);
+    // Estalvi nacional: 6.000 * 0.19 = 1.140,00 €
+    assert(comp.beckhamSavingsTax === 1140, `Quota estalvi Beckham: 1.140 € (obtingut: ${comp.beckhamSavingsTax})`);
+    assert(comp.beckhamTotalTax === 29940, `Quota total Beckham: 29.940 € (obtingut: ${comp.beckhamTotalTax})`);
+  });
+
+  test('38.3 Resolució Multi-Format de Comunitats Autònomes (getAutonomicBrackets)', () => {
+    // Per codi de 3 lletres
+    const bCatShort = getAutonomicBrackets('CAT');
+    assert(bCatShort.length === 9, 'CAT ha de retornar l\'escala de Catalunya de 9 trams');
+
+    const bMadShort = getAutonomicBrackets('MAD');
+    assert(bMadShort.length === 5, 'MAD ha de retornar l\'escala de Madrid de 5 trams');
+
+    const bAndShort = getAutonomicBrackets('AND');
+    assert(bAndShort.length === 5, 'AND ha de retornar l\'escala d\'Andalusia');
+
+    const bValShort = getAutonomicBrackets('VAL');
+    assert(bValShort.length === 9, 'VAL ha de retornar l\'escala valenciana');
+
+    // Per nom normalitzat
+    const bCatName = getAutonomicBrackets('catalunya');
+    assert(bCatName[0].rate === 0.105, 'Tram 1 català al 10,5%');
+
+    const bMadName = getAutonomicBrackets('madrid');
+    assert(bMadName[0].rate === 0.085, 'Tram 1 madrileny al 8,5% deflactat');
+  });
+});
+
+// ── 39. SUITE 39: DEDUCCIONS AUTONÒMIQUES DE CATALUNYA I EXACTITUD DE BASES ─
+
+suite('39. Deduccions Autonòmiques de Catalunya i Exactitud de Bases', () => {
+
+  test('39.1 Deducció per lloguer d\'habitatge habitual a Catalunya amb límit de renda (20.000 €)', () => {
+    // Cas 1: Contribuent que compleix el límit de renda (Rendiment net del treball 18.000 € < 20.000 €)
+    const dataOk = createEmptyDeclaracion(2024);
+    dataOk.personal.community = 'CAT';
+    dataOk.personal.taxDeclarationType = 'individual';
+    dataOk.workIncome.employers = [{
+      id: 'emp_low',
+      name: 'Empresa SL',
+      grossSalary: 21000,
+      withholdings: 2000,
+      socialSecurity: 1000,
+      inKind: 0,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    dataOk.deductions.catalanRentalDeduction = true;
+    dataOk.deductions.catalanRentalAmount = 6000; // 6.000 € pagats de lloguer a l'any
+    dataOk.deductions.catalanRentalSituation = 'under32';
+
+    const resOk = calculateIRPF(dataOk);
+    // 10% de 6.000 = 600 €, però topall general individual = 300,00 €
+    assert(resOk.catalanDeductionsAmount === 300, `Deducció lloguer Catalunya ha d'aplicar el límit de 300 € (obtingut: ${resOk.catalanDeductionsAmount})`);
+
+    // Cas 2: Contribuent que supera el límit de renda (Rendiment net 35.000 € > 20.000 €)
+    const dataOver = createEmptyDeclaracion(2024);
+    dataOver.personal.community = 'CAT';
+    dataOver.personal.taxDeclarationType = 'individual';
+    dataOver.workIncome.employers = [{
+      id: 'emp_high',
+      name: 'Empresa SL',
+      grossSalary: 45000,
+      withholdings: 8000,
+      socialSecurity: 2000,
+      inKind: 0,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    dataOver.deductions.catalanRentalDeduction = true;
+    dataOver.deductions.catalanRentalAmount = 6000;
+    dataOver.deductions.catalanRentalSituation = 'under32';
+
+    const resOver = calculateIRPF(dataOver);
+    assert(resOver.catalanDeductionsAmount === 0, `Contribuent amb base > 20.000 € no pot aplicar la deducció de lloguer (obtingut: ${resOver.catalanDeductionsAmount})`);
+  });
+
+  test('39.2 Deducció per lloguer en família nombrosa o conjunta (topall incrementat a 600 € i límit 30.000 €)', () => {
+    const dataSpecial = createEmptyDeclaracion(2024);
+    dataSpecial.personal.community = 'CAT';
+    dataSpecial.personal.taxDeclarationType = 'joint';
+    dataSpecial.workIncome.employers = [{
+      id: 'emp_mid',
+      name: 'Empresa SL',
+      grossSalary: 28000,
+      withholdings: 4000,
+      socialSecurity: 1500,
+      inKind: 0,
+      dietsIncome: 0,
+      dietsDays: 0,
+      mileageIncome: 0,
+      mileageKm: 0,
+    }];
+    dataSpecial.deductions.catalanRentalDeduction = true;
+    dataSpecial.deductions.catalanRentalAmount = 8000; // 10% = 800 €
+    dataSpecial.deductions.catalanRentalSituation = 'large_family'; // Família nombrosa -> topall 600 €
+
+    const resSpecial = calculateIRPF(dataSpecial);
+    assert(resSpecial.catalanDeductionsAmount === 600, `Família nombrosa ha d'aplicar el topall incrementat de 600 € (obtingut: ${resSpecial.catalanDeductionsAmount})`);
+  });
+});
+
+// ── 40. BLINDATGE DE L'ESTAT: SNAPSHOT IMMUTABLE DEL STORE ──────────────────
+
+suite("40. Blindatge de l'Estat: Snapshot Immutable del Store (getSnapshot)", () => {
+
+  test('40.1 getSnapshot() retorna una còpia desconnectada i profundament congelada', () => {
+    store.setYear(2024);
+    store.update('personal', { name: 'Snapshot Test', age: 42 });
+
+    const snapshot = store.getSnapshot();
+
+    assert(snapshot.personal.name === 'Snapshot Test', `El snapshot ha de reflectir l'estat viu (obtingut: ${snapshot.personal.name})`);
+
+    // La còpia està congelada: qualsevol escriptura ha de llançar en mode estricte.
+    let threw = false;
+    try {
+      (snapshot.personal as { name?: string }).name = 'Mutació il·legal';
+    } catch {
+      threw = true;
+    }
+    assert(threw, "L'escriptura sobre un snapshot congelat ha de llançar un error");
+    assert(snapshot.personal.name === 'Snapshot Test', 'El snapshot no ha de canviar després d’un intent de mutació');
+
+    // ...i tampoc no ha contaminat l'estat viu del store.
+    assert(store.getData().personal.name === 'Snapshot Test', "L'estat viu del store no ha de quedar alterat");
+  });
+
+  test('40.2 El snapshot conserva el valor del moment i no bloqueja el store', () => {
+    store.setYear(2024);
+    store.update('personal', { name: 'Base Original' });
+
+    const snapshot = store.getSnapshot();
+    const frozenName = snapshot.personal.name;
+
+    // El store ha de seguir operatiu després de prendre el snapshot.
+    store.update('personal', { name: 'Actualitzat' });
+
+    assert(store.getData().personal.name === 'Actualitzat', `El store ha de reflectir la nova actualització (obtingut: ${store.getData().personal.name})`);
+    assert(frozenName === 'Base Original', 'El snapshot anterior ha de conservar el valor del moment en què es va prendre');
+    assert(snapshot.personal.name === 'Base Original', "El snapshot no ha de rebre l'actualització posterior del store");
   });
 });
 

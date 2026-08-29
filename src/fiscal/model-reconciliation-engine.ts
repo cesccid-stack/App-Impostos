@@ -4497,11 +4497,23 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
   },
 ];
 
+const reconciliationCache = new WeakMap<DeclaracionData, ReconciliationReport>();
+
 export class ModelReconciliationEngine {
   /**
    * Executa les 200 comprovacions exhaustives de cuadre entre models tributaris.
+   * Memoitzat mitjançant WeakMap per a màxim estalvi de CPU i memòria RAM.
    */
   public static auditAndCheckDiscrepancies(data: DeclaracionData): ReconciliationReport {
+    if (reconciliationCache.has(data)) {
+      return reconciliationCache.get(data)!;
+    }
+    const report = ModelReconciliationEngine.auditAndCheckDiscrepanciesInternal(data);
+    reconciliationCache.set(data, report);
+    return report;
+  }
+
+  private static auditAndCheckDiscrepanciesInternal(data: DeclaracionData): ReconciliationReport {
     const discrepancies: ModelDiscrepancy[] = [];
     let passedChecks = 0;
 
@@ -4554,7 +4566,7 @@ export class ModelReconciliationEngine {
    * Executa el cuadre i reconciliació automàtica integral de tots els models de la declaració.
    */
   public static executeMasterReconciliation(data: DeclaracionData): DeclaracionData {
-    const updated: DeclaracionData = JSON.parse(JSON.stringify(data));
+    const updated: DeclaracionData = structuredClone(data);
 
     for (const rule of CROSS_CHECK_RULES) {
       if (rule.canAutoReconcile && rule.reconcile) {

@@ -38,30 +38,17 @@ import { computeCatalanDeductions } from './deductions-cat.ts';
 import { calculateAllProperties } from './real-estate-engine.ts';
 import { calculateSavingsCompensation } from './loss-carryover-engine.ts';
 import { calculateComplementaryIRPF } from './complementary-engine.ts';
+import { exactAdd, exactSub, round2, applyTaxBracketsExact } from '../utils/exact-math.ts';
 
 /**
- * Apply progressive tax brackets to a given base amount.
+ * Apply progressive tax brackets to a given base amount with exact AEAT cents precision.
  */
 export function applyBrackets(
   amount: number,
   brackets: readonly TaxBracket[],
 ): number {
   if (amount <= 0) return 0;
-
-  let remaining = amount;
-  let tax = 0;
-  let previousLimit = 0;
-
-  for (const bracket of brackets) {
-    const tierSize = bracket.upTo - previousLimit;
-    const taxableInTier = Math.min(remaining, tierSize);
-    tax += taxableInTier * bracket.rate;
-    remaining -= taxableInTier;
-    previousLimit = bracket.upTo;
-    if (remaining <= 0) break;
-  }
-
-  return tax;
+  return applyTaxBracketsExact(amount, brackets).totalTax;
 }
 
 /**
@@ -83,6 +70,10 @@ function computeNetWorkIncome(data: DeclaracionData): {
   reduction: number;
   foreignWorkExemptionApplied: number;
   irregularWorkReduction: number;
+  professionalCollegeDeduction: number;
+  legalDefenseDeduction: number;
+  exemptSeverancePay: number;
+  taxableSeverancePay: number;
 } {
   const w = data.workIncome;
   
@@ -104,22 +95,39 @@ function computeNetWorkIncome(data: DeclaracionData): {
     totalTaxableMileage += Math.max(0, (emp.mileageIncome || 0) - mileageExempt);
   }
 
-  // 1. Exempció per treballs a l'estranger (Art. 7.p LIRPF - Màx 60.100 €)
+  // 1. Indemnitzacions per acomiadament laboral (Art. 7.e LIRPF - Exempció màx 180.000 €)
+  let exemptSeverancePay = 0;
+  let taxableSeverancePay = 0;
+  if (w.severancePay && w.severancePay > 0) {
+    const legalLimit = Math.min(180000, w.severanceMandatoryLegalLimit ?? 180000);
+    exemptSeverancePay = Math.min(w.severancePay, legalLimit);
+    taxableSeverancePay = Math.max(0, w.severancePay - exemptSeverancePay);
+  }
+
+  // 2. Exempció per treballs a l'estranger (Art. 7.p LIRPF - Màx 60.100 €)
   const foreignWorkExemptionApplied = Math.min(60100, Math.max(0, w.foreignWorkExemption7p || 0));
-  const rawSalary = totalGrossSalary + totalInKind + totalTaxableDiets + totalTaxableMileage;
+  const rawSalary = totalGrossSalary + totalInKind + totalTaxableDiets + totalTaxableMileage + taxableSeverancePay;
   const grossAfterExemption = Math.max(0, rawSalary - foreignWorkExemptionApplied);
 
-  // 2. Reducció del 30% per rendiments irregulars o > 2 anys (Art. 18.2 LIRPF - Base màx 300.000 €)
+  // 3. Reducció del 30% per rendiments irregulars o > 2 anys (Art. 18.2 LIRPF - Base màx 300.000 €)
   const irregularBase = Math.min(300000, Math.max(0, w.irregularIncomeAmount || 0));
   const irregularWorkReduction = irregularBase * 0.30;
   const grossIncome = Math.max(0, grossAfterExemption - irregularWorkReduction);
 
-  // 3. Despeses deduïbles
+  // 4. Despeses deduïbles específiques (Art. 19.2 LIRPF)
+  const professionalCollegeDeduction = Math.min(500, Math.max(0, w.professionalCollegeFees || 0));
+  const legalDefenseDeduction = Math.min(300, Math.max(0, w.legalDefenseFees || 0));
+
   const deductibleExpenses =
-    totalSocialSecurity + (w.unionFees || 0) + (w.otherDeductible || 0) + WORK_OTHER_EXPENSES;
+    totalSocialSecurity +
+    (w.unionFees || 0) +
+    professionalCollegeDeduction +
+    legalDefenseDeduction +
+    (w.otherDeductible || 0) +
+    WORK_OTHER_EXPENSES;
   const netIncome = Math.max(0, grossIncome - deductibleExpenses);
 
-  // 4. Reducció per rendiments del treball
+  // 5. Reducció per rendiments del treball
   let reduction = 0;
   if (netIncome <= WORK_REDUCTION_THRESHOLD_LOW) {
     reduction = WORK_REDUCTION_MAX;
@@ -130,7 +138,16 @@ function computeNetWorkIncome(data: DeclaracionData): {
   }
   reduction = Math.max(0, reduction);
 
-  return { netIncome, reduction, foreignWorkExemptionApplied, irregularWorkReduction };
+  return {
+    netIncome,
+    reduction,
+    foreignWorkExemptionApplied,
+    irregularWorkReduction,
+    professionalCollegeDeduction,
+    legalDefenseDeduction,
+    exemptSeverancePay,
+    taxableSeverancePay,
+  };
 }
 
 /**
@@ -323,8 +340,16 @@ export function calculateIRPF(data: DeclaracionData, bypassCache = false): Fisca
 
 function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   // 1. Compute base imposable general
-  const { netIncome: netWork, reduction: workReduction, foreignWorkExemptionApplied, irregularWorkReduction } =
-    computeNetWorkIncome(data);
+  const {
+    netIncome: netWork,
+    reduction: workReduction,
+    foreignWorkExemptionApplied,
+    irregularWorkReduction,
+    professionalCollegeDeduction,
+    legalDefenseDeduction,
+    exemptSeverancePay,
+    taxableSeverancePay,
+  } = computeNetWorkIncome(data);
   const { mobiliary, immobiliary, foreignDividends, foreignTaxWithheld } = computeCapitalIncome(data);
   const activitiesNet = computeActivitiesIncome(data);
   const capitalGains = computeGains(data.gains?.items || []);
@@ -335,7 +360,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   const savingsComp = calculateSavingsCompensation(mobiliary, capitalGains, priorMob, priorGains);
 
   // General base: work + immobiliary + activities
-  const generalBase = netWork + immobiliary + activitiesNet;
+  const generalBase = exactAdd(netWork, immobiliary, activitiesNet);
 
   // Savings base: base de l'estalvi resultant de la integració i compensació
   const savingsBase = savingsComp.finalSavingsBase;
@@ -349,7 +374,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     data.deductions?.companyPensionContributions || 0,
     PENSION_PLAN_COMPANY_LIMIT,
   );
-  const pensionReduction = personalPension + companyPension;
+  const pensionReduction = exactAdd(personalPension, companyPension);
 
   let jointTaxationReduction = 0;
   if (data.personal?.taxDeclarationType === 'joint') {
@@ -358,68 +383,70 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     jointTaxationReduction = JOINT_TAXATION_REDUCTION_SINGLE_PARENT;
   }
 
-  const totalReductions = workReduction + pensionReduction + jointTaxationReduction;
+  const totalReductions = exactAdd(workReduction, pensionReduction, jointTaxationReduction);
 
   // 3. Base liquidable
-  const liquidableGeneralBase = Math.max(0, generalBase - totalReductions);
+  const liquidableGeneralBase = Math.max(0, exactSub(generalBase, totalReductions));
   const liquidableSavingsBase = Math.max(0, savingsBase);
 
   // 4. Minimums
   const minimums = computeMinimums(data);
 
-  // 5. Tax calculation (State + Autonomic)
+  // 5. Tax calculation (State + Autonomic) amb precisió exacta AEAT
   const autonomicBrackets = getAutonomicBrackets(data.personal?.autonomousCommunity || 'catalunya');
   const stateGeneralTax = applyBrackets(liquidableGeneralBase, STATE_GENERAL_TAX_BRACKETS);
   const autonomicGeneralTax = applyBrackets(liquidableGeneralBase, autonomicBrackets);
-  const generalTax = stateGeneralTax + autonomicGeneralTax;
+  const generalTax = exactAdd(stateGeneralTax, autonomicGeneralTax);
 
   const stateSavingsTax = applyBrackets(liquidableSavingsBase, STATE_SAVINGS_TAX_BRACKETS);
   const autonomicSavingsTax = applyBrackets(liquidableSavingsBase, AUTONOMIC_SAVINGS_TAX_BRACKETS);
-  const savingsTax = stateSavingsTax + autonomicSavingsTax;
+  const savingsTax = exactAdd(stateSavingsTax, autonomicSavingsTax);
 
   const stateMinimumTaxCredit = applyBrackets(minimums.totalMinimum, STATE_GENERAL_TAX_BRACKETS);
   const autonomicMinimumTaxCredit = applyBrackets(minimums.totalMinimum, autonomicBrackets);
-  const minimumTaxCredit = stateMinimumTaxCredit + autonomicMinimumTaxCredit;
+  const minimumTaxCredit = exactAdd(stateMinimumTaxCredit, autonomicMinimumTaxCredit);
 
-  const grossTax = Math.max(0, generalTax + savingsTax - minimumTaxCredit);
+  const grossTax = Math.max(0, exactSub(exactAdd(generalTax, savingsTax), minimumTaxCredit));
 
   // 6. Deduccions Generals i Autonòmiques
   const deductionAmounts = computeDeductions(data);
-  const catalanDeductionsAmount = computeCatalanDeductions(data);
+  const catalanDeductionsAmount = computeCatalanDeductions(data, generalBase, savingsBase);
 
   // 7. Deducció per Doble Imposició Internacional (Art. 80 LIRPF - Casella 0588)
   let foreignTaxCredit = 0;
   if (foreignDividends > 0 && foreignTaxWithheld > 0 && liquidableSavingsBase > 0) {
-    const totalSavingsTax = stateSavingsTax + autonomicSavingsTax;
+    const totalSavingsTax = exactAdd(stateSavingsTax, autonomicSavingsTax);
     const effectiveSavingsRate = totalSavingsTax / liquidableSavingsBase;
-    const spanishTaxOnForeignIncome = foreignDividends * effectiveSavingsRate;
+    const spanishTaxOnForeignIncome = round2(foreignDividends * effectiveSavingsRate);
     foreignTaxCredit = Math.min(foreignTaxWithheld, spanishTaxOnForeignIncome);
   }
   
-  const totalDeductions =
-    deductionAmounts.housingDeductionAmount +
-    deductionAmounts.donationsDeductionAmount +
-    deductionAmounts.maternityDeductionAmount +
-    deductionAmounts.energyEfficiencyDeductionAmount +
-    catalanDeductionsAmount +
-    foreignTaxCredit +
-    (data.deductions?.otherDeductions || 0);
+  const totalDeductions = exactAdd(
+    deductionAmounts.housingDeductionAmount,
+    deductionAmounts.donationsDeductionAmount,
+    deductionAmounts.maternityDeductionAmount,
+    deductionAmounts.energyEfficiencyDeductionAmount,
+    catalanDeductionsAmount,
+    foreignTaxCredit,
+    data.deductions?.otherDeductions || 0
+  );
 
   // 8. Net tax
-  const netTax = Math.max(0, grossTax - totalDeductions);
+  const netTax = Math.max(0, exactSub(grossTax, totalDeductions));
 
-  const totalWorkWithholdings = (data.workIncome?.employers || []).reduce((sum, emp) => sum + (emp.withholdings || 0), 0);
+  const totalWorkWithholdings = (data.workIncome?.employers || []).reduce((sum, emp) => exactAdd(sum, emp.withholdings || 0), 0);
 
   // 9. Withholdings
-  const totalWithholdings =
-    totalWorkWithholdings +
-    (data.capitalIncome?.mobiliaryWithholdings || 0) +
-    (data.capitalIncome?.realEstateWithholdings || 0) +
-    (data.activities?.withholdings || 0) +
-    (data.gains?.totalWithholdings || 0);
+  const totalWithholdings = exactAdd(
+    totalWorkWithholdings,
+    data.capitalIncome?.mobiliaryWithholdings || 0,
+    data.capitalIncome?.realEstateWithholdings || 0,
+    data.activities?.withholdings || 0,
+    data.gains?.totalWithholdings || 0
+  );
 
   // 10. Result
-  const result = netTax - totalWithholdings;
+  const result = exactSub(netTax, totalWithholdings);
 
   // 11. Declaració Complementària o Rectificativa (Model 100)
   const complementaryCalc = calculateComplementaryIRPF(data, result);
@@ -430,6 +457,10 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     workIncomeReduction: workReduction,
     foreignWorkExemptionApplied,
     irregularWorkReduction,
+    professionalCollegeDeduction,
+    legalDefenseDeduction,
+    exemptSeverancePay,
+    taxableSeverancePay,
     pensionReduction,
     jointTaxationReduction,
     totalReductions,

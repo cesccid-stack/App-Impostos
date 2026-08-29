@@ -15,7 +15,7 @@ const CENT_SCALE = 100n;         // 2 decimals per a liquidació oficial
  * Converteix una quantitat en euros (number) a cèntims enters (BigInt).
  */
 export function eurosToCents(euros: number | string | null | undefined): bigint {
-  if (euros === null || euros === undefined) return 0n;
+  if (euros === null || euros === undefined || euros === 0) return 0n;
   const num = typeof euros === 'string' ? parseFloat(euros.replace(',', '.')) : euros;
   if (!Number.isFinite(num) || Number.isNaN(num)) return 0n;
   // Arrodoniment simètric al cèntim
@@ -26,6 +26,7 @@ export function eurosToCents(euros: number | string | null | undefined): bigint 
  * Converteix cèntims enters (BigInt) a euros (number) amb 2 decimals garantits.
  */
 export function centsToEuros(cents: bigint): number {
+  if (cents === 0n) return 0;
   const isNegative = cents < 0n;
   const absCents = isNegative ? -cents : cents;
   const units = absCents / CENT_SCALE;

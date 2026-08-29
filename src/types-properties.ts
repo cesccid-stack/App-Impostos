@@ -98,7 +98,8 @@ export interface RentalProperty {
   // Càlcul d'Amortització de l'Immoble (Caselles 0079 a 0083)
   totalCadastralValue: number;        // Valor cadastral total
   constructionCadastralValue: number; // Valor cadastral de la construcció (per % sòl/construcció)
-  acquisitionCost: number;            // Preu de compra + despeses (ITP, notaria, registre)
+  acquisitionCost: number;            // Preu de compra o valor d'adquisició
+  acquisitionExpenses?: number;       // Despeses i tributs inherents d'adquisició (ITP, notaria, registre, gestoria - STS 1130/2021)
   
   // Extracontable d'inventari d'actius i factures (Taula Simplificada AEAT)
   inventory: PropertyInventoryItem[];
@@ -172,6 +173,7 @@ export interface PropertyFiscalResult {
   totalCurrentExpenses: number;
   
   // Amortitzacions
+  effectiveAcquisitionCost?: number;    // Cost d'adquisició satisfet total (preu + despeses STS 1130/2021)
   constructionBase: number;             // Base de càlcul de la construcció
   constructionPercentage: number;       // % construcció segons cadastre
   buildingAmortization: number;         // 3% anual sobre immoble

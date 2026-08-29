@@ -4,22 +4,23 @@
  */
 
 import type { PriorLossItem } from '../types.ts';
+import { exactAdd, exactSub, round2 } from '../utils/exact-math.ts';
 
 export interface SavingsCompensationResult {
   initialMobiliary: number;
   initialGains: number;
   
-  // Compensació de l'any actual (Regla del 25%)
-  crossCompensationApplied: number;
-  mobiliaryAfterCross: number;
-  gainsAfterCross: number;
-  
-  // Compensació d'exercicis anteriors (4 anys)
+  // Compensació d'exercicis anteriors (4 anys - Caselles 0426 i 0443)
   priorMobiliaryCompensated: number;
   priorGainsCompensated: number;
   totalPriorCompensated: number;
 
-  // Saldos finals de la Base de l'Estalvi
+  // Compensació de l'any actual (Regla del 25% - Caselles 0428 i 0445)
+  crossCompensationApplied: number;
+  mobiliaryAfterCross: number;
+  gainsAfterCross: number;
+
+  // Saldos finals de la Base de l'Estalvi (Casella 0460)
   finalSavingsBase: number;
 
   // Bossa romanent que es trasllada als anys següents
@@ -37,23 +38,23 @@ export function calculateSavingsCompensation(
   pendingPriorMobiliary: PriorLossItem[] = [],
   pendingPriorGains: PriorLossItem[] = []
 ): SavingsCompensationResult {
-  let mob = netMobiliary;
-  let gains = netGains;
+  let mob = round2(netMobiliary);
+  let gains = round2(netGains);
   let crossCompensationApplied = 0;
 
   // 1. Regla de Compensació Creuada del 25% en l'exercici actual
   if (mob < 0 && gains > 0) {
-    const maxOffset = gains * 0.25;
+    const maxOffset = round2(gains * 0.25);
     const offset = Math.min(Math.abs(mob), maxOffset);
     crossCompensationApplied = offset;
-    mob += offset;   // Es redueix el saldo negatiu
-    gains -= offset; // Es redueix el saldo positiu de guanys
+    mob = exactAdd(mob, offset);   // Es redueix el saldo negatiu
+    gains = exactSub(gains, offset); // Es redueix el saldo positiu de guanys
   } else if (gains < 0 && mob > 0) {
-    const maxOffset = mob * 0.25;
+    const maxOffset = round2(mob * 0.25);
     const offset = Math.min(Math.abs(gains), maxOffset);
     crossCompensationApplied = offset;
-    gains += offset; // Es redueix la pèrdua patrimonial
-    mob -= offset;   // Es redueix el rendiment positiu
+    gains = exactAdd(gains, offset); // Es redueix la pèrdua patrimonial
+    mob = exactSub(mob, offset);   // Es redueix el rendiment positiu
   }
 
   const mobiliaryAfterCross = mob;
@@ -61,50 +62,54 @@ export function calculateSavingsCompensation(
 
   // 2. Compensació de pèrdues d'exercicis anteriors (4 anys)
   // 2.1. Compensació sobre rendiments del capital mobiliari positius
-  let availableMobForPrior = Math.max(0, mob);
   let priorMobiliaryCompensated = 0;
   const remainingPriorMobiliaryLosses: PriorLossItem[] = [];
 
-  if (pendingPriorMobiliary.length > 0) {
+  if (mob > 0 && pendingPriorMobiliary.length > 0) {
     // Ordenar per any més antic primer (FIFO tributari)
     const sortedPriorMob = [...pendingPriorMobiliary].sort((a, b) => a.year - b.year);
-    for (let i = 0; i < sortedPriorMob.length; i++) {
-      const item = sortedPriorMob[i];
-      if (availableMobForPrior > 0 && item.amount > 0) {
-        const comp = Math.min(availableMobForPrior, item.amount);
-        priorMobiliaryCompensated += comp;
-        availableMobForPrior -= comp;
-        const rem = item.amount - comp;
+    for (const item of sortedPriorMob) {
+      if (mob > 0 && item.amount > 0) {
+        const comp = Math.min(mob, item.amount);
+        priorMobiliaryCompensated = exactAdd(priorMobiliaryCompensated, comp);
+        mob = exactSub(mob, comp);
+        const rem = exactSub(item.amount, comp);
         if (rem > 0) remainingPriorMobiliaryLosses.push({ year: item.year, amount: rem });
       } else if (item.amount > 0) {
         remainingPriorMobiliaryLosses.push({ ...item });
       }
     }
+  } else {
+    for (const item of pendingPriorMobiliary) {
+      if (item.amount > 0) remainingPriorMobiliaryLosses.push({ ...item });
+    }
   }
 
   // 2.2. Compensació sobre guanys patrimonials positius
-  let availableGainsForPrior = Math.max(0, gains);
   let priorGainsCompensated = 0;
   const remainingPriorGainsLosses: PriorLossItem[] = [];
 
-  if (pendingPriorGains.length > 0) {
+  if (gains > 0 && pendingPriorGains.length > 0) {
     const sortedPriorGains = [...pendingPriorGains].sort((a, b) => a.year - b.year);
-    for (let i = 0; i < sortedPriorGains.length; i++) {
-      const item = sortedPriorGains[i];
-      if (availableGainsForPrior > 0 && item.amount > 0) {
-        const comp = Math.min(availableGainsForPrior, item.amount);
-        priorGainsCompensated += comp;
-        availableGainsForPrior -= comp;
-        const rem = item.amount - comp;
+    for (const item of sortedPriorGains) {
+      if (gains > 0 && item.amount > 0) {
+        const comp = Math.min(gains, item.amount);
+        priorGainsCompensated = exactAdd(priorGainsCompensated, comp);
+        gains = exactSub(gains, comp);
+        const rem = exactSub(item.amount, comp);
         if (rem > 0) remainingPriorGainsLosses.push({ year: item.year, amount: rem });
       } else if (item.amount > 0) {
         remainingPriorGainsLosses.push({ ...item });
       }
     }
+  } else {
+    for (const item of pendingPriorGains) {
+      if (item.amount > 0) remainingPriorGainsLosses.push({ ...item });
+    }
   }
 
   // 3. Base de l'Estalvi resultant
-  const finalSavingsBase = Math.max(0, availableMobForPrior) + Math.max(0, availableGainsForPrior);
+  const finalSavingsBase = exactAdd(Math.max(0, mob), Math.max(0, gains));
 
   return {
     initialMobiliary: netMobiliary,
@@ -114,7 +119,7 @@ export function calculateSavingsCompensation(
     gainsAfterCross,
     priorMobiliaryCompensated,
     priorGainsCompensated,
-    totalPriorCompensated: priorMobiliaryCompensated + priorGainsCompensated,
+    totalPriorCompensated: exactAdd(priorMobiliaryCompensated, priorGainsCompensated),
     finalSavingsBase,
     remainingPriorMobiliaryLosses,
     remainingPriorGainsLosses,

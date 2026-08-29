@@ -162,7 +162,7 @@ export function calculateModel303Quarter(
   let deducibleInversionBase = 0, deducibleInversionCuota = 0;
   let deducibleImportacionesBase = 0, deducibleImportacionesCuota = 0;
   let deducibleIntraEuBase = 0, deducibleIntraEuCuota = 0;
-  let rectificacionDeducciones = 0;
+  const rectificacionDeducciones = 0;
 
   // Aplicar coeficient de prorrata si està actiu (Prorrata provisional en 1T-3T, definitiva en 4T)
   const effectiveProrrata = quarter === '4T'
@@ -298,11 +298,29 @@ export function calculateModel303Quarter(
   return { quarterResult, remainingCarryover };
 }
 
+const quartersCache = new WeakMap<IVAData, {
+  quarters: Record<FiscalQuarter, Model303QuarterResult>;
+  finalPendingCarryover: number;
+}>();
+
 /**
  * Calcula en cascada els 4 trimestres complets de l'exercici (1T, 2T, 3T, 4T),
  * arrossegant automàticament els saldos a compensar d'un trimestre al següent.
+ * Memoitzat via WeakMap per estalviar CPU en crides redundants de renderització.
  */
 export function calculateAllQuarters(ivaData: IVAData, year: number): {
+  quarters: Record<FiscalQuarter, Model303QuarterResult>;
+  finalPendingCarryover: number;
+} {
+  if (quartersCache.has(ivaData)) {
+    return quartersCache.get(ivaData)!;
+  }
+  const result = calculateAllQuartersInternal(ivaData, year);
+  quartersCache.set(ivaData, result);
+  return result;
+}
+
+function calculateAllQuartersInternal(ivaData: IVAData, year: number): {
   quarters: Record<FiscalQuarter, Model303QuarterResult>;
   finalPendingCarryover: number;
 } {
@@ -474,7 +492,6 @@ export function calculateProrrataComparison(
   const receivedInvoices = ivaData.receivedInvoices || [];
   let totalInputVat = 0;
   let directWithRightVat = 0;
-  let directWithoutRightVat = 0;
   let commonVat = 0;
 
   for (const inv of receivedInvoices) {
@@ -482,7 +499,7 @@ export function calculateProrrataComparison(
     totalInputVat += vat;
 
     if (inv.notes?.includes('exempt') || inv.concept?.toLowerCase().includes('lloguer habitatge')) {
-      directWithoutRightVat += vat;
+      // Despeses sense dret a deducció: no computen en cap dels dos règims de prorrata.
     } else if (inv.category === 'activity_expense' || inv.category === 'activity_supplies') {
       directWithRightVat += vat;
     } else {

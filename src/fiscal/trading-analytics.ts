@@ -4,6 +4,7 @@
  */
 
 import type { GainItem } from '../types.ts';
+import { calculateSavingsTaxEUR } from './investment-cockpit-engine.ts';
 
 export interface YearPerformance {
   year: number;
@@ -291,14 +292,8 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
   const avgHoldingDaysWins = winningTrades > 0 ? Math.round((winDaysSum / winningTrades) * 10) / 10 : 0;
   const avgHoldingDaysLosses = losingTrades > 0 ? Math.round((lossDaysSum / losingTrades) * 10) / 10 : 0;
 
-  // Càlcul d'impostos de l'estalvi aproximat
-  let estimatedTaxesSavings = 0;
-  if (netPnL > 0) {
-    if (netPnL <= 6000) estimatedTaxesSavings = netPnL * 0.19;
-    else if (netPnL <= 50000) estimatedTaxesSavings = (6000 * 0.19) + ((netPnL - 6000) * 0.21);
-    else if (netPnL <= 200000) estimatedTaxesSavings = (6000 * 0.19) + (44000 * 0.21) + ((netPnL - 50000) * 0.23);
-    else estimatedTaxesSavings = (6000 * 0.19) + (44000 * 0.21) + (150000 * 0.23) + ((netPnL - 200000) * 0.27);
-  }
+  // Càlcul d'impostos de l'estalvi oficial segons l'escala de gravamen (19% a 28%)
+  const estimatedTaxesSavings = netPnL > 0 ? calculateSavingsTaxEUR(netPnL) : 0;
   const netPnLAfterTax = netPnL - estimatedTaxesSavings;
 
   // Càlcul de ràtio de Sharpe aproximat

@@ -14,7 +14,6 @@ import { calculateWealthTax } from '../fiscal/wealth-tax-engine.ts';
 import { STATE_GENERAL_TAX_BRACKETS, type FiscalYear } from '../fiscal/constants.ts';
 import { formatCurrency, formatPercent } from '../utils/currency.ts';
 import { createDonutChart, createBarChart } from '../components/chart.ts';
-import { generateModel100PDF } from '../utils/pdf-generator.ts';
 import { showToast } from '../components/toast.ts';
 import { getStatusMeta } from '../fiscal/user-presets.ts';
 import { openCommandPalette } from '../components/command-palette.ts';
@@ -73,13 +72,18 @@ export function renderDashboard(): HTMLElement {
     // Càlculs immobiliaris
     const propSummary = calculateAllProperties(data.properties || [], currentYear);
 
-    // Càlculs guanys patrimonials
-    const totalGainsPositive = (data.gains?.items || [])
-      .filter(i => (i.transferValue - i.acquisitionValue - i.expenses) > 0)
-      .reduce((s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses), 0);
-    const totalGainsLosses = (data.gains?.items || [])
-      .filter(i => (i.transferValue - i.acquisitionValue - i.expenses) < 0)
-      .reduce((s, i) => s + Math.abs(i.transferValue - i.acquisitionValue - i.expenses), 0);
+    // Càlculs guanys patrimonials (recorregut únic O(N) sense assignació d'arrays temporals)
+    let totalGainsPositive = 0;
+    let totalGainsLosses = 0;
+    const gainItems = data.gains?.items;
+    if (gainItems && gainItems.length > 0) {
+      for (let i = 0; i < gainItems.length; i++) {
+        const item = gainItems[i];
+        const diff = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
+        if (diff > 0) totalGainsPositive += diff;
+        else if (diff < 0) totalGainsLosses += Math.abs(diff);
+      }
+    }
 
     // Càlculs d'IVA trimestral acumulat
     let ivaAnnualBalance = 0;
@@ -1082,12 +1086,15 @@ export function renderDashboard(): HTMLElement {
     });
 
     page.querySelector('#dash-btn-pdf')?.addEventListener('click', () => {
-      try {
-        generateModel100PDF(store.getData(), calculateIRPF(store.getData()));
-        showToast('PDF del Model 100 generat correctament', 'success');
-      } catch {
-        showToast('Error en generar el PDF', 'error');
-      }
+      // Lazily loaded so jsPDF stays out of the initial bundle.
+      void import('../utils/pdf-generator.ts')
+        .then(({ generateModel100PDF }) => {
+          generateModel100PDF(store.getData(), calculateIRPF(store.getData()));
+          showToast('PDF del Model 100 generat correctament', 'success');
+        })
+        .catch(() => {
+          showToast('Error en generar el PDF', 'error');
+        });
     });
 
     // Tab navigation

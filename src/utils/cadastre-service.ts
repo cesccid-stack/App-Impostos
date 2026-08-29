@@ -82,7 +82,7 @@ export async function lookupCadastreReference(reference: string): Promise<Cadast
         constructionRatioEstimated: 0.70, // 70% per defecte construcció
       };
     }
-  } catch (e) {
+  } catch {
     // Si falla la xarxa o CORS, retornem la validació sintàctica amb èxit
   }
 

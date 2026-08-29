@@ -141,10 +141,22 @@ export function isValidCadastralReference(ref: string): boolean {
   return /^[0-9A-Z]{20}$/.test(clean);
 }
 
+const complianceCache = new WeakMap<DeclaracionData, ValidationReport>();
+
 /**
  * Executa totes les comprovacions automàtiques sobre la declaració activa (IRPF & IVA).
+ * Memoitzat mitjançant WeakMap per reduir càrrega de processament i evitar revalidacions repetides.
  */
 export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationReport {
+  if (complianceCache.has(data)) {
+    return complianceCache.get(data)!;
+  }
+  const report = runAutomatedComplianceChecksInternal(data);
+  complianceCache.set(data, report);
+  return report;
+}
+
+function runAutomatedComplianceChecksInternal(data: DeclaracionData): ValidationReport {
   const issues: ValidationIssue[] = [];
   const year = data.year || 2024;
   
@@ -380,6 +392,19 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
         title: `Falta el valor d'adquisició o cadastral a ${p.name || 'Immoble'}`,
         message: `Per deduir l'amortització del 3% de l'immoble arrendat (Caselles 0079 a 0083), és obligatori informar el cost d'adquisició o el valor cadastral.`,
         legalReference: 'Art. 23.1.b Llei de l\'IRPF (Llei 35/2006)',
+        autoFixable: false,
+      });
+    }
+
+    // 3.3b Oportunitat Garantista: Despeses d'Adquisició de l'Immoble (STS 1130/2021)
+    if (p.grossRentalIncome > 0 && (p.acquisitionCost || 0) > 0 && (!p.acquisitionExpenses || p.acquisitionExpenses === 0)) {
+      issues.push({
+        id: `prop-missing-acq-expenses-${p.id}`,
+        module: 'properties',
+        severity: 'info',
+        title: `Oportunitat d'escut fiscal per despeses d'adquisició a ${p.name || 'Immoble'}`,
+        message: `Segons la Sentència del Tribunal Suprem STS 1130/2021, l'ITP, notaria, registre i gestoria formen part del cost d'adquisició amortitzable al 3%. Pots afegir aquestes despeses per optimitzar la declaració.`,
+        legalReference: 'STS 1130/2021 i Art. 23.1.b Llei de l\'IRPF',
         autoFixable: false,
       });
     }
@@ -644,6 +669,29 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
         title: 'Pèrdues patrimonials pendents prescrites (> 4 exercicis anteriors)',
         message: `S'han detectat pèrdues registrades d'exercicis anteriors al ${year - 4} (anys ${Array.from(new Set(expiredLosses)).join(', ')}). L'Art. 49 LIRPF limita estrictament la compensació als 4 exercicis immediatament posteriors. Les pèrdues anteriors estan caducades i prescrites.`,
         legalReference: 'Art. 49 Llei de l\'IRPF i Art. 66 de la Llei General Tributària (LGT)',
+        autoFixable: false,
+      });
+    }
+
+    const expiringThisYearLosses: number[] = [];
+    [
+      ...(lossCarryovers.pendingGeneralLosses || []),
+      ...(lossCarryovers.pendingMobiliaryLosses || []),
+      ...(lossCarryovers.pendingCapitalLosses || [])
+    ].forEach(item => {
+      if (item.year && (year - item.year) === 4 && item.amount > 0) {
+        expiringThisYearLosses.push(item.year);
+      }
+    });
+
+    if (expiringThisYearLosses.length > 0) {
+      issues.push({
+        id: 'gains-loss-carryover-expiring-this-year',
+        module: 'general',
+        severity: 'warning',
+        title: `Caducitat imminent de pèrdues fiscals de l'exercici ${year - 4} (Darrer any de compensació)`,
+        message: `Tens saldos negatius pendents de l'exercici ${year - 4}. Aquest és el quart i darrer exercici fiscal per poder-los compensar abans que prescriguin definitivament segons l'Art. 49 LIRPF.`,
+        legalReference: 'Art. 49 Llei de l\'IRPF (Termini màxim de 4 exercicis de compensació)',
         autoFixable: false,
       });
     }

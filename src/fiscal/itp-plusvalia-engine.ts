@@ -35,16 +35,30 @@ export class ITPAndAJDEngine {
   }
 
   /**
-   * Càlcul de Plusvalia Municipal (IIVTNU) comparant mètode objectiu i real.
+   * Càlcul de Plusvàlua Municipal (IIVTNU - Art. 104 a 110 TRLRHL)
+   * Incorpora la Doctrina Constitucional Vinculant STC 182/2021 i Art. 104.5 TRLRHL:
+   * Si no hi ha increment real de valor (venda a pèrdues o preu igual), l'operació NO està subjecta a l'IIVTNU (Base = 0 €, Quota = 0 €).
    */
   public static calculatePlusvalia(data: MunicipalPlusvaliaData): MunicipalPlusvaliaData {
-    // 1. Mètode Real
-    const realGain = Math.max(0, data.transferPrice - data.acquisitionPrice);
-    const proportionLand = 0.5; // Suposem que el valor del sòl és un 50% del total a l'IBI per l'exemple
-    const realBase = realGain * proportionLand;
+    // 1. Principi de No Subjecció per Inexistència d'Increment de Valor (STC 182/2021 i Art. 104.5 TRLRHL)
+    const rawGain = data.transferPrice - data.acquisitionPrice;
+    if (rawGain <= 0) {
+      return {
+        ...data,
+        objectiveBase: 0,
+        realBase: 0,
+        chosenMethod: 'real',
+        taxableBase: 0,
+        amountDue: 0,
+      };
+    }
 
-    // 2. Mètode Objectiu (Art. 107 TRLRHL)
-    // Utilitzem el coeficient màxim legal que els ajuntaments poden aplicar segons els anys de tinença.
+    // 2. Mètode Real (Art. 107.5 TRLRHL)
+    const proportionLand = 0.5; // Proporció del valor cadastral del sòl sobre el total a l'IBI
+    const realBase = Math.round(rawGain * proportionLand * 100) / 100;
+
+    // 3. Mètode Objectiu (Art. 107.1-4 TRLRHL)
+    // Coeficients màxims legals de l'Estat segons els anys de generació
     let coeficientAEAT = 0;
     if (data.yearsOwned < 1) coeficientAEAT = 0.14;
     else if (data.yearsOwned === 1) coeficientAEAT = 0.13;
@@ -53,15 +67,15 @@ export class ITPAndAJDEngine {
     else if (data.yearsOwned <= 15) coeficientAEAT = 0.12;
     else coeficientAEAT = 0.45; // 20 anys o més
 
-    const objectiveBase = data.cadastralLandValue * coeficientAEAT;
+    const municipalityFactor = data.municipalityCoef || 1.0;
+    const objectiveBase = Math.round(data.cadastralLandValue * coeficientAEAT * municipalityFactor * 100) / 100;
 
-    // 3. Comparativa i elecció del més favorable
+    // 4. Comparativa i elecció del mètode més beneficiós per al contribuent
     const taxableBase = Math.min(realBase, objectiveBase);
     const chosenMethod = realBase < objectiveBase ? 'real' : 'objective';
 
-    // 4. Quota
-    // El tipus pot ser establert per l'ajuntament (màxim legal 30%)
-    const amountDue = taxableBase * (data.taxRate / 100);
+    // 5. Quota tributària (màxim 30%)
+    const amountDue = Math.round(taxableBase * (data.taxRate / 100) * 100) / 100;
 
     return {
       ...data,

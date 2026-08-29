@@ -4,6 +4,19 @@
  */
 
 import type { Route } from './types.ts';
+import { escapeHtml } from './utils/dom.ts';
+
+/**
+ * Detects whether the user requested reduced motion. When true, view
+ * transitions are applied instantly to avoid vestibular discomfort.
+ */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
 
 class Router {
   private routes = new Map<string, Route>();
@@ -45,17 +58,19 @@ class Router {
     window.location.hash = path;
   }
 
+  private prefetchedPaths = new Set<string>();
+
   /**
-   * Predictive prefetch: trigger dynamic import in background on link hover.
+   * Predictive prefetch: pre-download the module chunk in background on hover
+   * without executing full page rendering or constructing DOM nodes.
    */
   prefetch(path: string): void {
+    if (this.prefetchedPaths.has(path)) return;
     const route = this.routes.get(path);
-    if (route && typeof route.render === 'function') {
+    if (route && typeof route.load === 'function') {
+      this.prefetchedPaths.add(path);
       try {
-        const res = route.render();
-        if (res instanceof Promise) {
-          res.catch(() => {}); // Silent catch for speculative prefetch
-        }
+        route.load().catch(() => {});
       } catch {
         // Non-blocking
       }
@@ -103,9 +118,13 @@ class Router {
     this.currentPath = hash;
 
     if (this.container) {
-      // Animate out
-      this.container.style.opacity = '0';
-      this.container.style.transform = 'translateY(8px)';
+      const reduceMotion = prefersReducedMotion();
+
+      // Animate out (skipped when the user prefers reduced motion)
+      if (!reduceMotion) {
+        this.container.style.opacity = '0';
+        this.container.style.transform = 'translateY(8px)';
+      }
 
       try {
         const renderResult = route.render();
@@ -124,7 +143,7 @@ class Router {
           }
 
           // Scroll to top of viewport
-          window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+          window.scrollTo({ top: 0, behavior: 'auto' });
 
           // Animate in & manage focus for screen readers
           requestAnimationFrame(() => {
@@ -139,9 +158,11 @@ class Router {
       } catch (err) {
         console.error('Failed to render route:', hash, err);
         if (this.container && this.currentPath === hash) {
+          const rawMessage = err instanceof Error ? err.message : String(err ?? '');
+          const message = escapeHtml(rawMessage) || 'Error desconegut';
           this.container.innerHTML = `<div class="card" style="margin:24px; padding:24px; color:var(--color-error);">
             <h3>Error carregant la pàgina</h3>
-            <p>${(err as Error)?.message || 'Error desconegut'}</p>
+            <p>${message}</p>
           </div>`;
           this.container.style.opacity = '1';
           this.container.style.transform = 'translateY(0)';

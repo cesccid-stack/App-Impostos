@@ -79,15 +79,22 @@ function computeDonationsDeduction(data: DeclaracionData): number {
 }
 
 /**
- * Deducció per maternitat (Art. 81 LIRPF).
- * 100 €/mes per mare treballadora amb fills < 3 anys (màx 1.200 €).
- * + Increment per despeses de guarderia / centres d'educació infantil (fins a 1.000 € addicionals).
+ * Deducció per maternitat (Art. 81 LIRPF i STS 8/2024).
+ * 100 €/mes per mare treballadora per cada fill < 3 anys (màx 1.200 € per descendent).
+ * + Increment per despeses de guarderia / centres d'educació infantil (fins a 1.000 € addicionals per descendent).
  */
 function computeMaternityDeduction(data: DeclaracionData): number {
   if (!data.deductions.maternityDeduction) return 0;
-  const months = Math.min(Math.max(0, data.deductions.maternityMonths || 0), 12);
-  const baseMaternity = Math.min(months * MATERNITY_DEDUCTION_PER_MONTH, MATERNITY_DEDUCTION_MAX);
-  const nurseryExtra = Math.min(data.deductions.maternityNurseryExpenses || 0, MATERNITY_NURSERY_MAX);
+  
+  // Garantisme: computar el límit per cada descendent menor de 3 anys
+  const eligibleChildren = (data.personal?.descendants || []).filter(d => (d.age || 0) < 3).length;
+  const numChildren = Math.max(1, eligibleChildren);
+  const maxBaseAllowed = MATERNITY_DEDUCTION_MAX * numChildren;
+  const maxNurseryAllowed = MATERNITY_NURSERY_MAX * numChildren;
+
+  const months = Math.min(Math.max(0, data.deductions.maternityMonths || 0), 12 * numChildren);
+  const baseMaternity = Math.min(months * MATERNITY_DEDUCTION_PER_MONTH, maxBaseAllowed);
+  const nurseryExtra = Math.min(data.deductions.maternityNurseryExpenses || 0, maxNurseryAllowed);
 
   return baseMaternity + nurseryExtra;
 }

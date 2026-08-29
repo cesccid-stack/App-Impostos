@@ -296,8 +296,66 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
     return;
   }
 
-  const list = document.createElement('div');
-  list.className = 'item-list';
+  // Estat reactiu de cerca, filtratge i paginació
+  let searchTerm = '';
+  let selectedAssetType = 'ALL';
+  let selectedOutcome = 'ALL';
+  let currentPage = 1;
+  const pageSize = 20;
+
+  // Barra de controls (Cerca, Filtres i Exportació)
+  const controlsCard = document.createElement('div');
+  controlsCard.className = 'card';
+  controlsCard.style.marginBottom = 'var(--space-md)';
+  controlsCard.style.padding = 'var(--space-md)';
+
+  controlsCard.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-md);">
+      <div style="display:flex; gap:var(--space-sm); align-items:center; flex-wrap:wrap; flex:1; min-width:280px;">
+        <div style="position:relative; flex:1; min-width:180px;">
+          <input type="text" id="gains-search-input" class="form-input" placeholder="🔍 Cerca per títol, ticker, bròker..." style="padding-left:12px; height:36px; font-size:0.85rem;" />
+        </div>
+        <select id="gains-asset-filter" class="form-select" style="height:36px; font-size:0.85rem; width:auto;">
+          <option value="ALL">📁 Tots els Actius</option>
+          <option value="shares">📈 Accions / ETF</option>
+          <option value="funds">📊 Fons d'Inversió</option>
+          <option value="crypto">₿ Criptomonedes</option>
+          <option value="real_estate">🏠 Immobles</option>
+          <option value="other">📋 Altres Actius</option>
+        </select>
+        <select id="gains-outcome-filter" class="form-select" style="height:36px; font-size:0.85rem; width:auto;">
+          <option value="ALL">⚖️ Tots els Resultats</option>
+          <option value="PROFIT">🟢 Només Guanys (+)</option>
+          <option value="LOSS">🔴 Només Pèrdues (-)</option>
+          <option value="WASH_SALE">🟡 Pèrdues Suspeses (Art. 33.5)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:var(--space-xs); align-items:center;">
+        <button id="btn-export-gains-csv" class="btn btn--secondary btn--sm" title="Descarregar llistat en CSV">
+          📄 CSV
+        </button>
+        <button id="btn-export-gains-json" class="btn btn--secondary btn--sm" title="Descarregar dades en JSON">
+          📦 JSON
+        </button>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(controlsCard);
+
+  // Contenidor de llista i paginació
+  const itemsContainer = document.createElement('div');
+  container.appendChild(itemsContainer);
+
+  const paginationContainer = document.createElement('div');
+  paginationContainer.style.display = 'flex';
+  paginationContainer.style.justifyContent = 'space-between';
+  paginationContainer.style.alignItems = 'center';
+  paginationContainer.style.marginTop = 'var(--space-md)';
+  paginationContainer.style.flexWrap = 'wrap';
+  paginationContainer.style.gap = 'var(--space-sm)';
+  container.appendChild(paginationContainer);
 
   const typeLabels: Record<string, string> = {
     shares: '📈 Accions / ETF',
@@ -307,96 +365,242 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
     other: '📋 Altres Actius',
   };
 
-  for (const item of items) {
-    const rawGain = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
-    let netTaxable = rawGain;
-    let exemptionNote = '';
-
-    if (item.isPrimaryResidenceExemptOver65 && rawGain > 0) {
-      netTaxable = 0;
-      exemptionNote = 'Exempció Venda Habitatge >65 anys (Art. 33.4.b)';
-    } else if (item.isPrimaryResidenceReinvestment && rawGain > 0 && item.reinvestmentAmount) {
-      const ratio = Math.min(1, item.reinvestmentAmount / (item.transferValue || 1));
-      netTaxable = rawGain * (1 - ratio);
-      exemptionNote = `Exempció Reinversió Habitatge (${Math.round(ratio * 100)}%)`;
-    } else if (item.isLifeAnnuityExemptOver65 && rawGain > 0 && item.lifeAnnuityAmount) {
-      const ratio = Math.min(1, item.lifeAnnuityAmount / (item.transferValue || 1));
-      netTaxable = rawGain * (1 - ratio);
-      exemptionNote = 'Exempció Renda Vitalícia >65 anys (Art. 38.3)';
-    }
-
-    // Regla dels 2 mesos / Anti-Wash Sale
-    let washSaleBadge = '';
-    if (rawGain < 0) {
-      if (item.nonComputableLossAmount !== undefined && item.nonComputableLossAmount > 0) {
-        washSaleBadge = `<span class="badge badge--warning" style="font-size:0.7rem;">🟡 Pèrdua Suspesa: ${formatCurrency(item.nonComputableLossAmount)} (Art. 33.5)</span>`;
-      } else if (item.isNonComputableLoss) {
-        washSaleBadge = `<span class="badge badge--danger" style="font-size:0.7rem;">🔴 Pèrdua Suspesa Total (Recompra <2 mesos)</span>`;
-      } else {
-        washSaleBadge = `<span class="badge badge--success" style="font-size:0.7rem;">🟢 Computable 100% (AEAT)</span>`;
+  function updateView() {
+    // 1. Filtrar
+    const query = searchTerm.toLowerCase().trim();
+    const filtered = items.filter(item => {
+      // Filtre de text
+      if (query) {
+        const text = `${item.description || ''} ${item.type || ''} ${item.notes || ''}`.toLowerCase();
+        if (!text.includes(query)) return false;
       }
+      // Filtre de classe d'actiu
+      if (selectedAssetType !== 'ALL' && item.type !== selectedAssetType) {
+        return false;
+      }
+      // Filtre de resultat
+      const rawGain = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
+      if (selectedOutcome === 'PROFIT' && rawGain <= 0) return false;
+      if (selectedOutcome === 'LOSS' && rawGain >= 0) return false;
+      if (selectedOutcome === 'WASH_SALE' && (!item.isNonComputableLoss && !(item.nonComputableLossAmount && item.nonComputableLossAmount > 0))) return false;
+
+      return true;
+    });
+
+    const totalFiltered = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const pageItems = filtered.slice(startIdx, startIdx + pageSize);
+
+    // 2. Renderitzar llista de la pàgina
+    itemsContainer.innerHTML = '';
+
+    if (totalFiltered === 0) {
+      itemsContainer.innerHTML = `
+        <div class="card empty-state" style="padding:var(--space-lg); text-align:center;">
+          <div style="font-size:1.5rem; margin-bottom:4px;">🔍</div>
+          <div style="font-weight:600; color:var(--text-secondary);">Cap operació coincideix amb els filtres seleccionats</div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Prova de modificar el terme de cerca o el filtre de classe d'actiu.</div>
+        </div>
+      `;
+      paginationContainer.innerHTML = '';
+      return;
     }
 
-    const row = document.createElement('div');
-    row.className = 'item-row';
-    row.innerHTML = `
-      <div class="item-row__content" style="display:grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 1.5fr; gap:var(--space-sm); align-items:center;">
-        <div class="item-row__field">
-          <span class="item-row__field-label">Tipus</span>
-          <span class="item-row__field-value" style="font-weight:600;">${escapeHtml(typeLabels[item.type] ?? item.type)}</span>
-        </div>
-        <div class="item-row__field">
-          <span class="item-row__field-label">Descripció & Dates</span>
-          <span class="item-row__field-value">
-            <strong>${escapeHtml(item.description || '—')}</strong><br>
-            <span style="font-size:0.7rem; color:var(--text-muted);">
-              Compra: ${escapeHtml(item.acquisitionDate || '—')} $\rightarrow$ Venda: ${escapeHtml(item.transferDate || '—')}
+    const list = document.createElement('div');
+    list.className = 'item-list';
+
+    for (const item of pageItems) {
+      const rawGain = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
+      let netTaxable = rawGain;
+      let exemptionNote = '';
+
+      if (item.isPrimaryResidenceExemptOver65 && rawGain > 0) {
+        netTaxable = 0;
+        exemptionNote = 'Exempció Venda Habitatge >65 anys (Art. 33.4.b)';
+      } else if (item.isPrimaryResidenceReinvestment && rawGain > 0 && item.reinvestmentAmount) {
+        const ratio = Math.min(1, item.reinvestmentAmount / (item.transferValue || 1));
+        netTaxable = rawGain * (1 - ratio);
+        exemptionNote = `Exempció Reinversió Habitatge (${Math.round(ratio * 100)}%)`;
+      } else if (item.isLifeAnnuityExemptOver65 && rawGain > 0 && item.lifeAnnuityAmount) {
+        const ratio = Math.min(1, item.lifeAnnuityAmount / (item.transferValue || 1));
+        netTaxable = rawGain * (1 - ratio);
+        exemptionNote = 'Exempció Renda Vitalícia >65 anys (Art. 38.3)';
+      }
+
+      let washSaleBadge = '';
+      if (rawGain < 0) {
+        if (item.nonComputableLossAmount !== undefined && item.nonComputableLossAmount > 0) {
+          washSaleBadge = `<span class="badge badge--warning" style="font-size:0.7rem;">🟡 Pèrdua Suspesa: ${formatCurrency(item.nonComputableLossAmount)} (Art. 33.5)</span>`;
+        } else if (item.isNonComputableLoss) {
+          washSaleBadge = `<span class="badge badge--danger" style="font-size:0.7rem;">🔴 Pèrdua Suspesa Total (Recompra <2 mesos)</span>`;
+        } else {
+          washSaleBadge = `<span class="badge badge--success" style="font-size:0.7rem;">🟢 Computable 100% (AEAT)</span>`;
+        }
+      }
+
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `
+        <div class="item-row__content" style="display:grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 1.5fr; gap:var(--space-sm); align-items:center;">
+          <div class="item-row__field">
+            <span class="item-row__field-label">Tipus</span>
+            <span class="item-row__field-value" style="font-weight:600;">${escapeHtml(typeLabels[item.type] ?? item.type)}</span>
+          </div>
+          <div class="item-row__field">
+            <span class="item-row__field-label">Descripció & Dates</span>
+            <span class="item-row__field-value">
+              <strong>${escapeHtml(item.description || '—')}</strong><br>
+              <span style="font-size:0.7rem; color:var(--text-muted);">
+                Compra: ${escapeHtml(item.acquisitionDate || '—')} $\rightarrow$ Venda: ${escapeHtml(item.transferDate || '—')}
+              </span>
             </span>
-          </span>
+          </div>
+          <div class="item-row__field">
+            <span class="item-row__field-label">Adquisició</span>
+            <span class="item-row__field-value">${formatCurrency(item.acquisitionValue)}</span>
+          </div>
+          <div class="item-row__field">
+            <span class="item-row__field-label">Transmissió</span>
+            <span class="item-row__field-value">${formatCurrency(item.transferValue)}</span>
+          </div>
+          <div class="item-row__field">
+            <span class="item-row__field-label">Rendiment Computable</span>
+            <span class="item-row__field-value ${netTaxable >= 0 ? 'text-success' : 'text-error'}" style="font-weight:700;">
+              ${netTaxable >= 0 ? '+' : ''}${formatCurrency(netTaxable)}
+              ${washSaleBadge ? `<br>${washSaleBadge}` : ''}
+              ${exemptionNote ? `<br><span style="font-size:0.7rem; color:var(--color-success); font-weight:600;">${escapeHtml(exemptionNote)}</span>` : ''}
+            </span>
+          </div>
         </div>
-        <div class="item-row__field">
-          <span class="item-row__field-label">Adquisició</span>
-          <span class="item-row__field-value">${formatCurrency(item.acquisitionValue)}</span>
+        <div class="item-row__actions" style="margin-left:var(--space-md);">
+          <button class="btn btn--ghost btn--sm btn--icon" data-delete="${escapeHtml(item.id)}" title="Eliminar">🗑</button>
         </div>
-        <div class="item-row__field">
-          <span class="item-row__field-label">Transmissió</span>
-          <span class="item-row__field-value">${formatCurrency(item.transferValue)}</span>
-        </div>
-        <div class="item-row__field">
-          <span class="item-row__field-label">Rendiment Computable</span>
-          <span class="item-row__field-value ${netTaxable >= 0 ? 'text-success' : 'text-error'}" style="font-weight:700;">
-            ${netTaxable >= 0 ? '+' : ''}${formatCurrency(netTaxable)}
-            ${washSaleBadge ? `<br>${washSaleBadge}` : ''}
-            ${exemptionNote ? `<br><span style="font-size:0.7rem; color:var(--color-success); font-weight:600;">${escapeHtml(exemptionNote)}</span>` : ''}
-          </span>
-        </div>
+      `;
+
+      list.appendChild(row);
+    }
+
+    // Event delegat per eliminar
+    list.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-delete]');
+      if (!btn) return;
+      const deleteId = btn.getAttribute('data-delete');
+      if (!deleteId) return;
+      const gains = store.getData().gains;
+      const newItems = (gains?.items || []).filter((i) => i.id !== deleteId);
+      store.setSection('gains', { ...gains, items: newItems });
+      if (page) {
+        page.replaceWith(renderGains());
+      } else {
+        renderItemsList(container, newItems);
+      }
+      showToast('Operació eliminada', 'success');
+    });
+
+    itemsContainer.appendChild(list);
+
+    // 3. Renderitzar paginació
+    const endCount = Math.min(startIdx + pageSize, totalFiltered);
+    paginationContainer.innerHTML = `
+      <div style="font-size:0.85rem; color:var(--text-secondary);">
+        Mostrant <strong>${startIdx + 1} - ${endCount}</strong> de <strong>${totalFiltered}</strong> operacions ${totalFiltered !== items.length ? `(filtrades de ${items.length})` : ''}
       </div>
-      <div class="item-row__actions" style="margin-left:var(--space-md);">
-        <button class="btn btn--ghost btn--sm btn--icon" data-delete="${escapeHtml(item.id)}" title="Eliminar">🗑</button>
+      <div style="display:flex; gap:var(--space-xs); align-items:center;">
+        <button id="btn-prev-page" class="btn btn--secondary btn--sm" ${currentPage <= 1 ? 'disabled' : ''}>
+          ⬅ Anterior
+        </button>
+        <span style="font-size:0.85rem; padding:0 8px; color:var(--text-muted); font-weight:600;">
+          ${currentPage} / ${totalPages}
+        </span>
+        <button id="btn-next-page" class="btn btn--secondary btn--sm" ${currentPage >= totalPages ? 'disabled' : ''}>
+          Següent ➡
+        </button>
       </div>
     `;
 
-    list.appendChild(row);
+    paginationContainer.querySelector('#btn-prev-page')?.addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        updateView();
+      }
+    });
+
+    paginationContainer.querySelector('#btn-next-page')?.addEventListener('click', () => {
+      if (currentPage < totalPages) {
+        currentPage++;
+        updateView();
+      }
+    });
   }
 
-  // Delegated delete handler
-  list.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-delete]');
-    if (!btn) return;
-    const deleteId = btn.getAttribute('data-delete');
-    if (!deleteId) return;
-    const gains = store.getData().gains;
-    const newItems = (gains?.items || []).filter((i) => i.id !== deleteId);
-    store.setSection('gains', { ...gains, items: newItems });
-    if (page) {
-      page.replaceWith(renderGains());
-    } else {
-      renderItemsList(container, newItems);
-    }
-    showToast('Operació eliminada', 'success');
+  // Connectar listeners de cerca i filtres
+  const searchInput = controlsCard.querySelector<HTMLInputElement>('#gains-search-input');
+  searchInput?.addEventListener('input', () => {
+    searchTerm = searchInput.value;
+    currentPage = 1;
+    updateView();
   });
 
-  container.appendChild(list);
+  const assetSelect = controlsCard.querySelector<HTMLSelectElement>('#gains-asset-filter');
+  assetSelect?.addEventListener('change', () => {
+    selectedAssetType = assetSelect.value;
+    currentPage = 1;
+    updateView();
+  });
+
+  const outcomeSelect = controlsCard.querySelector<HTMLSelectElement>('#gains-outcome-filter');
+  outcomeSelect?.addEventListener('change', () => {
+    selectedOutcome = outcomeSelect.value;
+    currentPage = 1;
+    updateView();
+  });
+
+  // Exportacions CSV i JSON
+  controlsCard.querySelector('#btn-export-gains-csv')?.addEventListener('click', () => {
+    const headers = ['ID', 'Tipus', 'Descripció', 'Data Adquisició', 'Data Transmissió', 'Valor Adquisició', 'Valor Transmissió', 'Despeses', 'Rendiment Brut', 'Pèrdua Suspesa'];
+    const rows = items.map(i => {
+      const raw = (i.transferValue || 0) - (i.acquisitionValue || 0) - (i.expenses || 0);
+      const susp = i.nonComputableLossAmount || (i.isNonComputableLoss ? Math.abs(raw) : 0);
+      return [
+        `"${i.id}"`,
+        `"${i.type}"`,
+        `"${(i.description || '').replace(/"/g, '""')}"`,
+        `"${i.acquisitionDate || ''}"`,
+        `"${i.transferDate || ''}"`,
+        i.acquisitionValue || 0,
+        i.transferValue || 0,
+        i.expenses || 0,
+        raw,
+        susp,
+      ].join(';');
+    });
+
+    const csvContent = '﻿' + [headers.join(';'), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cartera_fiscal_transmissions_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exportació CSV completada!', 'success');
+  });
+
+  controlsCard.querySelector('#btn-export-gains-json')?.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cartera_fiscal_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exportació JSON completada!', 'success');
+  });
+
+  updateView();
 }
 
 /**

@@ -35,6 +35,20 @@ const DEFAULT_PROFILES: UserProfile[] = [
 ];
 
 /**
+ * Recursively freezes an object graph so that accidental mutations throw in
+ * strict mode instead of silently corrupting shared state.
+ */
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const key of Object.getOwnPropertyNames(value)) {
+      deepFreeze((value as unknown as Record<string, unknown>)[key]);
+    }
+  }
+  return value;
+}
+
+/**
  * Singleton reactive store.
  */
 class Store {
@@ -61,9 +75,27 @@ class Store {
   }
 
 
-  /** Get current declaration data (read-only snapshot). */
+  /**
+   * Get the current declaration data.
+   *
+   * NOTE: for performance on hot render paths this returns the live internal
+   * reference. Consumers MUST treat the result as read-only and mutate through
+   * `store.update(...)` / section setters. Use `getSnapshot()` when a detached,
+   * immutable copy is required.
+   */
   getData(): DeclaracionData {
     return this.data;
+  }
+
+  /**
+   * Get a detached, deeply-frozen copy of the current declaration data.
+   *
+   * Safe to hand to code that may attempt to mutate the object graph directly:
+   * writes will throw in strict mode instead of silently bypassing the store's
+   * persistence and notification pipeline.
+   */
+  getSnapshot(): DeclaracionData {
+    return deepFreeze(structuredClone(this.data));
   }
 
   /** Get current fiscal year. */
@@ -499,7 +531,7 @@ class Store {
       keysToRemove.forEach(k => localStorage.removeItem(k));
     }
 
-    this.profiles = JSON.parse(JSON.stringify(DEFAULT_PROFILES));
+    this.profiles = structuredClone(DEFAULT_PROFILES);
     this.activeProfileId = this.profiles[0].id;
     this.currentYear = FISCAL_YEARS[FISCAL_YEARS.length - 1];
     this.data = createEmptyDeclaracion(this.currentYear, this.activeProfileId);

@@ -4,6 +4,7 @@
  */
 
 import type { TradePerformanceMetrics } from './trading-analytics.ts';
+import { calculateSavingsTaxEUR } from './investment-cockpit-engine.ts';
 
 export interface MonteCarloPercentilePoint {
   tradeNumber: number;
@@ -51,25 +52,38 @@ export function runMonteCarloSimulation(
   let drawdown50Count = 0;
   let profitCount = 0;
 
-  // Matriu d'equitat: iterations x (tradeHorizon + 1)
-  const allTrajetories: number[][] = [];
+  // Mostreig de punts temporals per al gràfic (~20 punts)
+  const step = Math.max(1, Math.floor(tradeHorizon / 20));
+  const sampleSteps: number[] = [];
+  for (let t = 0; t <= tradeHorizon; t += step) {
+    sampleSteps.push(t);
+  }
+  if (sampleSteps[sampleSteps.length - 1] !== tradeHorizon) {
+    sampleSteps.push(tradeHorizon);
+  }
+  const numSamples = sampleSteps.length;
+
+  // Buffer pla per als punts mostrejats: numSamples x iterations
+  const sampledValues = new Float64Array(numSamples * iterations);
 
   for (let i = 0; i < iterations; i++) {
-    const trajectory: number[] = [initialCapital];
     let capital = initialCapital;
     let peak = initialCapital;
     let hit20 = false;
     let hit30 = false;
     let hit50 = false;
+    let sampleIdx = 0;
+
+    // Pas t = 0
+    sampledValues[0 * iterations + i] = capital;
+    sampleIdx = 1;
 
     for (let t = 1; t <= tradeHorizon; t++) {
       const isWin = Math.random() < winProb;
-      // Afegir una mica de variabilitat normal a la mida del trade
-      const randomFactor = 0.7 + Math.random() * 0.6; // 0.7x a 1.3x
+      const randomFactor = 0.7 + Math.random() * 0.6;
       const pnl = isWin ? (avgWin * randomFactor) : (-avgLoss * randomFactor);
 
       capital = Math.max(0, capital + pnl);
-      trajectory.push(capital);
 
       if (capital > peak) peak = capital;
       const ddPct = peak > 0 ? ((peak - capital) / peak) * 100 : 0;
@@ -77,53 +91,48 @@ export function runMonteCarloSimulation(
       if (ddPct >= 20) hit20 = true;
       if (ddPct >= 30) hit30 = true;
       if (ddPct >= 50) hit50 = true;
+
+      if (sampleIdx < numSamples && t === sampleSteps[sampleIdx]) {
+        sampledValues[sampleIdx * iterations + i] = capital;
+        sampleIdx++;
+      }
     }
 
     if (hit20) drawdown20Count++;
     if (hit30) drawdown30Count++;
     if (hit50) drawdown50Count++;
     if (capital > initialCapital) profitCount++;
-
-    allTrajetories.push(trajectory);
   }
 
-  // Calcular percentils per a cada punt temporal
+  // Càlcul eficient de percentils per a cada pas mostrejat
   const fanChartPoints: MonteCarloPercentilePoint[] = [];
-  const step = Math.max(1, Math.floor(tradeHorizon / 20)); // ~20 punts al gràfic
+  const p5Idx = Math.floor(iterations * 0.05);
+  const p25Idx = Math.floor(iterations * 0.25);
+  const p50Idx = Math.floor(iterations * 0.50);
+  const p75Idx = Math.floor(iterations * 0.75);
+  const p95Idx = Math.floor(iterations * 0.95);
 
-  for (let t = 0; t <= tradeHorizon; t += step) {
-    const valuesAtT: number[] = allTrajetories.map(traj => traj[t]).sort((a, b) => a - b);
+  for (let s = 0; s < numSamples; s++) {
+    const offset = s * iterations;
+    const slice = sampledValues.subarray(offset, offset + iterations).slice().sort();
     fanChartPoints.push({
-      tradeNumber: t,
-      p5WorstCase: valuesAtT[Math.floor(iterations * 0.05)],
-      p25: valuesAtT[Math.floor(iterations * 0.25)],
-      p50Median: valuesAtT[Math.floor(iterations * 0.50)],
-      p75: valuesAtT[Math.floor(iterations * 0.75)],
-      p95BestCase: valuesAtT[Math.floor(iterations * 0.95)],
+      tradeNumber: sampleSteps[s],
+      p5WorstCase: slice[p5Idx],
+      p25: slice[p25Idx],
+      p50Median: slice[p50Idx],
+      p75: slice[p75Idx],
+      p95BestCase: slice[p95Idx],
     });
   }
 
-  // Si l'últim punt no és tradeHorizon, l'afegim
-  if (fanChartPoints[fanChartPoints.length - 1].tradeNumber !== tradeHorizon) {
-    const valuesAtEnd: number[] = allTrajetories.map(traj => traj[tradeHorizon]).sort((a, b) => a - b);
-    fanChartPoints.push({
-      tradeNumber: tradeHorizon,
-      p5WorstCase: valuesAtEnd[Math.floor(iterations * 0.05)],
-      p25: valuesAtEnd[Math.floor(iterations * 0.25)],
-      p50Median: valuesAtEnd[Math.floor(iterations * 0.50)],
-      p75: valuesAtEnd[Math.floor(iterations * 0.75)],
-      p95BestCase: valuesAtEnd[Math.floor(iterations * 0.95)],
-    });
-  }
-
-  const finalValues = allTrajetories.map(traj => traj[tradeHorizon]).sort((a, b) => a - b);
-  const medianFinalCapital = finalValues[Math.floor(iterations * 0.50)];
-  const p5WorstCaseCapital = finalValues[Math.floor(iterations * 0.05)];
-  const p95BestCaseCapital = finalValues[Math.floor(iterations * 0.95)];
+  const finalSlice = sampledValues.subarray((numSamples - 1) * iterations, numSamples * iterations).slice().sort();
+  const medianFinalCapital = finalSlice[p50Idx];
+  const p5WorstCaseCapital = finalSlice[p5Idx];
+  const p95BestCaseCapital = finalSlice[p95Idx];
 
   const totalNetGained = Math.max(0, medianFinalCapital - initialCapital);
-  // Estimació fiscal de l'estalvi (~21% mitjà)
-  const estimatedTax = totalNetGained * 0.21;
+  // Escala oficial de la base de l'estalvi d'IRPF
+  const estimatedTax = calculateSavingsTaxEUR(totalNetGained);
   const expectedAfterTaxWealth = medianFinalCapital - estimatedTax;
 
   return {

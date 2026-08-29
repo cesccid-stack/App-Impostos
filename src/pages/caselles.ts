@@ -278,11 +278,14 @@ function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSumma
   const workGross = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
   const workSS = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.socialSecurity || 0), 0);
   const workUnion = data.workIncome?.unionFees || 0;
-  const workExpenses = workSS + workUnion + (data.workIncome?.otherDeductible || 0);
-  const workNet = workGross - workExpenses;
+  const workProf = result.professionalCollegeDeduction || 0;
+  const workLegal = result.legalDefenseDeduction || 0;
+  const workExpenses = workSS + workUnion + workProf + workLegal + (data.workIncome?.otherDeductible || 0) + 2000;
+  const workNet = Math.max(0, workGross - workExpenses);
 
   const propGross = (data.properties || []).reduce((s: number, p) => s + (p.grossRentalIncome || 0), 0);
   const propExp = (data.properties || []).reduce((s: number, p) => s + (p.mortgageInterests || 0) + (p.repairExpenses || 0) + (p.ibi || 0) + (p.communityFees || 0), 0);
+  const propEffectiveAcq = (data.properties || []).reduce((s: number, p) => s + (p.acquisitionCost || 0) + (p.acquisitionExpenses || 0), 0);
   const propNet = Math.max(0, propGross - propExp);
 
   const actGross = data.activities?.income || 0;
@@ -296,10 +299,12 @@ function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSumma
     // ── Model 100: Rendiments del Treball ────────────────────────
     { model: '100', category: 'Rendiments del Treball', boxNumber: '0001', title: 'Retribucions dineràries íntegres', legalBasis: 'Art. 17 LIRPF', computedValue: workGross, routePath: '/treball' },
     { model: '100', category: 'Rendiments del Treball', boxNumber: '0011', title: 'Cotitzacions a la Seguretat Social', legalBasis: 'Art. 19.2.a LIRPF', computedValue: workSS, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0012', title: 'Quotes satisfetes a sindicats i col·legis', legalBasis: 'Art. 19.2.d LIRPF', computedValue: workUnion, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0018', title: 'Total despeses deduïbles del treball', legalBasis: 'Art. 19 LIRPF', computedValue: workExpenses, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0019', title: 'Rendiment net del treball', legalBasis: 'Art. 19 LIRPF', computedValue: workNet, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0022', title: 'Rendiment net reduït del treball', legalBasis: 'Art. 20 LIRPF', computedValue: workNet, routePath: '/treball' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0013', title: 'Quotes satisfetes a sindicats', legalBasis: 'Art. 19.2.d LIRPF', computedValue: workUnion, routePath: '/treball' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0015', title: 'Quotes satisfetes a col·legis professionals', legalBasis: 'Art. 19.2.d LIRPF', computedValue: workProf, routePath: '/treball', notes: 'Obligatòria per a la feina, límit 500 €' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0016', title: 'Despeses de defensa jurídica laboral', legalBasis: 'Art. 19.2.e LIRPF', computedValue: workLegal, routePath: '/treball', notes: 'Litigis contra l\'ocupador, límit 300 €' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0019', title: 'Rendiment net del treball abans de reduccions', legalBasis: 'Art. 19 LIRPF', computedValue: workNet, routePath: '/treball' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0020', title: 'Reducció per rendiments del treball', legalBasis: 'Art. 20 LIRPF', computedValue: result.workIncomeReduction || 0, routePath: '/treball' },
+    { model: '100', category: 'Rendiments del Treball', boxNumber: '0022', title: 'Rendiment net reduït del treball', legalBasis: 'Art. 20 LIRPF', computedValue: Math.max(0, workNet - (result.workIncomeReduction || 0)), routePath: '/treball' },
 
     // ── Model 100: Capital Mobiliari ────────────────────────────
     { model: '100', category: 'Capital Mobiliari', boxNumber: '0027', title: 'Interessos de comptes i dipòsits', legalBasis: 'Art. 25.2 LIRPF', computedValue: mobInt, routePath: '/capital' },
@@ -307,6 +312,7 @@ function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSumma
     { model: '100', category: 'Capital Mobiliari', boxNumber: '0037', title: 'Rendiment net del capital mobiliari a integrar a l\'estalvi', legalBasis: 'Art. 25 LIRPF', computedValue: mobInt + mobDiv, routePath: '/capital' },
 
     // ── Model 100: Capital Immobiliari ──────────────────────────
+    { model: '100', category: 'Capital Immobiliari', boxNumber: '0081', title: 'Cost d\'adquisició satisfet amortitzable', legalBasis: 'Art. 23.1.b LIRPF & STS 1130/2021', computedValue: propEffectiveAcq, routePath: '/immobles', notes: 'Inclou preu + ITP/IVA + notaria + registre' },
     { model: '100', category: 'Capital Immobiliari', boxNumber: '0102', title: 'Ingressos íntegres per arrendament d\'immobles', legalBasis: 'Art. 22 LIRPF', computedValue: propGross, routePath: '/immobles' },
     { model: '100', category: 'Capital Immobiliari', boxNumber: '0115', title: 'Despeses deduïbles (interessos, IBI, comunitat)', legalBasis: 'Art. 23.1 LIRPF', computedValue: propExp, routePath: '/immobles' },
     { model: '100', category: 'Capital Immobiliari', boxNumber: '0156', title: 'Rendiment net del capital immobiliari', legalBasis: 'Art. 24 LIRPF', computedValue: propNet, routePath: '/immobles' },
