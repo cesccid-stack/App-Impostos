@@ -1,7 +1,7 @@
 /**
  * @module pages/trading-analytics
  * Quadre de Comandament d'Inversions, Trading, Laboratori de Backtest Institucional & Kaizen 360°.
- * Avalua el rendiment, tècniques operatives (Borsa, Cripto, Fons), gestió de risc (Kelly/VaR),
+ * Avalua el rendiment, tècniques operatives (Borsa, Cripto, Fons), gestió de risc (Kelly/VaR/Cornish-Fisher),
  * simulació de backtesting multi-estratègia, mapa de calor calendari i pla de millora contínua.
  */
 
@@ -39,7 +39,9 @@ export function renderTradingAnalytics(): HTMLElement {
   let selectedSetup: string | 'ALL' = 'ALL';
   let activeTab: 'cockpit' | 'backtest' | 'calendar' | 'setups' | 'journal' | 'kaizen' | 'whatif' | 'harvesting' = 'cockpit';
   let searchQuery = '';
+  let backtestSearchQuery = '';
   let backtestTradeFilter: 'ALL' | 'MODIFIED' | 'STOP_LOSS' | 'TAKE_PROFIT' = 'ALL';
+  let backtestSortBy: 'index' | 'pnl_desc' | 'pnl_asc' | 'r_desc' | 'dur_desc' = 'index';
   let monteCarloHorizon = 100;
   const monteCarloCap = 10000;
 
@@ -89,7 +91,7 @@ export function renderTradingAnalytics(): HTMLElement {
             <span class="badge badge--success">${report.totalTrades} operacions reals</span>
           </div>
           <p class="page-header__subtitle" style="margin:0; color:var(--text-secondary); font-size:0.9rem;">
-            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Omega / CAPM), ràtios Kelly/VaR i millora contínua Kaizen.
+            Analítica quantitativa 360°, motor de backtesting institucional (Walk-Forward / SQN / Cornish-Fisher VaR / CAPM), ràtios Kelly/VaR i millora contínua Kaizen.
           </p>
         </div>
         <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap;">
@@ -404,13 +406,22 @@ export function renderTradingAnalytics(): HTMLElement {
 
     const isOutperforming = bt.strategyEdgeOverRealEUR >= 0;
 
-    // Filtrar operacions per a la taula d'inspecció
-    const filteredTrades = bt.trades.filter(t => {
-      if (backtestTradeFilter === 'MODIFIED') return t.wasModifiedByStrategy;
-      if (backtestTradeFilter === 'STOP_LOSS') return t.exitReason === 'STOP_LOSS';
-      if (backtestTradeFilter === 'TAKE_PROFIT') return t.exitReason === 'TAKE_PROFIT';
+    // Filtrar i ordenar operacions per a la taula d'inspecció
+    let filteredTrades = bt.trades.filter(t => {
+      if (backtestTradeFilter === 'MODIFIED' && !t.wasModifiedByStrategy) return false;
+      if (backtestTradeFilter === 'STOP_LOSS' && t.exitReason !== 'STOP_LOSS') return false;
+      if (backtestTradeFilter === 'TAKE_PROFIT' && t.exitReason !== 'TAKE_PROFIT') return false;
+      if (backtestSearchQuery.trim() !== '') {
+        const q = backtestSearchQuery.toLowerCase();
+        if (!t.concept.toLowerCase().includes(q) && !t.assetClass.toLowerCase().includes(q)) return false;
+      }
       return true;
     });
+
+    if (backtestSortBy === 'pnl_desc') filteredTrades.sort((a, b) => b.simulatedPnL - a.simulatedPnL);
+    else if (backtestSortBy === 'pnl_asc') filteredTrades.sort((a, b) => a.simulatedPnL - b.simulatedPnL);
+    else if (backtestSortBy === 'r_desc') filteredTrades.sort((a, b) => b.rMultiple - a.rMultiple);
+    else if (backtestSortBy === 'dur_desc') filteredTrades.sort((a, b) => b.holdingDays - a.holdingDays);
 
     return `
       <!-- Panell de Configuració Paramètrica del Backtest -->
@@ -547,13 +558,13 @@ export function renderTradingAnalytics(): HTMLElement {
 
       </div>
 
-      <!-- Dashboard de Ràtios Quantitatius Institucionals Avançats (CAPM, Omega, Ulcer) -->
+      <!-- Dashboard de Ràtios Quantitatius Institucionals Avançats (CAPM, Omega, Ulcer, Cornish-Fisher VaR) -->
       <div class="card" style="margin-bottom:var(--space-xl); border:1px solid var(--border-default);">
         <h3 style="margin:0 0 var(--space-md) 0; font-size:1rem; font-weight:800; display:flex; align-items:center; gap:8px;">
           <span>🔬 Mètriques de Rendiment Avançat & CAPM (Hedge Fund Standards)</span>
           <span class="badge badge--primary">Rigor Quant</span>
         </h3>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:var(--space-md); text-align:center;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:var(--space-md); text-align:center;">
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Jensen's Alpha (α)</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:${bt.jensenAlphaPct >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
@@ -567,6 +578,16 @@ export function renderTradingAnalytics(): HTMLElement {
             <div style="font-size:0.65rem; color:var(--text-secondary);">Sensibilitat S&P 500</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Cornish-Fisher VaR 95%</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-warning);">${formatCurrency(bt.cornishFisherVaR95EUR)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Ajust Skew/Kurtosi</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
+            <div style="font-size:0.75rem; color:var(--text-muted);">Expected Shortfall (CVaR)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-error);">${formatCurrency(bt.conditionalVaR95EUR)}</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Cua adversa 5%</div>
+          </div>
+          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Ràtio Omega</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-primary);">${bt.omegaRatio.toFixed(2)}</div>
             <div style="font-size:0.65rem; color:var(--text-secondary);">Guanys vs Pèrdues</div>
@@ -577,19 +598,14 @@ export function renderTradingAnalytics(): HTMLElement {
             <div style="font-size:0.65rem; color:var(--text-secondary);">Jack Schwager</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
-            <div style="font-size:0.75rem; color:var(--text-muted);">Tail Ratio (P95 / |P5|)</div>
-            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--accent-start);">${bt.tailRatio.toFixed(2)}</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Asimetria de Cues</div>
-          </div>
-          <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
             <div style="font-size:0.75rem; color:var(--text-muted);">Ulcer Index (UI)</div>
             <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:${bt.ulcerIndex > 10 ? 'var(--color-warning)' : 'var(--color-success)'};">${bt.ulcerIndex.toFixed(2)}%</div>
             <div style="font-size:0.65rem; color:var(--text-secondary);">Volatilitat Drawdowns</div>
           </div>
           <div style="background:var(--bg-surface-elevated); padding:10px; border-radius:var(--radius-md);">
-            <div style="font-size:0.75rem; color:var(--text-muted);">Underwater Màxim</div>
-            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--text-primary);">${bt.maxDrawdownDurationDays} dies</div>
-            <div style="font-size:0.65rem; color:var(--text-secondary);">Temps en Drawdown</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Eficiència Captura (MFE)</div>
+            <div style="font-size:1.3rem; font-weight:800; font-family:var(--font-mono); color:var(--color-success);">${bt.tradeExecutionEfficiencyScore}%</div>
+            <div style="font-size:0.65rem; color:var(--text-secondary);">Avg MFE: +${bt.avgMfePercent}%</div>
           </div>
         </div>
       </div>
@@ -625,6 +641,38 @@ export function renderTradingAnalytics(): HTMLElement {
           ${renderBacktestEquityCurveSvg(bt.equityCurve)}
         </div>
       </div>
+
+      <!-- Proves d'Estrès de Mercat (Stress-Testing Scenarios) -->
+      ${bt.stressTestScenarios.length > 0 ? `
+        <div class="card" style="margin-bottom:var(--space-xl);">
+          <div class="card__header" style="margin-bottom:var(--space-md);">
+            <div class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <span>⚡ Proves d'Estrès de Mercat & Resiliència a Shocks Extrems</span>
+            </div>
+            <div class="card__subtitle" style="font-size:0.8rem; color:var(--text-secondary);">
+              Impacte projectat davant caigudes sobtades, duplicació de slippage i salts de volatilitat
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-md);">
+            ${bt.stressTestScenarios.map(sc => `
+              <div style="background:var(--bg-surface-elevated); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <strong style="font-size:0.85rem;">${sc.name}</strong>
+                  <span class="badge ${sc.severity === 'ALTA' ? 'badge--error' : (sc.severity === 'MITJANA' ? 'badge--warning' : 'badge--info')}" style="font-size:0.65rem;">
+                    ${sc.severity}
+                  </span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:8px;">${sc.description}</div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                  <span style="font-size:0.7rem; color:var(--text-muted);">Impacte Capital:</span>
+                  <span style="font-weight:800; font-family:var(--font-mono); color:var(--color-error); font-size:0.95rem;">${formatCurrency(sc.projectedImpactEUR)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Distribució Empírica de R-Multiples -->
       ${bt.rMultipleDistribution.length > 0 ? `
@@ -823,13 +871,20 @@ export function renderTradingAnalytics(): HTMLElement {
               Inspecciona com hauria actuat el model en cada posició real del teu compte
             </div>
           </div>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary);">Filtrar:</label>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="bt-search-trade-input" class="form-input" placeholder="🔍 Cercar ticker..." value="${backtestSearchQuery}" style="font-size:0.75rem; padding:4px 8px; width:140px;" />
+            <select class="form-select" id="bt-sort-select" style="font-size:0.75rem; padding:4px 8px;">
+              <option value="index" ${backtestSortBy === 'index' ? 'selected' : ''}>Ordre Cronològic</option>
+              <option value="pnl_desc" ${backtestSortBy === 'pnl_desc' ? 'selected' : ''}>Major P&L Simulat</option>
+              <option value="pnl_asc" ${backtestSortBy === 'pnl_asc' ? 'selected' : ''}>Major Pèrdua</option>
+              <option value="r_desc" ${backtestSortBy === 'r_desc' ? 'selected' : ''}>Major R-Multiple</option>
+              <option value="dur_desc" ${backtestSortBy === 'dur_desc' ? 'selected' : ''}>Major Permanència</option>
+            </select>
             <select class="form-select" id="bt-trade-filter-select" style="font-size:0.75rem; padding:4px 8px;">
-              <option value="ALL" ${backtestTradeFilter === 'ALL' ? 'selected' : ''}>Totes les Operacions</option>
-              <option value="MODIFIED" ${backtestTradeFilter === 'MODIFIED' ? 'selected' : ''}>⚡ Només Modificades per Estratègia</option>
-              <option value="STOP_LOSS" ${backtestTradeFilter === 'STOP_LOSS' ? 'selected' : ''}>🛑 Només Stop Loss Executats</option>
-              <option value="TAKE_PROFIT" ${backtestTradeFilter === 'TAKE_PROFIT' ? 'selected' : ''}>🎯 Només Take Profit Executats</option>
+              <option value="ALL" ${backtestTradeFilter === 'ALL' ? 'selected' : ''}>Totes</option>
+              <option value="MODIFIED" ${backtestTradeFilter === 'MODIFIED' ? 'selected' : ''}>⚡ Modificades</option>
+              <option value="STOP_LOSS" ${backtestTradeFilter === 'STOP_LOSS' ? 'selected' : ''}>🛑 Stop Loss</option>
+              <option value="TAKE_PROFIT" ${backtestTradeFilter === 'TAKE_PROFIT' ? 'selected' : ''}>🎯 Take Profit</option>
             </select>
           </div>
         </div>
@@ -1572,6 +1627,20 @@ export function renderTradingAnalytics(): HTMLElement {
     const searchInput = container.querySelector<HTMLInputElement>('#journal-search-input');
     searchInput?.addEventListener('input', () => {
       searchQuery = searchInput.value;
+      render();
+    });
+
+    // Cerca Taula Backtest
+    const btSearchInput = container.querySelector<HTMLInputElement>('#bt-search-trade-input');
+    btSearchInput?.addEventListener('input', () => {
+      backtestSearchQuery = btSearchInput.value;
+      render();
+    });
+
+    // Ordenació Taula Backtest
+    const btSortSelect = container.querySelector<HTMLSelectElement>('#bt-sort-select');
+    btSortSelect?.addEventListener('change', () => {
+      backtestSortBy = (btSortSelect.value as typeof backtestSortBy) || 'index';
       render();
     });
 

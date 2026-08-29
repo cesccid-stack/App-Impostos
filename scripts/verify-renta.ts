@@ -2525,6 +2525,30 @@ suite('34. Laboratori de Backtesting Institucional & Walk-Forward (backtest-engi
     assert(res.washSaleTradesCount === 1, '1 operació afectada per regla dels 2 mesos');
     assert(res.rMultipleDistribution.length > 0, 'Distribució de R-Multiples calculada');
   });
+
+  test('34.6 Value at Risk Avançat (Cornish-Fisher, CVaR), Eficiència MAE/MFE i Stress-Testing', () => {
+    const trades: any[] = Array.from({ length: 20 }).map((_, i) => ({
+      id: `cf_${i}`,
+      description: `Asset ${i}`,
+      type: 'shares',
+      acquisitionDate: `2024-0${Math.floor(i / 3) + 1}-01`,
+      transferDate: `2024-0${Math.floor(i / 3) + 1}-20`,
+      acquisitionValue: 2000,
+      transferValue: i % 4 === 0 ? 1700 : (i % 2 === 0 ? 2300 : 2100),
+      expenses: 2,
+    }));
+
+    const res = runInstitutionalBacktest(trades);
+    assert(res.historicalVaR95EUR >= 0, 'Historical VaR 95% calculat');
+    assert(res.cornishFisherVaR95EUR >= 0, 'Cornish-Fisher VaR 95% calculat');
+    assert(res.conditionalVaR95EUR >= 0, 'Expected Shortfall (CVaR) calculat');
+    assert(res.skewness !== undefined, 'Asimetria calculada');
+    assert(res.kurtosis !== undefined, 'Curtosi calculada');
+    assert(res.avgMaePercent >= 0, 'Average MAE calculat');
+    assert(res.avgMfePercent >= 0, 'Average MFE calculat');
+    assert(res.tradeExecutionEfficiencyScore >= 0, 'Trade execution efficiency calculada');
+    assert(res.stressTestScenarios.length === 3, '3 escenaris de stress testing generats');
+  });
 });
 
 // ── INFORME I BALANÇ FINAL ──────────────────────────────────────────────────

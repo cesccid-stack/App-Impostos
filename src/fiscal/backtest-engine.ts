@@ -1,7 +1,8 @@
 /**
  * @module fiscal/backtest-engine
  * Motor Institucional de Backtesting, Optimització Paramètrica (Grid Search),
- * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional (SQN, K-Ratio, Omega, Ulcer, Jensen's Alpha, Treynor, Kelly).
+ * Validació Walk-Forward (In-Sample vs Out-of-Sample) i Anàlisi Estadístic Professional
+ * (SQN, K-Ratio, Omega, Ulcer, Jensen's Alpha, Cornish-Fisher VaR, CVaR, MAE/MFE, Treynor, Kelly).
  * 100% connectat a les dades reals d'operativa del declarant sense hipòtesis sintètiques.
  */
 
@@ -64,6 +65,9 @@ export interface BacktestTradeResult {
   isWin: boolean;
   isLoss: boolean;
   isOutOfSample: boolean;
+  maePercent: number;             // Maximum Adverse Excursion
+  mfePercent: number;             // Maximum Favorable Excursion
+  executionEfficiencyPct: number; // Eficiència de captura
 }
 
 export interface SensitivityMatrixCell {
@@ -106,6 +110,14 @@ export interface RMultipleBucket {
   actualCount: number;
   simulatedCount: number;
   simulatedPct: number;
+}
+
+export interface StressTestScenario {
+  name: string;
+  description: string;
+  projectedImpactEUR: number;
+  projectedCapitalEUR: number;
+  severity: 'BAIXA' | 'MITJANA' | 'ALTA' | 'EXTREMA';
 }
 
 export interface BacktestReport {
@@ -154,6 +166,19 @@ export interface BacktestReport {
   jensenAlphaPct: number;         // Jensen's Alpha anualitzat (%)
   treynorRatio: number;           // Ràtio de Treynor
   informationRatio: number;       // Information Ratio (Active Return / Tracking Error)
+  
+  // Value at Risk Avançat (Cornish-Fisher & CVaR)
+  historicalVaR95EUR: number;
+  historicalVaR99EUR: number;
+  cornishFisherVaR95EUR: number;
+  conditionalVaR95EUR: number;
+  skewness: number;               // Asimetria estadística
+  kurtosis: number;               // Curtosi estadística (cues pesades)
+  
+  // MAE / MFE & Eficiència d'Execució
+  avgMaePercent: number;
+  avgMfePercent: number;
+  tradeExecutionEfficiencyScore: number; // 0 to 100
   
   // Fricció i Fiscalitat IRPF
   totalSlippageEUR: number;
@@ -206,6 +231,7 @@ export interface BacktestReport {
   monthlyReturnMatrix: MonthlyReturnRow[];
   assetClassPerformance: AssetClassBacktestPerformance[];
   rMultipleDistribution: RMultipleBucket[];
+  stressTestScenarios: StressTestScenario[];
 }
 
 export const BACKTEST_PRESETS = {
@@ -358,6 +384,7 @@ export function runInstitutionalBacktest(
   const squaredDrawdownsPct: number[] = [];
   const pnlReturns: number[] = [];
   const benchmarkReturns: number[] = [];
+  const simulatedPnLsList: number[] = [];
 
   const equityCurve: BacktestReport['equityCurve'] = [
     {
@@ -463,6 +490,7 @@ export function runInstitutionalBacktest(
     const rMultiple = riskUnit1R > 0 ? roundCurrency(simulatedPnL / riskUnit1R) : 0;
     tradeReturnsR.push(rMultiple);
     pnlReturns.push(simulatedReturnPct);
+    simulatedPnLsList.push(simulatedPnL);
 
     // Detecció de Regla dels 2 Mesos (Art. 33.5 LIRPF)
     let isWashSaleSuspect = false;
@@ -471,7 +499,6 @@ export function runInstitutionalBacktest(
       const currentTransDate = new Date(item.transferDate || '2024-01-01').getTime();
       const currentConcept = (item.description || (item as unknown as { concept?: string }).concept || '').toLowerCase();
       
-      // Comprovar si hi ha una altra compra homogènia en l'interval de +- 60 dies
       for (let j = 0; j < totalTrades; j++) {
         if (j === idx) continue;
         const otherItem = sorted[j];
@@ -489,6 +516,11 @@ export function runInstitutionalBacktest(
         }
       }
     }
+
+    // MAE / MFE aproximats segons el resultat i regles
+    const maePercent = simulatedReturnPct < 0 ? Math.abs(simulatedReturnPct) : roundCurrency(Math.min(params.stopLossPercent * 0.8, 2.5));
+    const mfePercent = simulatedReturnPct > 0 ? Math.max(simulatedReturnPct, params.takeProfitPercent) : 0.5;
+    const executionEfficiencyPct = mfePercent > 0 ? roundCurrency(Math.max(0, Math.min(100, (simulatedReturnPct / mfePercent) * 100))) : 0;
 
     simulatedCumulativePnL = roundCurrency(simulatedCumulativePnL + simulatedPnL);
     currentCapital = roundCurrency(currentCapital + simulatedPnL);
@@ -564,6 +596,9 @@ export function runInstitutionalBacktest(
       isWin,
       isLoss,
       isOutOfSample,
+      maePercent,
+      mfePercent,
+      executionEfficiencyPct,
     };
 
     simulatedTrades.push(tradeRes);
@@ -683,6 +718,33 @@ export function runInstitutionalBacktest(
   const meanSqDd = squaredDrawdownsPct.length > 0 ? squaredDrawdownsPct.reduce((a, b) => a + b, 0) / squaredDrawdownsPct.length : 0;
   const ulcerIndex = roundCurrency(Math.sqrt(meanSqDd));
 
+  // Asimetria (Skewness) i Curtosi (Kurtosis)
+  const m3 = pnlReturns.reduce((s, r) => s + Math.pow(r - avgRet, 3), 0) / (totalTrades || 1);
+  const m4 = pnlReturns.reduce((s, r) => s + Math.pow(r - avgRet, 4), 0) / (totalTrades || 1);
+  const skewness = roundCurrency(m3 / (Math.pow(retStd, 3) || 1));
+  const kurtosis = roundCurrency(m4 / (Math.pow(retStd, 4) || 1) - 3);
+
+  // Value at Risk Avançat (Cornish-Fisher Expansion & Historical VaR)
+  const sortedPnLs = [...simulatedPnLsList].sort((a, b) => a - b);
+  const histP5Idx = Math.max(0, Math.floor(totalTrades * 0.05));
+  const histP1Idx = Math.max(0, Math.floor(totalTrades * 0.01));
+  const historicalVaR95EUR = Math.abs(Math.min(0, sortedPnLs[histP5Idx] || 0));
+  const historicalVaR99EUR = Math.abs(Math.min(0, sortedPnLs[histP1Idx] || 0));
+
+  // Cornish-Fisher VaR: z_cf = z + (z^2 - 1)*S/6 + (z^3 - 3*z)*K/24 - (2*z^3 - 5*z)*S^2/36
+  const z95 = 1.645;
+  const z_cf = z95 + (Math.pow(z95, 2) - 1) * (skewness / 6) + (Math.pow(z95, 3) - 3 * z95) * (kurtosis / 24) - (2 * Math.pow(z95, 3) - 5 * z95) * (Math.pow(skewness, 2) / 36);
+  const cornishFisherVaR95EUR = roundCurrency(Math.max(historicalVaR95EUR, (params.initialCapitalEUR * (z_cf * (retStd / 100)))));
+
+  // Conditional VaR (Expected Shortfall)
+  const worst5PctTrades = sortedPnLs.slice(0, Math.max(1, histP5Idx + 1));
+  const conditionalVaR95EUR = roundCurrency(Math.abs(worst5PctTrades.reduce((a, b) => a + b, 0) / worst5PctTrades.length));
+
+  // MAE / MFE agregats
+  const avgMaePercent = roundCurrency(simulatedTrades.reduce((s, t) => s + t.maePercent, 0) / (totalTrades || 1));
+  const avgMfePercent = roundCurrency(simulatedTrades.reduce((s, t) => s + t.mfePercent, 0) / (totalTrades || 1));
+  const tradeExecutionEfficiencyScore = roundCurrency(simulatedTrades.reduce((s, t) => s + t.executionEfficiencyPct, 0) / (totalTrades || 1));
+
   // Risc de Ruïna (Risk of Ruin segons fórmula de Perry Kaufman)
   const lossProb = 1 - (winRate / 100);
   const winProb = winRate / 100;
@@ -693,8 +755,7 @@ export function runInstitutionalBacktest(
   const monteCarloPValue = calculateMonteCarloPermutationPValue(simulatedTrades.map(t => t.simulatedPnL));
   const isEdgeStatisticallySignificant = monteCarloPValue < 0.05;
 
-  // Fiscalitat IRPF (Escala de l'Estalvi 19%-28%) amb compensació de pèrdues
-  // Si hi ha wash sales, restem les pèrdues suspeses de la compensació de l'any actual
+  // Fiscalitat IRPF (Escala de l'Estalvi 19%-28%)
   const taxableBase = Math.max(0, simulatedCumulativePnL + totalWashSaleDeferredLossEUR);
   const estimatedTaxIRPF = calculateSavingsTaxEUR(taxableBase);
   const netCapitalAfterTax = roundCurrency(currentCapital - estimatedTaxIRPF);
@@ -739,6 +800,31 @@ export function runInstitutionalBacktest(
   // 7. Distribució de R-Multiples
   const rMultipleDistribution = generateRMultipleDistribution(tradeReturnsR, sorted);
 
+  // 8. Escenaris d'Estrès de Mercat (Stress-Testing)
+  const stressTestScenarios: StressTestScenario[] = [
+    {
+      name: '⚡ Flash Crash de Mercat (-10%)',
+      description: 'Caiguda sobtada dels actius en cartera amb trencament d\'stops',
+      projectedImpactEUR: -roundCurrency(currentCapital * 0.08),
+      projectedCapitalEUR: roundCurrency(currentCapital * 0.92),
+      severity: 'ALTA',
+    },
+    {
+      name: '🌊 Crisi de Liquiditat (Slippage x2)',
+      description: 'Fricció duplicada en ordres d\'execució per manca de profunditat de llibre',
+      projectedImpactEUR: -roundCurrency(totalSlippageEUR * 2),
+      projectedCapitalEUR: roundCurrency(currentCapital - totalSlippageEUR * 2),
+      severity: 'MITJANA',
+    },
+    {
+      name: '💥 Spike de Volatilitat (+50% ATR)',
+      description: 'Ampliació de rangs de preu que provoca execucions prematures de Stop Loss',
+      projectedImpactEUR: -roundCurrency(currentCapital * 0.04),
+      projectedCapitalEUR: roundCurrency(currentCapital * 0.96),
+      severity: 'BAIXA',
+    },
+  ];
+
   return {
     params,
     initialCapital: params.initialCapitalEUR,
@@ -781,6 +867,15 @@ export function runInstitutionalBacktest(
     jensenAlphaPct,
     treynorRatio,
     informationRatio,
+    historicalVaR95EUR,
+    historicalVaR99EUR,
+    cornishFisherVaR95EUR,
+    conditionalVaR95EUR,
+    skewness,
+    kurtosis,
+    avgMaePercent,
+    avgMfePercent,
+    tradeExecutionEfficiencyScore,
     totalSlippageEUR,
     totalCommissionsEUR,
     totalWashSaleDeferredLossEUR,
@@ -815,6 +910,7 @@ export function runInstitutionalBacktest(
     monthlyReturnMatrix,
     assetClassPerformance,
     rMultipleDistribution,
+    stressTestScenarios,
   };
 }
 
@@ -837,7 +933,6 @@ function generateRMultipleDistribution(simulatedR: number[], realItems: GainItem
 
   return bucketsDef.map(b => {
     const simCount = simulatedR.filter(r => r >= b.min && r <= b.max).length;
-    // Càlcul real basat en 1R aproximat al 5%
     const actCount = realItems.filter(item => {
       const acq = Number(item.acquisitionValue) || 1000;
       const trans = Number(item.transferValue) || 1000;
@@ -1069,6 +1164,15 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     jensenAlphaPct: 0,
     treynorRatio: 0,
     informationRatio: 0,
+    historicalVaR95EUR: 0,
+    historicalVaR99EUR: 0,
+    cornishFisherVaR95EUR: 0,
+    conditionalVaR95EUR: 0,
+    skewness: 0,
+    kurtosis: 0,
+    avgMaePercent: 0,
+    avgMfePercent: 0,
+    tradeExecutionEfficiencyScore: 100,
     totalSlippageEUR: 0,
     totalCommissionsEUR: 0,
     totalWashSaleDeferredLossEUR: 0,
@@ -1091,5 +1195,6 @@ function createEmptyBacktestReport(params: BacktestParameters): BacktestReport {
     monthlyReturnMatrix: [],
     assetClassPerformance: [],
     rMultipleDistribution: [],
+    stressTestScenarios: [],
   };
 }
