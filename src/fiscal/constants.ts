@@ -125,6 +125,14 @@ export const DONATION_FIRST_TIER_RATE = 0.80;
 export const DONATION_REST_RATE = 0.40;
 export const DONATION_REST_RECURRING_RATE = 0.45;
 
+/** Deducció per donatius a fundacions i associacions d'utilitat pública no acollides (Art. 68.3.b) */
+export const DONATION_PUBLIC_UTILITY_RATE = 0.10;
+/** Deducció per aportacions a partits polítics, federacions i agrupacions d'electors (Art. 68.3.c) */
+export const DONATION_POLITICAL_PARTY_RATE = 0.20;
+export const DONATION_POLITICAL_PARTY_MAX_BASE = 600;
+/** Límit conjunt de la base de les deduccions dels apartats b) i c): 10% de la base liquidable */
+export const DONATION_CAPPED_BASE_LIMIT_RATE = 0.10;
+
 /** Deducció per maternitat */
 export const MATERNITY_DEDUCTION_PER_MONTH = 100;
 export const MATERNITY_DEDUCTION_MAX = 1_200;
@@ -157,7 +165,7 @@ export const CAT_WIDOWHOOD_WITH_DEPENDENTS = 300;
 export const CAT_LANGUAGE_DONATION_RATE = 0.15;
 
 /** Donacions a recerca biomèdica i universitats a Catalunya */
-export const CAT_BIOMEDICAL_DONATION_RATE = 0.30;
+export const CAT_BIOMEDICAL_DONATION_RATE = 0.25;
 
 /** Rehabilitació habitatge habitual a Catalunya */
 export const CAT_HOME_REHAB_RATE = 0.015;

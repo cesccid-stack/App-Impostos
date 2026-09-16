@@ -20,6 +20,9 @@ export interface SavingsCompensationResult {
   mobiliaryAfterCross: number;
   gainsAfterCross: number;
 
+  /** Compensació creuada del 25% aplicada a la bossa romanent de 4 anys (Art. 49 LIRPF) */
+  priorCrossCompensated: number;
+
   // Saldos finals de la Base de l'Estalvi (Casella 0460)
   finalSavingsBase: number;
 
@@ -108,7 +111,26 @@ export function calculateSavingsCompensation(
     }
   }
 
-  // 3. Base de l'Estalvi resultant
+  // 3. Compensació creuada del 25% sobre la bossa de 4 anys romanent (Art. 49 LIRPF)
+  // Esgotada la compensació dins de cada categoria, la bossa de pèrdues pot minorar el saldo
+  // positiu de l'altra categoria amb el límit del 25% del saldo positiu.
+  let priorCrossCompensated = 0;
+  let restPriorMobiliary = remainingPriorMobiliaryLosses;
+  let restPriorGains = remainingPriorGainsLosses;
+
+  if (gains > 0 && restPriorMobiliary.length > 0) {
+    const consumed = consumePriorLosses(restPriorMobiliary, round2(gains * 0.25));
+    priorCrossCompensated = consumed.compensated;
+    gains = exactSub(gains, consumed.compensated);
+    restPriorMobiliary = consumed.rest;
+  } else if (mob > 0 && restPriorGains.length > 0) {
+    const consumed = consumePriorLosses(restPriorGains, round2(mob * 0.25));
+    priorCrossCompensated = consumed.compensated;
+    mob = exactSub(mob, consumed.compensated);
+    restPriorGains = consumed.rest;
+  }
+
+  // 4. Base de l'Estalvi resultant
   const finalSavingsBase = exactAdd(Math.max(0, mob), Math.max(0, gains));
 
   return {
@@ -119,9 +141,37 @@ export function calculateSavingsCompensation(
     gainsAfterCross,
     priorMobiliaryCompensated,
     priorGainsCompensated,
-    totalPriorCompensated: exactAdd(priorMobiliaryCompensated, priorGainsCompensated),
+    priorCrossCompensated,
+    totalPriorCompensated: exactAdd(priorMobiliaryCompensated, priorGainsCompensated, priorCrossCompensated),
     finalSavingsBase,
-    remainingPriorMobiliaryLosses,
-    remainingPriorGainsLosses,
+    remainingPriorMobiliaryLosses: restPriorMobiliary,
+    remainingPriorGainsLosses: restPriorGains,
   };
+}
+
+/**
+ * Consumeix la bossa de pèrdues (any més antic primer) fins a esgotar `maxAmount`.
+ * Retorna l'import compensat i la bossa romanent.
+ */
+function consumePriorLosses(
+  losses: PriorLossItem[],
+  maxAmount: number,
+): { compensated: number; rest: PriorLossItem[] } {
+  let remaining = round2(maxAmount);
+  let compensated = 0;
+  const rest: PriorLossItem[] = [];
+
+  for (const item of [...losses].sort((a, b) => a.year - b.year)) {
+    if (remaining > 0 && item.amount > 0) {
+      const comp = Math.min(remaining, item.amount);
+      compensated = exactAdd(compensated, comp);
+      remaining = exactSub(remaining, comp);
+      const leftover = exactSub(item.amount, comp);
+      if (leftover > 0) rest.push({ year: item.year, amount: leftover });
+    } else if (item.amount > 0) {
+      rest.push({ ...item });
+    }
+  }
+
+  return { compensated, rest };
 }

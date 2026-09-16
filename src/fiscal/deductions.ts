@@ -11,6 +11,10 @@ import {
   DONATION_FIRST_TIER_RATE,
   DONATION_REST_RATE,
   DONATION_REST_RECURRING_RATE,
+  DONATION_PUBLIC_UTILITY_RATE,
+  DONATION_POLITICAL_PARTY_RATE,
+  DONATION_POLITICAL_PARTY_MAX_BASE,
+  DONATION_CAPPED_BASE_LIMIT_RATE,
   MATERNITY_DEDUCTION_PER_MONTH,
   MATERNITY_DEDUCTION_MAX,
   MATERNITY_NURSERY_MAX,
@@ -25,11 +29,14 @@ export interface DeductionAmounts {
 
 /**
  * Compute all applicable state deductions.
+ *
+ * @param liquidableBase Base liquidable del contribuent (general + estalvi), necessària per al
+ *   límit del 10% que afecta les deduccions per donatius dels apartats b) i c) de l'Art. 68.3.
  */
-export function computeDeductions(data: DeclaracionData): DeductionAmounts {
+export function computeDeductions(data: DeclaracionData, liquidableBase = 0): DeductionAmounts {
   return {
     housingDeductionAmount: computeHousingDeduction(data),
-    donationsDeductionAmount: computeDonationsDeduction(data),
+    donationsDeductionAmount: computeDonationsDeduction(data, liquidableBase),
     maternityDeductionAmount: computeMaternityDeduction(data),
     energyEfficiencyDeductionAmount: computeEnergyEfficiencyDeduction(data),
   };
@@ -50,32 +57,57 @@ function computeHousingDeduction(data: DeclaracionData): number {
 }
 
 /**
- * Deduccions per donatius (Llei 49/2002 actualitzada RD-Llei 6/2023).
- * - Primers 250 €: 80%
- * - Restant: 40% (o 45% si recurrent ≥3 anys a la mateixa entitat)
- * - Donatius generals no prioritaris: 10%
+ * Deduccions per donatius i altres aportacions (Art. 68.3 LIRPF, Llei 49/2002 i RD-Llei 6/2023).
+ * - Mecenatge (Llei 49/2002): 80% dels primers 250 € i 40% de la resta (45% si és recurrent). Sense límit de base.
+ * - Fundacions i associacions d'utilitat pública no acollides: 10% (apartat b).
+ * - Partits polítics, federacions, coalicions i agrupacions d'electors: 20% amb una base màxima de 600 € (apartat c).
+ * La base conjunta de les deduccions b) i c) no pot superar el 10% de la base liquidable del contribuent.
  */
-function computeDonationsDeduction(data: DeclaracionData): number {
-  let totalDeduction = 0;
+function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): number {
   const donations = data.deductions.donations || [];
 
-  for (const donation of donations) {
-    if ((donation.amount || 0) <= 0) continue;
+  let mecenatgeDeduction = 0;   // Apartat a) — sense límit de base
+  let publicUtilityBase = 0;    // Apartat b)
+  let politicalPartyBase = 0;   // Apartat c)
 
-    if (donation.priority) {
-      const firstTier = Math.min(donation.amount, DONATION_FIRST_TIER);
-      const rest = Math.max(0, donation.amount - DONATION_FIRST_TIER);
+  for (const donation of donations) {
+    const amount = donation.amount || 0;
+    if (amount <= 0) continue;
+
+    const category = donation.category ?? (donation.priority ? 'ley_49_2002' : 'public_utility');
+
+    if (category === 'ley_49_2002') {
+      const firstTier = Math.min(amount, DONATION_FIRST_TIER);
+      const rest = Math.max(0, amount - DONATION_FIRST_TIER);
       const restRate = donation.recurring
         ? DONATION_REST_RECURRING_RATE
         : DONATION_REST_RATE;
 
-      totalDeduction += firstTier * DONATION_FIRST_TIER_RATE + rest * restRate;
+      mecenatgeDeduction += firstTier * DONATION_FIRST_TIER_RATE + rest * restRate;
+    } else if (category === 'political_party') {
+      politicalPartyBase += amount;
     } else {
-      totalDeduction += donation.amount * 0.10;
+      publicUtilityBase += amount;
     }
   }
 
-  return totalDeduction;
+  // Art. 68.3.c: base màxima de 600 € per a aportacions a partits polítics
+  const politicalPartyCappedBase = Math.min(politicalPartyBase, DONATION_POLITICAL_PARTY_MAX_BASE);
+
+  let cappedDeduction =
+    publicUtilityBase * DONATION_PUBLIC_UTILITY_RATE +
+    politicalPartyCappedBase * DONATION_POLITICAL_PARTY_RATE;
+
+  // Art. 68.3, pàrraf final: la base de les deduccions b) i c) no pot superar el 10% de la base liquidable
+  const cappedBase = publicUtilityBase + politicalPartyCappedBase;
+  if (cappedBase > 0 && liquidableBase > 0) {
+    const maxBase = liquidableBase * DONATION_CAPPED_BASE_LIMIT_RATE;
+    if (cappedBase > maxBase) {
+      cappedDeduction *= maxBase / cappedBase;
+    }
+  }
+
+  return mecenatgeDeduction + cappedDeduction;
 }
 
 /**

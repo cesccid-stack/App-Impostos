@@ -20,6 +20,12 @@ export interface TradeRecord {
   commission: number;        // Comissió en divisa original
   totalEUR: number;          // Import total en EUR (inclou comissions)
   marketType?: 'regulated_eu' | 'unregulated_or_foreign'; // 2 mesos vs 1 any (Art 33.5.f/g)
+  /**
+   * Indica si el valor està admès a negociació en un mercat regulat (espanyol, UE o equivalent
+   * de tercer país). Determina el termini de la regla d'antiaplicació: 2 mesos si cotitza i
+   * 1 any si no cotitza (Art. 33.5.f LIRPF). Si s'omet, es dedueix de `marketType`.
+   */
+  isListed?: boolean;
 }
 
 /** Lot FIFO (posició oberta) */

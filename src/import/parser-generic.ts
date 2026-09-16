@@ -187,6 +187,9 @@ export async function parseGeneric(
       marketType: isinRaw.startsWith('ES') || isinRaw.startsWith('FR') || isinRaw.startsWith('DE') || isinRaw.startsWith('IT')
         ? 'regulated_eu'
         : 'unregulated_or_foreign',
+      // Un ISIN (ISO 6166) identifica un valor negociable, per tant es considera admès a
+      // negociació a efectes del termini de 2 mesos de l'Art. 33.5.f LIRPF.
+      isListed: isinRaw.length > 0,
     });
   }
 

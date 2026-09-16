@@ -114,6 +114,8 @@ export interface PersonalData {
   nif?: string;
   age: number;
   disability: number; // 0–100 %
+  /** Discapacitat ≥ 65% amb mobilitat reduïda o ajuda de terceres persones (mínim de 12.000 €) */
+  reducedMobility?: boolean;
   descendants: Descendant[];
   ascendants: Ascendant[];
   community: string; // Autonomous community code (CAT per defecte)
@@ -126,6 +128,8 @@ export interface Descendant {
   id: string;
   age: number;
   disability: number;
+  /** Movilitat reduïda o necessitat d'ajuda de terceres persones (mínim de 12.000 € si discapacitat ≥ 65%) */
+  reducedMobility?: boolean;
 }
 
 export interface Ascendant {
@@ -134,6 +138,8 @@ export interface Ascendant {
   disability: number;
   liveTogether?: boolean; // Convivència durant almenys la meitat de l'any (Art. 59 LIRPF)
   annualIncome?: number;  // Rendes anuals de l'ascendent (màx 8.000 €)
+  /** Movilitat reduïda o necessitat d'ajuda de terceres persones (mínim de 12.000 € si discapacitat ≥ 65%) */
+  reducedMobility?: boolean;
 }
 
 export interface EmployerItem {
@@ -280,7 +286,7 @@ export interface DeductionsData {
   catalanWidowhoodWithDependents?: boolean;
   catalanAgaurMasterLoanInterests?: number; // Interessos préstecs màster/doctorat AGAUR (100%)
   catalanLanguageDonations?: number; // Donacions al foment de la llengua catalana / aranesa (15%)
-  catalanBiomedicalDonations?: number; // Donacions a entitats de recerca biomèdica i universitats (25% / 30%)
+  catalanBiomedicalDonations?: number; // Donacions a entitats de recerca biomèdica i universitats (25%)
   catalanHomeRehabilitation?: number; // Rehabilitació habitatge habitual (1,5%)
 }
 
@@ -290,6 +296,13 @@ export interface DonationItem {
   amount: number;
   recurring: boolean; // Donació recurrent (≥3 anys mateixa entitat)
   priority: boolean; // Entitat prioritària (Llei 49/2002)
+  /**
+   * Règim fiscal de l'entitat destinatària (Art. 68.3 LIRPF). Si s'omet, es dedueix de `priority`.
+   * - `ley_49_2002`: entitats beneficiaries del mecenatge (80% / 40% / 45%).
+   * - `public_utility`: fundacions i associacions d'utilitat pública no acollides al mecenatge (10%).
+   * - `political_party`: partits polítics, federacions, coalicions i agrupacions d'electors (20%, base màx. 600 €).
+   */
+  category?: 'ley_49_2002' | 'public_utility' | 'political_party';
 }
 
 /** Resultat del càlcul fiscal */

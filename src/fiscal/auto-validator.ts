@@ -898,18 +898,22 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
     });
   }
 
-  // 7.6 Sostre del 15% de la Base Liquidable en Deduccions per Donatius (Art. 69.1 LIRPF)
-  const totalDonationsAmount = (deductions.donations || []).reduce((s: number, d: DonationItem) => s + (d.amount || 0), 0);
-  if (totalDonationsAmount > 0 && data.workIncome) {
+  // 7.6 Sostre del 10% de la Base Liquidable en Deduccions per Donatius (Art. 68.3 LIRPF)
+  // Només afecta les deduccions dels apartats b) (fundacions i associacions d'utilitat pública no
+  // acollides) i c) (partits polítics). El mecenatge de la Llei 49/2002 (apartat a) no té límit de base.
+  const cappedDonationsBase = (deductions.donations || [])
+    .filter((d: DonationItem) => (d.category ?? (d.priority ? 'ley_49_2002' : 'public_utility')) !== 'ley_49_2002')
+    .reduce((s: number, d: DonationItem) => s + (d.amount || 0), 0);
+  if (cappedDonationsBase > 0 && data.workIncome) {
     const approxBase = (data.workIncome.employers || []).reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0), 0);
-    if (approxBase > 0 && totalDonationsAmount > (approxBase * 0.15)) {
+    if (approxBase > 0 && cappedDonationsBase > (approxBase * 0.10)) {
       issues.push({
-        id: 'ded-donations-15pct-base-cap',
+        id: 'ded-donations-10pct-base-cap',
         module: 'general',
         severity: 'info',
-        title: 'Deducció per donatius subjecta al límit del 15% de la base liquidable',
-        message: `La base de la deducció per donatius a ONGs i entitats sense ànim de lucre no pot superar el 15% de la base liquidable del contribuent. L'excés no genera dret a deducció en aquest exercici.`,
-        legalReference: 'Art. 69.1 de la Llei de l\'IRPF i Art. 19 Llei 49/2002',
+        title: 'Deducció per donatius subjecta al límit del 10% de la base liquidable',
+        message: `La base de les deduccions per donatius a fundacions i associacions de utilitat pública no acollides al règim de la Llei 49/2002 (i a partits polítics) no pot superar el 10% de la base liquidable del contribuent. L'excés no genera dret a deducció en aquest exercici.`,
+        legalReference: 'Art. 68.3, pàrraf final, de la Llei de l\'IRPF',
         autoFixable: false,
       });
     }

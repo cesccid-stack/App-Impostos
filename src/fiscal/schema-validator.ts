@@ -81,6 +81,7 @@ export function validateAndSanitizeDeclaration(
     nif: sanitizeString(pSrc.nif, defaults.personal.nif),
     age: sanitizeNumber(pSrc.age, 35, 0, 120),
     disability: sanitizeNumber(pSrc.disability, 0, 0, 100),
+    reducedMobility: pSrc.reducedMobility === true,
     community: sanitizeString(pSrc.community, 'CAT'),
     taxDeclarationType: pSrc.taxDeclarationType === 'joint' || pSrc.taxDeclarationType === 'single_parent'
       ? pSrc.taxDeclarationType
@@ -90,6 +91,7 @@ export function validateAndSanitizeDeclaration(
           id: sanitizeString(d?.id, `desc_${idx + 1}`),
           age: sanitizeNumber(d?.age, 0, 0, 30),
           disability: sanitizeNumber(d?.disability, 0, 0, 100),
+          reducedMobility: d?.reducedMobility === true,
         }))
       : [],
     ascendants: Array.isArray(pSrc.ascendants)
@@ -97,6 +99,7 @@ export function validateAndSanitizeDeclaration(
           id: sanitizeString(a?.id, `asc_${idx + 1}`),
           age: sanitizeNumber(a?.age, 65, 0, 120),
           disability: sanitizeNumber(a?.disability, 0, 0, 100),
+          reducedMobility: a?.reducedMobility === true,
         }))
       : [],
   };

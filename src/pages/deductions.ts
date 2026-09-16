@@ -498,6 +498,7 @@ function openDonationModal(listContainer: HTMLElement): void {
     amount: 0,
     recurring: false,
     priority: true,
+    category: 'ley_49_2002',
   };
 
   const fields = document.createElement('div');
@@ -526,11 +527,20 @@ function openDonationModal(listContainer: HTMLElement): void {
   );
 
   fields.appendChild(
-    createToggle({
-      id: 'donation-priority',
-      label: 'Entitat acollida a la Llei 49/2002 (80% fins a 250 € i 40% resta)',
-      checked: true,
-      onChange: (checked) => { form.priority = checked; },
+    createField({
+      id: 'donation-category',
+      label: 'Règim fiscal de l\'entitat (Art. 68.3 LIRPF)',
+      type: 'select',
+      value: 'ley_49_2002',
+      options: [
+        { value: 'ley_49_2002', label: 'Mecenatge — Llei 49/2002 (80% / 40% / 45%)' },
+        { value: 'public_utility', label: 'Fundació o associació d\'utilitat pública no acollida (10%)' },
+        { value: 'political_party', label: 'Partit polític o agrupació d\'electors (20%, base màx. 600 €)' },
+      ],
+      onChange: (val) => {
+        form.category = val as DonationItem['category'];
+        form.priority = val === 'ley_49_2002';
+      },
     }),
   );
 
@@ -559,7 +569,8 @@ function openDonationModal(listContainer: HTMLElement): void {
       entity: form.entity ?? '',
       amount: form.amount ?? 0,
       recurring: form.recurring ?? false,
-      priority: form.priority ?? true,
+      priority: form.category === 'ley_49_2002',
+      category: form.category ?? 'ley_49_2002',
     };
 
     const deductions = store.getData().deductions;

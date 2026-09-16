@@ -19,6 +19,7 @@ import {
   ASCENDANT_MINIMUM_OVER_75_EXTRA,
   DISABILITY_MINIMUM_33,
   DISABILITY_MINIMUM_65,
+  DISABILITY_MINIMUM_65_MOBILITY,
   WORK_OTHER_EXPENSES,
   WORK_REDUCTION_THRESHOLD_LOW,
   WORK_REDUCTION_THRESHOLD_HIGH,
@@ -277,7 +278,8 @@ function computeMinimums(data: DeclaracionData): {
 
   const disability = data.personal?.disability || 0;
   if (disability >= 65) {
-    personalMinimum += DISABILITY_MINIMUM_65;
+    // Art. 60.2 LIRPF: 12.000 € si hi ha mobilitat reduïda o necessitat d'ajuda de terceres persones
+    personalMinimum += data.personal?.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
   } else if (disability >= 33) {
     personalMinimum += DISABILITY_MINIMUM_33;
   }
@@ -290,7 +292,7 @@ function computeMinimums(data: DeclaracionData): {
       min += DESCENDANT_UNDER_3_EXTRA;
     }
     if ((desc.disability || 0) >= 65) {
-      min += DISABILITY_MINIMUM_65;
+      min += desc.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
     } else if ((desc.disability || 0) >= 33) {
       min += DISABILITY_MINIMUM_33;
     }
@@ -306,7 +308,7 @@ function computeMinimums(data: DeclaracionData): {
       ascendantsMinimum += ASCENDANT_MINIMUM_OVER_65;
     }
     if ((asc.disability || 0) >= 65) {
-      ascendantsMinimum += DISABILITY_MINIMUM_65;
+      ascendantsMinimum += asc.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
     } else if ((asc.disability || 0) >= 33) {
       ascendantsMinimum += DISABILITY_MINIMUM_33;
     }
@@ -409,7 +411,9 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   const grossTax = Math.max(0, exactSub(exactAdd(generalTax, savingsTax), minimumTaxCredit));
 
   // 6. Deduccions Generals i Autonòmiques
-  const deductionAmounts = computeDeductions(data);
+  // El límit del 10% de l'Art. 68.3 (donatius b/c) s'aplica sobre la base liquidable total.
+  const totalLiquidableBase = exactAdd(liquidableGeneralBase, liquidableSavingsBase);
+  const deductionAmounts = computeDeductions(data, totalLiquidableBase);
   const catalanDeductionsAmount = computeCatalanDeductions(data, generalBase, savingsBase);
 
   // 7. Deducció per Doble Imposició Internacional (Art. 80 LIRPF - Casella 0588)
@@ -431,8 +435,16 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     data.deductions?.otherDeductions || 0
   );
 
-  // 8. Net tax
-  const netTax = Math.max(0, exactSub(grossTax, totalDeductions));
+  // 8. Quota líquida.
+  // La deducció per maternitat (Art. 81 LIRPF) és una deducció "no lligada a quota": pot generar
+  // quota negativa (import a retornar) encara que la quota íntegra sigui inferior. La resta de
+  // deduccions són "lligades a quota" i no poden fer-la baixar per sota de zero.
+  const refundableDeductions = deductionAmounts.maternityDeductionAmount;
+  const quotaLinkedDeductions = exactSub(totalDeductions, refundableDeductions);
+  const netTax = exactSub(
+    Math.max(0, exactSub(grossTax, quotaLinkedDeductions)),
+    refundableDeductions,
+  );
 
   const totalWorkWithholdings = (data.workIncome?.employers || []).reduce((sum, emp) => exactAdd(sum, emp.withholdings || 0), 0);
 

@@ -23,6 +23,14 @@ export function calculateFIFO(trades: TradeRecord[]): {
   const matches: FIFOMatch[] = [];
   const summariesMap: Record<string, AssetSummary> = {};
 
+  // Ajustos derivats de la regla d'antiaplicació: l'Art. 33.5.f LIRPF obliga a incrementar el
+  // valor d'adquisició dels valors recomprables amb l'import de la pèrdua suspesa.
+  const pendingRepurchases: Array<{
+    assetId: string;
+    suspendedLossEUR: number;
+    windowBuys: Array<{ id: string; dateMs: number; quantity: number }>;
+  }> = [];
+
   // Pre-parse timestamps to avoid repetitive new Date allocations in sorting and matching
   const indexedTrades = trades.map(t => ({
     ...t,
@@ -32,8 +40,16 @@ export function calculateFIFO(trades: TradeRecord[]): {
   // Sort trades by date ascending (FIFO requirement)
   indexedTrades.sort((a, b) => a.dateMs - b.dateMs);
 
-  // Buy index for ultra-fast wash-sale detection O(B_asset) instead of scanning all trades O(N)
-  const buysByAsset = new Map<string, Array<{ id: string; dateMs: number; quantity: number }>>();
+  // Índex complet de totes les compres, agrupat per actiu homogeni.
+  // Cal que sigui complet (no incremental) perquè la regla d'antiaplicació de l'Art. 33.5.f
+  // LIRPF mira recompres ANTERIORS i POSTERIORS a la venda dins de la finestra temporal.
+  const allBuysByAsset = new Map<string, Array<{ id: string; dateMs: number; quantity: number }>>();
+  for (const t of indexedTrades) {
+    if (t.type !== 'buy') continue;
+    const key = t.isin?.trim() || t.symbol?.trim() || 'UNKNOWN';
+    if (!allBuysByAsset.has(key)) allBuysByAsset.set(key, []);
+    allBuysByAsset.get(key)!.push({ id: t.id, dateMs: t.dateMs, quantity: t.quantity });
+  }
 
   for (const trade of indexedTrades) {
     // Homogeneity key: ISIN is primary, fallback to Symbol
@@ -73,15 +89,6 @@ export function calculateFIFO(trades: TradeRecord[]): {
       });
       summary.totalBought += trade.totalEUR;
       summary.openPosition += trade.quantity;
-
-      if (!buysByAsset.has(assetId)) {
-        buysByAsset.set(assetId, []);
-      }
-      buysByAsset.get(assetId)!.push({
-        id: trade.id,
-        dateMs: trade.dateMs,
-        quantity: trade.quantity,
-      });
     } else if (trade.type === 'sell') {
       const lots = openLotsByAsset[assetId] || [];
       let remainingToSell = trade.quantity;
@@ -134,9 +141,11 @@ export function calculateFIFO(trades: TradeRecord[]): {
       if (totalGainForThisSale < 0) {
         const sellDate = new Date(trade.dateMs);
         
-        // Determinar finestra temporal: 2 mesos per mercat regulat UE, 1 any per la resta
-        const isRegulatedEU = trade.marketType !== 'unregulated_or_foreign';
-        const windowMonths = isRegulatedEU ? 2 : 12;
+        // Determinar finestra temporal (Art. 33.5.f LIRPF): 2 mesos per a valors admesos a
+        // negociació en mercats regulats (espanyols, UE o equivalents de tercer país) i 1 any
+        // per a valors no cotitzats.
+        const isListed = trade.isListed ?? (trade.marketType !== 'unregulated_or_foreign');
+        const windowMonths = isListed ? 2 : 12;
 
         const windowStart = new Date(sellDate);
         windowStart.setMonth(windowStart.getMonth() - windowMonths);
@@ -146,8 +155,8 @@ export function calculateFIFO(trades: TradeRecord[]): {
         windowEnd.setMonth(windowEnd.getMonth() + windowMonths);
         const windowEndMs = windowEnd.getTime();
 
-        // Recerca directa sobre compres de l'actiu homogeni O(B_asset)
-        const candidateBuys = buysByAsset.get(assetId);
+        // Recerca sobre totes les compres de l'actiu homogeni (anteriors i posteriors a la venda)
+        const candidateBuys = allBuysByAsset.get(assetId);
         if (candidateBuys && candidateBuys.length > 0) {
           for (let bIdx = 0; bIdx < candidateBuys.length; bIdx++) {
             const b = candidateBuys[bIdx];
@@ -166,6 +175,15 @@ export function calculateFIFO(trades: TradeRecord[]): {
           suspendedLossEUR = Math.abs(totalGainForThisSale) * suspendedRatio;
           // La pèrdua computable és la part no recomprada (negativa)
           computedGainLossEUR = totalGainForThisSale + suspendedLossEUR;
+
+          // Registrar quins valors recomprables han d'incrementar el seu valor d'adquisició
+          pendingRepurchases.push({
+            assetId,
+            suspendedLossEUR,
+            windowBuys: (candidateBuys || []).filter(
+              b => b.id !== trade.id && b.dateMs >= windowStartMs && b.dateMs <= windowEndMs,
+            ),
+          });
         }
       }
 
@@ -198,12 +216,60 @@ export function calculateFIFO(trades: TradeRecord[]): {
     }
   }
 
+  // ── Regla d'antiaplicació (Art. 33.5.f LIRPF): increment del valor d'adquisició ──
+  // El valor d'adquisició dels valors recomprables s'incrementa en l'import de la pèrdua suspesa.
+  // L'increment es propaga a les vendes posteriors que consumeixin aquests lots i queda reflectit
+  // en el cost dels lots que continuen oberts a final d'exercici.
+  for (const pending of pendingRepurchases) {
+    const totalQty = pending.windowBuys.reduce((s, b) => s + b.quantity, 0);
+    if (totalQty <= 0 || pending.suspendedLossEUR <= 0) continue;
+    const extraCostPerUnit = pending.suspendedLossEUR / totalQty;
+
+    for (const buy of pending.windowBuys) {
+      for (const lot of openLotsByAsset[pending.assetId] || []) {
+        if (lot.buyTradeId === buy.id) {
+          lot.priceEUR += extraCostPerUnit;
+        }
+      }
+
+      for (const match of matches) {
+        if (new Date(match.sellTrade.date).getTime() <= buy.dateMs) continue;
+        for (const matchedLot of match.matchedLots) {
+          if (matchedLot.lot.buyTradeId !== buy.id) continue;
+          const delta = extraCostPerUnit * matchedLot.quantity;
+          matchedLot.acquisitionValueEUR += delta;
+          matchedLot.gain -= delta;
+          match.totalAcquisitionEUR += delta;
+          match.totalGain -= delta;
+          match.computedGainLossEUR -= delta;
+        }
+      }
+    }
+  }
+
   const openLots: FIFOLot[] = [];
   for (const assetId in openLotsByAsset) {
     openLots.push(...openLotsByAsset[assetId]);
   }
 
   const summaries = Object.values(summariesMap);
+
+  // Recalcular els resums per actiu quan hi ha hagut ajustos d'antiaplicació
+  if (pendingRepurchases.length > 0) {
+    for (const summary of summaries) {
+      summary.realizedGain = 0;
+      summary.netTaxableGain = 0;
+      summary.suspendedLosses = 0;
+    }
+    for (const match of matches) {
+      const key = match.sellTrade.isin?.trim() || match.sellTrade.symbol?.trim() || 'UNKNOWN';
+      const summary = summariesMap[key];
+      if (!summary) continue;
+      summary.realizedGain += match.totalGain;
+      summary.netTaxableGain += match.computedGainLossEUR;
+      summary.suspendedLosses += match.suspendedLossEUR;
+    }
+  }
 
   return { matches, openLots, summaries };
 }

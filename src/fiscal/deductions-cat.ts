@@ -75,13 +75,13 @@ export function computeCatalanDeductions(
   // 3. Inversió en empreses de nova o recent creació (Startups Catalunya)
   if (d.catalanStartupInvestment > 0) {
     if (d.catalanStartupIsResearchOrUniversity) {
-      // 50% fins a 12.000€ per a societats creades per universitats o centres de recerca
-      const deduction = Math.min(d.catalanStartupInvestment * CAT_STARTUP_RESEARCH_RATE, CAT_STARTUP_RESEARCH_MAX);
-      totalCatalan += deduction;
+      // 50% amb una BASE màxima de 12.000 € → deducció màxima 6.000 €
+      const base = Math.min(d.catalanStartupInvestment, CAT_STARTUP_RESEARCH_MAX);
+      totalCatalan += base * CAT_STARTUP_RESEARCH_RATE;
     } else {
-      // 30% fins a 6.000€ general
-      const deduction = Math.min(d.catalanStartupInvestment * CAT_STARTUP_GENERAL_RATE, CAT_STARTUP_GENERAL_MAX);
-      totalCatalan += deduction;
+      // 30% amb una BASE màxima de 6.000 € → deducció màxima 1.800 €
+      const base = Math.min(d.catalanStartupInvestment, CAT_STARTUP_GENERAL_MAX);
+      totalCatalan += base * CAT_STARTUP_GENERAL_RATE;
     }
   }
 

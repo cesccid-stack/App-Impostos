@@ -259,6 +259,8 @@ import {
   COMMUNITY_NAME_MAP,
 } from '../src/fiscal/constants.ts';
 import type { GainItem, RentalProperty } from '../src/types.ts';
+import type { TradeRecord } from '../src/types-portfolio.ts';
+import { calculateFIFO } from '../src/import/fifo-engine.ts';
 import type { TradePerformanceMetrics } from '../src/fiscal/trading-analytics.ts';
 import type { IVAData, IVAInvoiceIssued, IVAInvoiceReceived } from '../src/types-iva.ts';
 import type { WealthTaxData } from '../src/fiscal/wealth-tax-engine.ts';
@@ -581,8 +583,11 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
     assert(comp.mobiliaryAfterCross === -1000, 'Mobiliari restant després de creuada ha de ser -1.000');
     assert(comp.gainsAfterCross === 3000, 'Guanys després de creuada ha de ser 3.000');
     assert(comp.priorGainsCompensated === 1000, 'S\'han de compensar 1.000 € de pèrdues anteriors de guanys');
-    assert(comp.finalSavingsBase === 2000, `Base de l'estalvi final ha de ser 2.000, obtingut: ${comp.finalSavingsBase}`);
-    assert(comp.remainingPriorMobiliaryLosses.length > 0, 'Les pèrdues de mobiliari pendents s\'han de guardar a la bossa');
+    // Les pèrdues prèvies de mobiliari també poden creuar-se contra els guanys amb el límit del 25%
+    // (Art. 49 LIRPF: la bossa de 4 anys es compensa "en el mateix orden"). 25% de 2.000 = 500 €.
+    assert(comp.priorCrossCompensated === 500, `Compensació creuada de la bossa ha de ser 500, obtingut: ${comp.priorCrossCompensated}`);
+    assert(comp.finalSavingsBase === 1500, `Base de l'estalvi final ha de ser 1.500, obtingut: ${comp.finalSavingsBase}`);
+    assert(comp.remainingPriorMobiliaryLosses.length === 0, 'La bossa de mobiliari s\'ha d\'haver esgotat amb la creuada');
   });
 
   test('1.7 Mínim Personal i Familiar (Edat, Descendents, Ascendents i Discapacitat)', () => {
@@ -653,8 +658,9 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
     assertCloseTo(stateDeds.energyEfficiencyDeductionAmount, 600, 0.1, 'Deducció eficiència 20%');
 
     const catDeds = computeCatalanDeductions(data);
-    // Lloguer: 300 € + Naixement: 150 € + Startups: 3.000 € + AGAUR: 250 € + Llengua (15%): 30 € + Biomèdica (30%): 120 € = 3.850 €
-    assertCloseTo(catDeds, 3850, 1.0, 'Total deduccions catalanes');
+    // Lloguer: 300 € + Naixement: 150 € + Startups (30% de 6.000 € de base): 1.800 €
+    // + AGAUR: 250 € + Llengua (15%): 30 € + Biomèdica (25%): 100 € = 2.630 €
+    assertCloseTo(catDeds, 2630, 1.0, 'Total deduccions catalanes');
   });
 
   test('1.9 Declaració Complementària i Recàrrec d\'Extemporaneïtat (Art. 27 LGT)', () => {
@@ -983,17 +989,30 @@ suite('6. Radar de Risc d\'Inspecció i Compliment Normatiu', () => {
     assert(cohabIssue !== undefined, 'Ha de detectar ascendent que no conviu amb el contribuent');
   });
 
-  test('6.13 Detecció de límit de donacions del 15% sobre la base liquidable (Art. 69.1 LIRPF)', () => {
+  test('6.13 Detecció de límit de donacions del 10% sobre la base liquidable (Art. 68.3 LIRPF)', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 20000, inKind: 0, withholdings: 3000, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
     data.deductions.donations = [
-      { id: 'don1', entity: 'ONG Metges Sense Fronteres', amount: 5000, recurring: true, priority: true }
+      { id: 'don1', entity: 'Fundació Cultural', amount: 5000, recurring: false, priority: false, category: 'public_utility' }
     ];
 
     const compliance = runAutomatedComplianceChecks(data);
-    const donCapIssue = compliance.issues.find(i => i.id === 'ded-donations-15pct-base-cap');
+    const donCapIssue = compliance.issues.find(i => i.id === 'ded-donations-10pct-base-cap');
 
-    assert(donCapIssue !== undefined, 'Ha de detectar donacions superiors al 15% de la base');
+    assert(donCapIssue !== undefined, 'Ha de detectar donacions superiors al 10% de la base');
+  });
+
+  test('6.14 El mecenatge de la Llei 49/2002 no genera fals positiu del límit del 10%', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 20000, inKind: 0, withholdings: 3000, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.deductions.donations = [
+      { id: 'don1', entity: 'Creu Roja', amount: 5000, recurring: true, priority: true, category: 'ley_49_2002' }
+    ];
+
+    const compliance = runAutomatedComplianceChecks(data);
+    const donCapIssue = compliance.issues.find(i => i.id === 'ded-donations-10pct-base-cap');
+
+    assert(donCapIssue === undefined, 'El mecenatge (Llei 49/2002) no està subjecte al límit del 10% de base');
   });
 });
 
@@ -2869,7 +2888,9 @@ suite('35. Perfeccionament de l\'Exactitud Numèrica i Blindatge Tributari Garan
     assert(comp.crossCompensationApplied === 500, `Compensació creuada: ${comp.crossCompensationApplied}`);
     assert(comp.gainsAfterCross === 1500, `Guanys restants després de creuada: ${comp.gainsAfterCross}`);
     assert(comp.priorGainsCompensated === 450.5, `Pèrdues prèvies de guanys compensades: ${comp.priorGainsCompensated}`);
-    assert(comp.finalSavingsBase === 1049.5, `Base final de l'estalvi exacta: ${comp.finalSavingsBase}`);
+    // La bossa de mobiliari (250,75 €) s'aplica creuada amb el límit del 25% de 1.049,50 € = 262,375 €
+    assert(comp.priorCrossCompensated === 250.75, `Compensació creuada de la bossa: ${comp.priorCrossCompensated}`);
+    assert(comp.finalSavingsBase === 798.75, `Base final de l'estalvi exacta: ${comp.finalSavingsBase}`);
   });
 });
 
@@ -3309,6 +3330,100 @@ suite("40. Blindatge de l'Estat: Snapshot Immutable del Store (getSnapshot)", ()
     assert(store.getData().personal.name === 'Actualitzat', `El store ha de reflectir la nova actualització (obtingut: ${store.getData().personal.name})`);
     assert(frozenName === 'Base Original', 'El snapshot anterior ha de conservar el valor del moment en què es va prendre');
     assert(snapshot.personal.name === 'Base Original', "El snapshot no ha de rebre l'actualització posterior del store");
+  });
+});
+
+// ── 41. CORRECCIONS D'AUDITORIA FISCAL ─────────────────────────────────────
+
+suite("41. Blindatge Fiscal: Startups, Donatius, Maternitat, Mínims i Antiaplicació", () => {
+
+  test('41.1 Startups Catalunya: el topall s\'aplica a la BASE, no a la deducció', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.deductions.catalanStartupInvestment = 100000;
+    data.deductions.catalanStartupIsResearchOrUniversity = false;
+    // 30% amb base màxima de 6.000 € → 1.800 € (no 3.000 €)
+    assert(computeCatalanDeductions(data) === 1800, `Startup general ha de ser 1.800 €, obtingut: ${computeCatalanDeductions(data)}`);
+
+    data.deductions.catalanStartupIsResearchOrUniversity = true;
+    // 50% amb base màxima de 12.000 € → 6.000 € (no 12.000 €)
+    assert(computeCatalanDeductions(data) === 6000, `Startup recerca ha de ser 6.000 €, obtingut: ${computeCatalanDeductions(data)}`);
+  });
+
+  test('41.2 Donatius a partits polítics: 20% amb base màxima de 600 € (Art. 68.3.c)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.deductions.donations = [
+      { id: 'pp1', entity: 'Partit Polític', amount: 5000, recurring: false, priority: false, category: 'political_party' },
+    ];
+    const deds = computeDeductions(data);
+    assert(deds.donationsDeductionAmount === 120, `Partits polítics: 600 × 20% = 120 €, obtingut: ${deds.donationsDeductionAmount}`);
+  });
+
+  test('41.3 Donatius d\'utilitat pública: 10% amb el sostre del 10% de la base liquidable', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.deductions.donations = [
+      { id: 'fu1', entity: 'Fundació Cultural', amount: 5000, recurring: false, priority: false, category: 'public_utility' },
+    ];
+    assert(computeDeductions(data).donationsDeductionAmount === 500, 'Sense base informada: 5.000 × 10% = 500 €');
+    // Amb base liquidable de 10.000 € el sostre és 1.000 € de base → 100 € de deducció
+    assert(computeDeductions(data, 10000).donationsDeductionAmount === 100, 'Amb base 10.000 €: sostre 1.000 € → 100 €');
+  });
+
+  test('41.4 Maternitat: deducció no lligada a quota (pot generar quota negativa, Art. 81)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 3000, inKind: 0, withholdings: 0, socialSecurity: 200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.personal.descendants = [{ id: 'd1', age: 1, disability: 0 }];
+    data.deductions.maternityDeduction = true;
+    data.deductions.maternityMonths = 12;
+
+    const res = calculateIRPF(data);
+    assert(res.maternityDeductionAmount === 1200, `Deducció maternitat 1.200 €, obtingut: ${res.maternityDeductionAmount}`);
+    assert(res.netTax === -1200, `Quota líquida negativa de -1.200 €, obtingut: ${res.netTax}`);
+    assert(res.result === -1200, `Retorn de 1.200 €, obtingut: ${res.result}`);
+  });
+
+  test('41.5 Mínim per discapacitat ≥ 65% amb mobilitat reduïda: 12.000 € (Art. 60.2)', () => {
+    const senseMobilitat = createEmptyDeclaracion(2024);
+    senseMobilitat.personal.age = 40;
+    senseMobilitat.personal.disability = 65;
+    assert(calculateIRPF(senseMobilitat).totalMinimum === 14550, 'Sense mobilitat reduïda: 5.550 + 9.000 = 14.550 €');
+
+    const ambMobilitat = createEmptyDeclaracion(2024);
+    ambMobilitat.personal.age = 40;
+    ambMobilitat.personal.disability = 65;
+    ambMobilitat.personal.reducedMobility = true;
+    assert(calculateIRPF(ambMobilitat).totalMinimum === 17550, 'Amb mobilitat reduïda: 5.550 + 12.000 = 17.550 €');
+  });
+
+  test('41.6 Antiaplicació Art. 33.5.f: detecta la recompra POSTERIOR dins dels 2 mesos', () => {
+    const trades: TradeRecord[] = [
+      { id: 'b1', broker: 'generic', date: '2024-01-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'buy', assetClass: 'shares', quantity: 100, price: 100, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 10000, isListed: true },
+      { id: 's1', broker: 'generic', date: '2024-06-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'sell', assetClass: 'shares', quantity: 100, price: 80, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 8000, isListed: true },
+      { id: 'b2', broker: 'generic', date: '2024-07-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'buy', assetClass: 'shares', quantity: 100, price: 80, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 8000, isListed: true },
+    ];
+
+    const { matches } = calculateFIFO(trades);
+    assert(matches.length === 1, `Ha de generar 1 casament, obtingut: ${matches.length}`);
+    const m = matches[0];
+    assert(m.totalGain === -2000, `Pèrdua de 2.000 €, obtingut: ${m.totalGain}`);
+    assert(m.antiApplicationRuleApplied, 'Ha de detectar la recompra posterior dins dels 2 mesos');
+    assert(m.suspendedLossEUR === 2000, `Pèrdua suspesa de 2.000 €, obtingut: ${m.suspendedLossEUR}`);
+    assert(m.computedGainLossEUR === 0, `Pèrdua computable de 0 €, obtingut: ${m.computedGainLossEUR}`);
+  });
+
+  test('41.7 Antiaplicació: el valor d\'adquisició de la recompra s\'incrementa amb la pèrdua suspesa', () => {
+    const trades: TradeRecord[] = [
+      { id: 'b1', broker: 'generic', date: '2024-01-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'buy', assetClass: 'shares', quantity: 100, price: 100, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 10000, isListed: true },
+      { id: 's1', broker: 'generic', date: '2024-06-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'sell', assetClass: 'shares', quantity: 100, price: 80, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 8000, isListed: true },
+      { id: 'b2', broker: 'generic', date: '2024-07-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'buy', assetClass: 'shares', quantity: 100, price: 80, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 8000, isListed: true },
+      { id: 's2', broker: 'generic', date: '2024-11-10', symbol: 'ACME', isin: 'US1234567890', name: 'ACME', type: 'sell', assetClass: 'shares', quantity: 100, price: 100, currency: 'EUR', exchangeRate: 1, commission: 0, totalEUR: 10000, isListed: true },
+    ];
+
+    const { matches } = calculateFIFO(trades);
+    const second = matches.find(m => m.sellTrade.id === 's2');
+    assert(second !== undefined, 'Hi ha d\'haver la segona venda');
+    // Cost inicial 8.000 € + 2.000 € de pèrdua suspesa = 10.000 € → guany 0 €
+    assert(second!.totalAcquisitionEUR === 10000, `Cost ajustat 10.000 €, obtingut: ${second!.totalAcquisitionEUR}`);
+    assert(second!.totalGain === 0, `Guany de 0 €, obtingut: ${second!.totalGain}`);
   });
 });
 
