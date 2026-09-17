@@ -4,7 +4,7 @@
  */
 
 export type { RentalProperty } from './types-properties.ts';
-import type { RentalProperty } from './types-properties.ts';
+import type { RentalProperty, RentalReductionType } from './types-properties.ts';
 import type { IVAData } from './types-iva.ts';
 import type { WealthTaxData } from './fiscal/wealth-tax-engine.ts';
 import type { ForeignAssetsData } from './fiscal/model720-engine.ts';
@@ -130,6 +130,12 @@ export interface Descendant {
   disability: number;
   /** Movilitat reduïda o necessitat d'ajuda de terceres persones (mínim de 12.000 € si discapacitat ≥ 65%) */
   reducedMobility?: boolean;
+  /**
+   * Mesos de convivència amb el contribuent durant l'exercici (1–12). Art. 61 LIRPF:
+   * els mínims per descendents es prorrategen pel nombre de mesos en què es compleixen
+   * els requisits, computant com a mes complet aquell en què es compleixen.
+   */
+  coexistenceMonths?: number;
 }
 
 export interface Ascendant {
@@ -140,6 +146,11 @@ export interface Ascendant {
   annualIncome?: number;  // Rendes anuals de l'ascendent (màx 8.000 €)
   /** Movilitat reduïda o necessitat d'ajuda de terceres persones (mínim de 12.000 € si discapacitat ≥ 65%) */
   reducedMobility?: boolean;
+  /**
+   * Mesos de convivència amb el contribuent durant l'exercici (1–12). Art. 61 LIRPF:
+   * els mínims per ascendents es prorrategen pel nombre de mesos amb dret.
+   */
+  coexistenceMonths?: number;
 }
 
 export interface EmployerItem {
@@ -187,6 +198,11 @@ export interface CapitalIncomeData {
   insuranceGains: number;
   otherMobiliary: number;
   mobiliaryWithholdings: number;
+  /**
+   * Gastos d'administració i dipòsit de valors negociables (Art. 26.1.a LIRPF).
+   * Es resten dels rendiments íntegres del capital mobiliari.
+   */
+  securitiesManagementExpenses: number;
 
   /** Dividends i rendiments internacionals (Doble Imposició - Casella 0588) */
   foreignDividends: number;
@@ -205,6 +221,13 @@ export interface CapitalIncomeData {
   rentalAmortization?: number;      // Amortització immoble + mobles (Casella 0081)
   imputedIncome: number;            // Imputació de rendes immobiliàries
   realEstateWithholdings: number;
+  /**
+   * Règim de reducció del rendiment immobiliari (Llei 12/2023) per a la via simplificada
+   * (`capitalIncome.rental*`) quan no s'informa l'array detallat `properties`.
+   */
+  rentalReductionType?: RentalReductionType;
+  /** Data d'inici del contracte d'arrendament (AAAA-MM-DD), per determinar el règim transitori. */
+  rentalContractDate?: string;
 }
 
 /** Activitats econòmiques (autònoms) */
@@ -296,6 +319,15 @@ export interface DonationItem {
   amount: number;
   recurring: boolean; // Donació recurrent (≥3 anys mateixa entitat)
   priority: boolean; // Entitat prioritària (Llei 49/2002)
+  /**
+   * Import donat a la MATEIXA entitat en l'exercici immediatament anterior (N-1).
+   * Art. 68.3 LIRPF i art. 19 Llei 49/2002: el tipus del 45% s'aplica quan en els dos
+   * períodes impositius immediats anteriors es van fer donatius a la mateixa entitat per
+   * import igual o superior, en cada un d'ells, al del exercici actual.
+   */
+  priorYearAmount?: number;
+  /** Import donat a la MATEIXA entitat dos exercicis abans (N-2). */
+  priorYear2Amount?: number;
   /**
    * Règim fiscal de l'entitat destinatària (Art. 68.3 LIRPF). Si s'omet, es dedueix de `priority`.
    * - `ley_49_2002`: entitats beneficiaries del mecenatge (80% / 40% / 45%).

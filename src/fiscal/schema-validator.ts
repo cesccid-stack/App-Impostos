@@ -9,6 +9,17 @@ import type { DeclaracionData, PersonalData, WorkIncomeData, CapitalIncomeData, 
 import { createEmptyDeclaracion } from './declaration-factory.ts';
 import { FISCAL_YEARS, type FiscalYear } from './constants.ts';
 
+/** Règims de reducció del rendiment immobiliari permesos (Llei 12/2023) */
+const RENTAL_REDUCTION_TYPES: readonly string[] = [
+  'none',
+  'transitional_60',
+  'general_50',
+  'rehabilitated_60',
+  'young_tenant_70',
+  'public_or_social_70',
+  'tensioned_rent_cut_90',
+];
+
 /**
  * Sanitizes an unknown input into a guaranteed finite number with fallback.
  */
@@ -92,6 +103,7 @@ export function validateAndSanitizeDeclaration(
           age: sanitizeNumber(d?.age, 0, 0, 30),
           disability: sanitizeNumber(d?.disability, 0, 0, 100),
           reducedMobility: d?.reducedMobility === true,
+          coexistenceMonths: sanitizeNumber(d?.coexistenceMonths, 12, 0, 12),
         }))
       : [],
     ascendants: Array.isArray(pSrc.ascendants)
@@ -100,6 +112,7 @@ export function validateAndSanitizeDeclaration(
           age: sanitizeNumber(a?.age, 65, 0, 120),
           disability: sanitizeNumber(a?.disability, 0, 0, 100),
           reducedMobility: a?.reducedMobility === true,
+          coexistenceMonths: sanitizeNumber(a?.coexistenceMonths, 12, 0, 12),
         }))
       : [],
   };
@@ -137,12 +150,19 @@ export function validateAndSanitizeDeclaration(
     insuranceGains: sanitizeNumber(cSrc.insuranceGains, 0),
     otherMobiliary: sanitizeNumber(cSrc.otherMobiliary, 0),
     mobiliaryWithholdings: sanitizeNumber(cSrc.mobiliaryWithholdings, 0),
+    securitiesManagementExpenses: sanitizeNumber(cSrc.securitiesManagementExpenses, 0),
     foreignDividends: sanitizeNumber(cSrc.foreignDividends, 0),
     foreignTaxWithheld: sanitizeNumber(cSrc.foreignTaxWithheld, 0),
     rentalIncome: sanitizeNumber(cSrc.rentalIncome, 0),
     rentalExpenses: sanitizeNumber(cSrc.rentalExpenses, 0),
     imputedIncome: sanitizeNumber(cSrc.imputedIncome, 0),
     realEstateWithholdings: sanitizeNumber(cSrc.realEstateWithholdings, 0),
+    ...(RENTAL_REDUCTION_TYPES.includes(cSrc.rentalReductionType as string)
+      ? { rentalReductionType: cSrc.rentalReductionType }
+      : {}),
+    ...(typeof cSrc.rentalContractDate === 'string'
+      ? { rentalContractDate: sanitizeString(cSrc.rentalContractDate) }
+      : {}),
   };
 
   // Activities
@@ -193,6 +213,8 @@ export function validateAndSanitizeDeclaration(
           amount: sanitizeNumber(d?.amount, 0),
           recurring: sanitizeBoolean(d?.recurring, false),
           priority: sanitizeBoolean(d?.priority, false),
+          priorYearAmount: sanitizeNumber(d?.priorYearAmount, 0, 0),
+          priorYear2Amount: sanitizeNumber(d?.priorYear2Amount, 0, 0),
         }))
       : [],
     maternityDeduction: sanitizeBoolean(dSrc.maternityDeduction, false),

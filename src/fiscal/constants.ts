@@ -84,6 +84,13 @@ export const ASCENDANT_MINIMUM_OVER_75_EXTRA = 1_400;
 /** Mínim per discapacitat */
 export const DISABILITY_MINIMUM_33 = 3_000;
 export const DISABILITY_MINIMUM_65 = 9_000;
+/**
+ * Gastos de asistencia (Art. 60.3 LIRPF): increment addicional de 3.000 € quan el contribuent
+ * (o familiar) acredita necessitar ajuda de terceres persones, movilitat reduïda o un grau
+ * de discapacitat ≥ 65%. Es suma a la base (3.000 € o 9.000 €).
+ */
+export const DISABILITY_ASSISTANCE_EXTRA = 3_000;
+/** Base de 9.000 € + gastos de asistencia de 3.000 € (mantingut per compatibilitat) */
 export const DISABILITY_MINIMUM_65_MOBILITY = 12_000;
 
 /* ── Reducció per rendiments del treball ───────────────────── */
@@ -98,6 +105,16 @@ export const WORK_REDUCTION_THRESHOLD_LOW = 14_852;
 export const WORK_REDUCTION_THRESHOLD_HIGH = 19_747.50;
 export const WORK_REDUCTION_MAX = 7_302;
 export const WORK_REDUCTION_COEFFICIENT = 1.75;
+/**
+ * Art. 20.1.c LIRPF: si les rendes (excloses les exentes) distintes de les del treball
+ * superen 6.500 €, no s'aplica el tram pla de 7.302 € i passa a aplicar-se la fórmula
+ * progressiva amb independència del rendiment net del treball.
+ */
+export const WORK_REDUCTION_OTHER_RENTS_LIMIT = 6_500;
+/** Art. 20.3 LIRPF: increment de la reducció per treballadors actius amb discapacitat */
+export const WORK_REDUCTION_DISABILITY_EXTRA = 3_500;
+/** Art. 20.3 LIRPF: increment reforçat (ajuda de tercers / movilitat reduïda / ≥ 65%) */
+export const WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED = 7_750;
 
 /* ── Plans de pensions ─────────────────────────────────────── */
 
