@@ -3,8 +3,66 @@
  * Motor fiscal per al càlcul del Rendiment del Capital Immobiliari, Amortitzacions i Imputació de Rendes (Art. 23 & 85 LIRPF).
  */
 
-import type { RentalProperty, PropertyFiscalResult, InventoryAmortizationBreakdown } from '../types-properties.ts';
+import type { RentalProperty, PropertyFiscalResult, InventoryAmortizationBreakdown, RentalReductionType } from '../types-properties.ts';
 import { calculateItemAnnualAmortization } from './amortization-tables.ts';
+
+/**
+ * Data d'entrada en vigor de la Llei 12/2023 pel Dret a l'Habitatge.
+ * Els contractes formalitzats abans d'aquesta data es regeixen pel règim transitori (60%).
+ */
+export const LEY_12_2023_EFFECTIVE_DATE = '2023-05-26';
+
+/**
+ * Determina el percentatge de reducció del rendiment net per arrendament d'habitatge (Art. 23.2 LIRPF).
+ *
+ * - Contractes previs al 26/05/2023 → 60% (règim transitori, Disposició Transitòria 38a).
+ * - Contractes posteriors → 50% general, 60% rehabilitat, 70% joves/habitatge social, 90% zona tensionada.
+ *
+ * @param reductionType Règim informat explícitament per l'usuari.
+ * @param usageType Tipus d'ús de l'immoble (només l'habitatge habitual té reducció).
+ * @param contractDate Data de formalització/inici del contracte (AAAA-MM-DD).
+ */
+export function getRentalReductionRate(
+  reductionType: RentalReductionType | undefined,
+  usageType: 'habitual' | 'temporary' | 'tourist' | 'commercial' = 'habitual',
+  contractDate?: string,
+): number {
+  if (usageType !== 'habitual') return 0;
+
+  let type: RentalReductionType | undefined = reductionType;
+
+  // Règim transitori derogat: una reducció del 60% "transitoria" no pot aplicar-se a
+  // contractes formalitzats a partir del 26/05/2023.
+  if (type === 'transitional_60' && contractDate && contractDate >= LEY_12_2023_EFFECTIVE_DATE) {
+    type = 'general_50';
+  }
+
+  // Sense informació explícita: inferir pel règim transitori segons la data del contracte.
+  if (!type) {
+    if (contractDate) {
+      type = contractDate >= LEY_12_2023_EFFECTIVE_DATE ? 'general_50' : 'transitional_60';
+    } else {
+      // Compatibilitat retroactiva: dades antigues sense data → règim transitori del 60%.
+      type = 'transitional_60';
+    }
+  }
+
+  switch (type) {
+    case 'tensioned_rent_cut_90':
+      return 90;
+    case 'young_tenant_70':
+    case 'public_or_social_70':
+      return 70;
+    case 'rehabilitated_60':
+    case 'transitional_60':
+      return 60;
+    case 'general_50':
+      return 50;
+    case 'none':
+    default:
+      return 0;
+  }
+}
 
 /**
  * Calcula el compte d'explotació fiscal d'un immoble individual (incloent ús mixt i imputació de rendes).
@@ -140,28 +198,9 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
   const netIncome = grossIncome - totalExpenses;
 
   // 6. Reducció per arrendament d'habitatge habitual (Llei 12/2023)
-  let reductionRate = 0;
-  if (netIncome > 0 && p.usageType === 'habitual') {
-    switch (p.reductionType) {
-      case 'tensioned_rent_cut_90':
-        reductionRate = 90;
-        break;
-      case 'young_tenant_70':
-      case 'public_or_social_70':
-        reductionRate = 70;
-        break;
-      case 'rehabilitated_60':
-      case 'transitional_60':
-        reductionRate = 60;
-        break;
-      case 'general_50':
-        reductionRate = 50;
-        break;
-      case 'none':
-      default:
-        reductionRate = 0;
-    }
-  }
+  const reductionRate = netIncome > 0
+    ? getRentalReductionRate(p.reductionType, p.usageType, p.contractStartDate || p.contractDate)
+    : 0;
 
   const reductionAmount = (netIncome > 0) ? (netIncome * (reductionRate / 100)) : 0;
   const netReducedIncome = netIncome - reductionAmount;

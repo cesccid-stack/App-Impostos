@@ -55,6 +55,7 @@ primer cop) i obre el navegador automàticament.
 | `npm run typecheck` | Comprovació estricta de tipus de `src/` **i** `scripts/` |
 | `npm run lint` | ESLint (0 `any`, 0 codi mort; qualsevol infracció falla) |
 | `npm run format` | Prettier sobre `src/` i `scripts/` |
+| `npm run index` | Regenera `docs/CODE_INDEX.md` i `docs/SYMBOLS.md` (índexs per a la IA) |
 
 ## 🔍 Rigor i qualitat
 
@@ -83,8 +84,23 @@ src/
 └─ utils/                  # Aritmètica exacta, PDF/CSV, sanetització DOM, AEAT
 scripts/
 └─ verify-renta.ts         # Bucle de verificació end-to-end headless
+docs/
+├─ CODE_INDEX.md           # Índex generat de mòduls i mapa de seccions (npm run index)
+└─ SYMBOLS.md              # Índex alfabètic símbol → fitxer (npm run index)
 styles/                    # CSS (index, components, pages)
 ```
+
+## 🤖 Context per a agents d'IA
+
+Per tal de reduir el consum de context (i de tokens) quan treballa un agent de codi,
+el projecte manté un índex navegable:
+
+- **`AGENTS.md`** — índex mestre: arquitectura, mapa de fitxers, rutes, convencions,
+  comandaments i guia «on és cada cosa». **Llegeix-lo abans d'explorar codi.**
+- **`.clinerules`** — regles de treball de l'agent (lectura mínima, validacions obligatòries).
+- **`docs/CODE_INDEX.md`** — generat amb `npm run index`: mòduls (descripció + exportacions)
+  i mapa de seccions (número de línia de cada bloc) dels fitxers grans.
+- **`docs/SYMBOLS.md`** — generat amb `npm run index`: índex alfabètic `símbol → fitxer`.
 
 ## 🔒 Privacitat
 

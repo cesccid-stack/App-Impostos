@@ -298,7 +298,7 @@ export const CROSS_CHECK_RULES: readonly CrossCheckRule[] = [
       if (commercial.length > 0) {
         const expected = commercial.reduce((s, p) => s + ((p.grossRentalIncome || 0) * 0.19), 0);
         if (!data.capitalIncome) {
-          data.capitalIncome = { interests: 0, dividends: 0, foreignDividends: 0, foreignTaxWithheld: 0, insuranceGains: 0, otherMobiliary: 0, mobiliaryWithholdings: 0, rentalIncome: 0, rentalExpenses: 0, imputedIncome: 0, realEstateWithholdings: expected };
+          data.capitalIncome = { interests: 0, dividends: 0, foreignDividends: 0, foreignTaxWithheld: 0, insuranceGains: 0, otherMobiliary: 0, mobiliaryWithholdings: 0, securitiesManagementExpenses: 0, rentalIncome: 0, rentalExpenses: 0, imputedIncome: 0, realEstateWithholdings: expected };
         } else {
           data.capitalIncome.realEstateWithholdings = Math.round(expected * 100) / 100;
         }

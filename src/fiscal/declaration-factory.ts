@@ -40,7 +40,6 @@ export function createEmptyDeclaracion(year: number, profileId: string = 'profil
       rentalExpenses: 0,
       imputedIncome: 0,
       realEstateWithholdings: 0,
-      rentalReductionType: 'transitional_60',
     },
     properties: [],
     activities: {

@@ -8,6 +8,7 @@ import { createField, createFormRow, createFormSection } from '../components/for
 import { calculateAllProperties } from '../fiscal/real-estate-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
+import type { RentalReductionType } from '../types-properties.ts';
 
 export function renderCapital(): HTMLElement {
   const page = document.createElement('div');
@@ -80,6 +81,15 @@ export function renderCapital(): HTMLElement {
           placeholder: '0,00',
           hint: 'Retencions d\'IRPF practicades pel banc o broker espanyol',
           onChange: updater('mobiliaryWithholdings'),
+        }),
+        createField({
+          id: 'securities-management-expenses',
+          label: '📁 Gastos d\'administració i dipòsit de valors',
+          value: c.securitiesManagementExpenses || 0,
+          suffix: '€',
+          placeholder: '0,00',
+          hint: 'Art. 26.1.a LIRPF — custòdia i administració de valors negociables',
+          onChange: updater('securitiesManagementExpenses'),
         }),
       ),
     ),
@@ -212,6 +222,32 @@ export function renderCapital(): HTMLElement {
           placeholder: '0,00',
           hint: 'Suma de tributs (IBI/brosses), assegurança, comunitat, reparacions...',
           onChange: updater('rentalExpenses'),
+        }),
+      ),
+      createFormRow(
+        createField({
+          id: 'rental-reduction-type',
+          label: 'Règim de reducció del lloguer (Llei 12/2023)',
+          type: 'select',
+          value: c.rentalReductionType || 'transitional_60',
+          options: [
+            { value: 'transitional_60', label: '60% — Contracte anterior al 26/05/2023 (transitori)' },
+            { value: 'general_50', label: '50% — Règim general (contractes post-26/05/2023)' },
+            { value: 'rehabilitated_60', label: '60% — Immoble rehabilitat' },
+            { value: 'young_tenant_70', label: '70% — Llogater jove / zona tensionada' },
+            { value: 'public_or_social_70', label: '70% — Administració pública / habitatge social' },
+            { value: 'tensioned_rent_cut_90', label: '90% — Rebaixa de renda ≥ 5% (zona tensionada)' },
+            { value: 'none', label: 'Sense reducció' },
+          ],
+          onChange: (v) => store.update('capitalIncome', { rentalReductionType: v as RentalReductionType }),
+        }),
+        createField({
+          id: 'rental-contract-date',
+          label: 'Data d\'inici del contracte de lloguer',
+          type: 'date',
+          value: c.rentalContractDate || '',
+          hint: 'Posterior al 26/05/2023 → règim general (sense 60% transitori)',
+          onChange: (v) => store.update('capitalIncome', { rentalContractDate: v }),
         }),
       ),
       createFormRow(

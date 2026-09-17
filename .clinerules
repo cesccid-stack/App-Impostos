@@ -1,0 +1,37 @@
+# Reglas del proyecto — Hacienda / Control de la Renda
+
+## 1. Contexto mínimo (ahorro de tokens) — OBLIGATORIO
+
+- Lee **siempre** `AGENTS.md` antes de explorar código: es el índice del repositorio.
+- **No leas ficheros completos**: usa `search_codebase` (patrones acotados) y
+  `read_files` con `start_line`/`end_line`.
+- Localiza símbolos en `docs/SYMBOLS.md`; módulos y mapa de secciones (ficheros ≥ 800
+  líneas) en `docs/CODE_INDEX.md`. **Búscalos**, no los leas enteros.
+- No abras `node_modules/`, `dist/`, `package-lock.json` ni
+  `src/fiscal/model-reconciliation-engine.ts` (~4.600 líneas) sin razón concreta.
+- **Filtra la salida de los comandos**: usa `Select-Object -Last N` / `Out-Null`, o
+  vuelca a un fichero y léelo con `read_files`. Nunca dejes que `run_commands` vuelque
+  el historial completo del terminal (gasta miles de tokens).
+
+## 2. Reglas que rompen el build/lint (siempre activas)
+
+- TypeScript `strict`: **prohibido `any`** y variables/imports sin usar (prefijo `_`).
+- **Dinero:** usa `src/utils/exact-math.ts` (`exactAdd`, `exactSub`, `exactMultiply`,
+  `exactDivide`, `round2`); nunca `+ - * /` directos ni `toFixed` sobre flotantes.
+- **DOM:** `document.createElement` + `escapeHtml` antes de insertar datos en `innerHTML`.
+- **Estado:** escribe solo vía `src/store.ts`; `store.getData()` es de solo lectura.
+- **Motores `src/fiscal/`:** funciones puras o clases estáticas, sin DOM ni store.
+- **Textos de UI en catalán.** Ficheros en kebab-case; tipos en PascalCase.
+- Nueva página: exporta `renderXxx(): HTMLElement` y regístrala en `src/main.ts`.
+
+## 3. Validación obligatoria antes de terminar
+
+1. `npm run typecheck` → **0 errores**.
+2. `npm run lint` → **0 errores**.
+3. Si tocas lógica fiscal: `npm test`.
+4. Si añades/renombras módulos o exportaciones: `npm run index` (y actualiza `AGENTS.md` §4).
+
+## 4. Límites
+
+- Sin dependencias nuevas sin justificar (solo `jspdf` y `jszip`).
+- Sin llamadas de red nuevas más allá de `api.frankfurter.app` y la Sede del Cadastre.

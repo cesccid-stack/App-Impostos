@@ -19,12 +19,15 @@ import {
   ASCENDANT_MINIMUM_OVER_75_EXTRA,
   DISABILITY_MINIMUM_33,
   DISABILITY_MINIMUM_65,
-  DISABILITY_MINIMUM_65_MOBILITY,
+  DISABILITY_ASSISTANCE_EXTRA,
   WORK_OTHER_EXPENSES,
   WORK_REDUCTION_THRESHOLD_LOW,
   WORK_REDUCTION_THRESHOLD_HIGH,
   WORK_REDUCTION_MAX,
   WORK_REDUCTION_COEFFICIENT,
+  WORK_REDUCTION_OTHER_RENTS_LIMIT,
+  WORK_REDUCTION_DISABILITY_EXTRA,
+  WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED,
   PENSION_PLAN_LIMIT,
   PENSION_PLAN_COMPANY_LIMIT,
   JOINT_TAXATION_REDUCTION_MATRIMONY,
@@ -36,7 +39,7 @@ import {
 import { getAutonomicBrackets } from './autonomic-tax-scales.ts';
 import { computeDeductions } from './deductions.ts';
 import { computeCatalanDeductions } from './deductions-cat.ts';
-import { calculateAllProperties } from './real-estate-engine.ts';
+import { calculateAllProperties, getRentalReductionRate } from './real-estate-engine.ts';
 import { calculateSavingsCompensation } from './loss-carryover-engine.ts';
 import { calculateComplementaryIRPF } from './complementary-engine.ts';
 import { exactAdd, exactSub, round2, applyTaxBracketsExact } from '../utils/exact-math.ts';
@@ -66,7 +69,7 @@ export function effectiveRate(
 /**
  * Compute net work income (rendimiento neto del trabajo) including Art. 7.p and Art. 18.2.
  */
-function computeNetWorkIncome(data: DeclaracionData): {
+function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
   netIncome: number;
   reduction: number;
   foreignWorkExemptionApplied: number;
@@ -128,16 +131,33 @@ function computeNetWorkIncome(data: DeclaracionData): {
     WORK_OTHER_EXPENSES;
   const netIncome = Math.max(0, grossIncome - deductibleExpenses);
 
-  // 5. Reducció per rendiments del treball
+  // 5. Reducció per rendiments del treball (Art. 20 LIRPF)
+  // Art. 20.1: el tram pla de 7.302 € només s'aplica quan el rendiment net del treball és
+  // ≤ 14.852 € I les rendes distintes de les del treball (excloses les exentes) no superen
+  // 6.500 €. En cas contrari (rendiment entre 14.852 i 19.747,50 €, rendiment superior, o
+  // altres rendes > 6.500 €) s'aplica la fórmula progressiva 7.302 − 1,75 × (RNT − 14.852).
+  const exceedsOtherRents = otherRents > WORK_REDUCTION_OTHER_RENTS_LIMIT;
   let reduction = 0;
-  if (netIncome <= WORK_REDUCTION_THRESHOLD_LOW) {
+  if (netIncome <= WORK_REDUCTION_THRESHOLD_LOW && !exceedsOtherRents) {
     reduction = WORK_REDUCTION_MAX;
-  } else if (netIncome <= WORK_REDUCTION_THRESHOLD_HIGH) {
+  } else if (netIncome <= WORK_REDUCTION_THRESHOLD_HIGH || exceedsOtherRents) {
     reduction =
       WORK_REDUCTION_MAX -
       WORK_REDUCTION_COEFFICIENT * (netIncome - WORK_REDUCTION_THRESHOLD_LOW);
   }
   reduction = Math.max(0, reduction);
+
+  // Art. 20.3: increment de la reducció per treballadors actius amb discapacitat.
+  // +3.500 € per discapacitat reconeguda; +7.750 € si necessita ajuda de tercers, té
+  // movilitat reduïda o un grau de discapacitat ≥ 65%.
+  const workerDisability = data.personal?.disability || 0;
+  if (workerDisability >= 33) {
+    const enhanced =
+      data.personal?.reducedMobility === true || workerDisability >= 65;
+    reduction += enhanced
+      ? WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED
+      : WORK_REDUCTION_DISABILITY_EXTRA;
+  }
 
   return {
     netIncome,
@@ -166,6 +186,7 @@ function computeCapitalIncome(data: DeclaracionData): {
     insuranceGains: 0,
     otherMobiliary: 0,
     mobiliaryWithholdings: 0,
+    securitiesManagementExpenses: 0,
     foreignDividends: 0,
     foreignTaxWithheld: 0,
     rentalIncome: 0,
@@ -177,8 +198,12 @@ function computeCapitalIncome(data: DeclaracionData): {
   const foreignDividends = c.foreignDividends || 0;
   const foreignTaxWithheld = c.foreignTaxWithheld || 0;
 
-  const mobiliary =
+  // Art. 26.1.a LIRPF: els gastos d'administració i dipòsit de valors negociables es resten
+  // dels rendiments íntegres del capital mobiliari.
+  const securitiesExpenses = Math.max(0, c.securitiesManagementExpenses || 0);
+  const grossMobiliary =
     (c.interests || 0) + (c.dividends || 0) + foreignDividends + (c.insuranceGains || 0) + (c.otherMobiliary || 0);
+  const mobiliary = Math.max(0, grossMobiliary - securitiesExpenses);
   
   let rentalReduced = 0;
   let imputedFromProperties = 0;
@@ -187,8 +212,16 @@ function computeCapitalIncome(data: DeclaracionData): {
     rentalReduced = totalNetReducedIncome;
     imputedFromProperties = totalImputedIncome;
   } else {
+    // Via simplificada (sense array `properties`): la reducció de l'Art. 23.2 depèn del règim
+    // aplicable. La reducció transitoria del 60% queda derogada per a contractes formalitzats
+    // a partir del 26/05/2023 (Llei 12/2023), que passen al règim general del 50%.
     const rentalNet = Math.max(0, (c.rentalIncome || 0) - (c.rentalExpenses || 0));
-    rentalReduced = rentalNet * 0.4;
+    const reductionRate = getRentalReductionRate(
+      c.rentalReductionType,
+      'habitual',
+      c.rentalContractDate,
+    );
+    rentalReduced = rentalNet * (1 - reductionRate / 100);
   }
 
   const immobiliary = rentalReduced + (c.imputedIncome || 0) + imputedFromProperties;
@@ -260,6 +293,35 @@ function computeGains(items: GainItem[] = []): number {
 }
 
 /**
+ * Mínim per discapacitat d'una persona (Art. 60 LIRPF).
+ * Base: 3.000 € (discapacitat ≥ 33%) o 9.000 € (≥ 65%).
+ * Gastos de asistencia (Art. 60.3): +3.000 € quan acredita necessitar ajuda de terceres
+ * persones, té movilitat reduïda o un grau de discapacitat ≥ 65%.
+ */
+function disabilityMinimum(disability: number, reducedMobility: boolean): number {
+  let base = 0;
+  if (disability >= 65) {
+    base = DISABILITY_MINIMUM_65;
+  } else if (disability >= 33) {
+    base = DISABILITY_MINIMUM_33;
+  } else {
+    return 0;
+  }
+  const needsAssistance = reducedMobility || disability >= 65;
+  return base + (needsAssistance ? DISABILITY_ASSISTANCE_EXTRA : 0);
+}
+
+/**
+ * Prorrateja un mínim pel nombre de mesos de convivència amb el contribuent (Art. 61 LIRPF).
+ * Es computa com a mes complet aquell en què es compleixen els requisits.
+ */
+function prorateByCoexistence(minimum: number, coexistenceMonths?: number): number {
+  if (coexistenceMonths === undefined) return minimum;
+  const months = Math.min(12, Math.max(0, coexistenceMonths));
+  return minimum * (months / 12);
+}
+
+/**
  * Compute personal and family minimum.
  */
 function computeMinimums(data: DeclaracionData): {
@@ -276,13 +338,10 @@ function computeMinimums(data: DeclaracionData): {
     personalMinimum = PERSONAL_MINIMUM_OVER_65;
   }
 
-  const disability = data.personal?.disability || 0;
-  if (disability >= 65) {
-    // Art. 60.2 LIRPF: 12.000 € si hi ha mobilitat reduïda o necessitat d'ajuda de terceres persones
-    personalMinimum += data.personal?.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
-  } else if (disability >= 33) {
-    personalMinimum += DISABILITY_MINIMUM_33;
-  }
+  personalMinimum += disabilityMinimum(
+    data.personal?.disability || 0,
+    data.personal?.reducedMobility === true,
+  );
 
   let descendantsMinimum = 0;
   (data.personal?.descendants || []).forEach((desc, index) => {
@@ -291,27 +350,20 @@ function computeMinimums(data: DeclaracionData): {
     if ((desc.age || 0) < 3) {
       min += DESCENDANT_UNDER_3_EXTRA;
     }
-    if ((desc.disability || 0) >= 65) {
-      min += desc.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
-    } else if ((desc.disability || 0) >= 33) {
-      min += DISABILITY_MINIMUM_33;
-    }
-    descendantsMinimum += min;
+    min += disabilityMinimum(desc.disability || 0, desc.reducedMobility === true);
+    descendantsMinimum += prorateByCoexistence(min, desc.coexistenceMonths);
   });
 
   let ascendantsMinimum = 0;
   (data.personal?.ascendants || []).forEach((asc) => {
+    let min = 0;
     if ((asc.age || 0) >= 75) {
-      ascendantsMinimum +=
-        ASCENDANT_MINIMUM_OVER_65 + ASCENDANT_MINIMUM_OVER_75_EXTRA;
+      min += ASCENDANT_MINIMUM_OVER_65 + ASCENDANT_MINIMUM_OVER_75_EXTRA;
     } else if ((asc.age || 0) >= 65) {
-      ascendantsMinimum += ASCENDANT_MINIMUM_OVER_65;
+      min += ASCENDANT_MINIMUM_OVER_65;
     }
-    if ((asc.disability || 0) >= 65) {
-      ascendantsMinimum += asc.reducedMobility ? DISABILITY_MINIMUM_65_MOBILITY : DISABILITY_MINIMUM_65;
-    } else if ((asc.disability || 0) >= 33) {
-      ascendantsMinimum += DISABILITY_MINIMUM_33;
-    }
+    min += disabilityMinimum(asc.disability || 0, asc.reducedMobility === true);
+    ascendantsMinimum += prorateByCoexistence(min, asc.coexistenceMonths);
   });
 
   const totalMinimum =
@@ -342,6 +394,14 @@ export function calculateIRPF(data: DeclaracionData, bypassCache = false): Fisca
 
 function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   // 1. Compute base imposable general
+  const { mobiliary, immobiliary, foreignDividends, foreignTaxWithheld } = computeCapitalIncome(data);
+  const activitiesNet = computeActivitiesIncome(data);
+  const capitalGains = computeGains(data.gains?.items || []);
+
+  // Rendes (excloses les exentes) distintes de les del treball — Art. 20.1.c LIRPF.
+  // Determinen si s'aplica el tram pla de la reducció per rendiments del treball.
+  const otherRents = Math.max(0, exactAdd(mobiliary, immobiliary, activitiesNet, capitalGains));
+
   const {
     netIncome: netWork,
     reduction: workReduction,
@@ -351,10 +411,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     legalDefenseDeduction,
     exemptSeverancePay,
     taxableSeverancePay,
-  } = computeNetWorkIncome(data);
-  const { mobiliary, immobiliary, foreignDividends, foreignTaxWithheld } = computeCapitalIncome(data);
-  const activitiesNet = computeActivitiesIncome(data);
-  const capitalGains = computeGains(data.gains?.items || []);
+  } = computeNetWorkIncome(data, otherRents);
 
   // Compensació de l'estalvi amb regla del 25% i bossa de 4 anys
   const priorMob = data.lossCarryovers?.pendingMobiliaryLosses || [];

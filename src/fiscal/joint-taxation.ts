@@ -98,6 +98,7 @@ export function combineDeclarationsForJoint(
       insuranceGains: (spouse1.capitalIncome?.insuranceGains || 0) + (spouse2.capitalIncome?.insuranceGains || 0),
       otherMobiliary: (spouse1.capitalIncome?.otherMobiliary || 0) + (spouse2.capitalIncome?.otherMobiliary || 0),
       mobiliaryWithholdings: (spouse1.capitalIncome?.mobiliaryWithholdings || 0) + (spouse2.capitalIncome?.mobiliaryWithholdings || 0),
+      securitiesManagementExpenses: (spouse1.capitalIncome?.securitiesManagementExpenses || 0) + (spouse2.capitalIncome?.securitiesManagementExpenses || 0),
       rentalIncome: (spouse1.capitalIncome?.rentalIncome || 0) + (spouse2.capitalIncome?.rentalIncome || 0),
       rentalExpenses: (spouse1.capitalIncome?.rentalExpenses || 0) + (spouse2.capitalIncome?.rentalExpenses || 0),
       imputedIncome: (spouse1.capitalIncome?.imputedIncome || 0) + (spouse2.capitalIncome?.imputedIncome || 0),

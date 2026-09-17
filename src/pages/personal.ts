@@ -198,6 +198,23 @@ function renderDescendantsList(container: HTMLElement) {
       })
     );
 
+    row.appendChild(
+      createField({
+        id: `desc-${desc.id}-coex`,
+        label: 'Mesos de convivència (Art. 61)',
+        value: desc.coexistenceMonths ?? 12,
+        type: 'number',
+        min: 0,
+        max: 12,
+        hint: 'Mesos de l\'any amb convivència (per prorratejar el mínim)',
+        onChange: (val) => {
+          const arr = [...store.getData().personal.descendants];
+          arr[idx].coexistenceMonths = Math.min(12, Math.max(0, parseInt(val) || 0));
+          store.update('personal', { descendants: arr });
+        }
+      })
+    );
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn--icon btn--ghost';
     delBtn.innerHTML = '🗑';
@@ -267,6 +284,23 @@ function renderAscendantsList(container: HTMLElement) {
         onChange: (val) => {
           const arr = [...(store.getData().personal.ascendants || [])];
           arr[idx].disability = parseInt(val) || 0;
+          store.update('personal', { ascendants: arr });
+        }
+      })
+    );
+
+    row.appendChild(
+      createField({
+        id: `asc-${asc.id}-coex`,
+        label: 'Mesos de convivència (Art. 61)',
+        value: asc.coexistenceMonths ?? 12,
+        type: 'number',
+        min: 0,
+        max: 12,
+        hint: 'Mesos de l\'any amb convivència (per prorratejar el mínim)',
+        onChange: (val) => {
+          const arr = [...(store.getData().personal.ascendants || [])];
+          arr[idx].coexistenceMonths = Math.min(12, Math.max(0, parseInt(val) || 0));
           store.update('personal', { ascendants: arr });
         }
       })

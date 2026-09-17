@@ -204,7 +204,8 @@ declare const process: { exit(code?: number): void };
 // ── IMPORTS DELS MOTORS I SUBSISTEMA DE RENDA ──────────────────────────────
 
 import { calculateIRPF, applyBrackets } from '../src/fiscal/irpf.ts';
-import { calculatePropertyFiscalResult } from '../src/fiscal/real-estate-engine.ts';
+
+import { calculatePropertyFiscalResult, getRentalReductionRate } from '../src/fiscal/real-estate-engine.ts';
 import { calculateSavingsCompensation } from '../src/fiscal/loss-carryover-engine.ts';
 import { compareIndividualVsJoint } from '../src/fiscal/joint-taxation.ts';
 import { computeDeductions } from '../src/fiscal/deductions.ts';
@@ -491,6 +492,7 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
       insuranceGains: 0,
       otherMobiliary: 0,
       mobiliaryWithholdings: 570,
+      securitiesManagementExpenses: 0,
       rentalIncome: 0,
       rentalExpenses: 0,
       imputedIncome: 0,
@@ -612,15 +614,16 @@ suite('1. Motors de Càlcul Fiscal IRPF (Llei 35/2006)', () => {
     const res = calculateIRPF(data);
 
     assert(res.personalMinimum === 9700, `Mínim personal ha de ser 9.700, obtingut: ${res.personalMinimum}`);
-    assert(res.descendantsMinimum === 20900, `Mínim descendents ha de ser 20.900, obtingut: ${res.descendantsMinimum}`);
+    // Fill amb discapacitat 65%: 4.000 (3r fill) + 9.000 (base ≥65%) + 3.000 (gastos de asistencia) = 16.000
+    assert(res.descendantsMinimum === 23900, `Mínim descendents ha de ser 23.900, obtingut: ${res.descendantsMinimum}`);
     assert(res.ascendantsMinimum === 2550, `Mínim ascendents ha de ser 2.550, obtingut: ${res.ascendantsMinimum}`);
-    assert(res.totalMinimum === 33150, `Mínim total ha de ser 33.150, obtingut: ${res.totalMinimum}`);
+    assert(res.totalMinimum === 36150, `Mínim total ha de ser 36.150, obtingut: ${res.totalMinimum}`);
   });
 
   test('1.8 Deduccions Estatals i Autonòmiques de Catalunya', () => {
     const data = createEmptyDeclaracion(2024);
     data.workIncome.employers = [{
-      id: 'e1', name: 'Empresa', grossSalary: 18000, inKind: 0, withholdings: 2500, socialSecurity: 1200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
+      id: 'e1', name: 'Empresa', grossSalary: 18000, inKind: 0, withholdings: 2500, socialSecurity: 2000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0
     }];
     data.personal.age = 28;
     data.deductions = {
@@ -2864,6 +2867,8 @@ suite('35. Perfeccionament de l\'Exactitud Numèrica i Blindatge Tributari Garan
 
   test('35.5 Deducció per Maternitat Multi-Hijo (Art. 81 LIRPF i STS 8/2024)', () => {
     const data = createEmptyDeclaracion(2024);
+    // Cotitzacions a la Seguretat Social suficients per cobrir la deducció (Art. 81.3)
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 30000, inKind: 0, withholdings: 6000, socialSecurity: 4200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
     data.personal.descendants = [
       { id: 'child1', age: 1, disability: 0 },
       { id: 'child2', age: 1, disability: 0 },
@@ -3176,6 +3181,7 @@ suite('38. Blindatge Plusvàlua STC 182/2021, Llei Beckham & CCAA Multi-Format',
       insuranceGains: 0,
       otherMobiliary: 0,
       mobiliaryWithholdings: 1140,
+      securitiesManagementExpenses: 0,
       rentalIncome: 0,
       rentalExpenses: 0,
       imputedIncome: 0,
@@ -3370,7 +3376,8 @@ suite("41. Blindatge Fiscal: Startups, Donatius, Maternitat, Mínims i Antiaplic
 
   test('41.4 Maternitat: deducció no lligada a quota (pot generar quota negativa, Art. 81)', () => {
     const data = createEmptyDeclaracion(2024);
-    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 3000, inKind: 0, withholdings: 0, socialSecurity: 200, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    // Cotitzacions suficients (≥ 1.200 €) perquè el topall de l'Art. 81.3 no redueixi la deducció.
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 3000, inKind: 0, withholdings: 0, socialSecurity: 1500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
     data.personal.descendants = [{ id: 'd1', age: 1, disability: 0 }];
     data.deductions.maternityDeduction = true;
     data.deductions.maternityMonths = 12;
@@ -3381,17 +3388,25 @@ suite("41. Blindatge Fiscal: Startups, Donatius, Maternitat, Mínims i Antiaplic
     assert(res.result === -1200, `Retorn de 1.200 €, obtingut: ${res.result}`);
   });
 
-  test('41.5 Mínim per discapacitat ≥ 65% amb mobilitat reduïda: 12.000 € (Art. 60.2)', () => {
-    const senseMobilitat = createEmptyDeclaracion(2024);
-    senseMobilitat.personal.age = 40;
-    senseMobilitat.personal.disability = 65;
-    assert(calculateIRPF(senseMobilitat).totalMinimum === 14550, 'Sense mobilitat reduïda: 5.550 + 9.000 = 14.550 €');
+  test('41.5 Mínim per discapacitat i gastos de asistencia (Art. 60 LIRPF)', () => {
+    // Discapacitat ≥ 65%: base 9.000 € + gastos de asistencia 3.000 € = 12.000 € (sempre)
+    const seixantaCinc = createEmptyDeclaracion(2024);
+    seixantaCinc.personal.age = 40;
+    seixantaCinc.personal.disability = 65;
+    assert(calculateIRPF(seixantaCinc).totalMinimum === 17550, '≥ 65%: 5.550 + 9.000 + 3.000 = 17.550 €');
 
-    const ambMobilitat = createEmptyDeclaracion(2024);
-    ambMobilitat.personal.age = 40;
-    ambMobilitat.personal.disability = 65;
-    ambMobilitat.personal.reducedMobility = true;
-    assert(calculateIRPF(ambMobilitat).totalMinimum === 17550, 'Amb mobilitat reduïda: 5.550 + 12.000 = 17.550 €');
+    // Discapacitat 33-64% amb movilitat reduïda: base 3.000 € + gastos de asistencia 3.000 € = 6.000 €
+    const trentaTresMobilitat = createEmptyDeclaracion(2024);
+    trentaTresMobilitat.personal.age = 40;
+    trentaTresMobilitat.personal.disability = 40;
+    trentaTresMobilitat.personal.reducedMobility = true;
+    assert(calculateIRPF(trentaTresMobilitat).totalMinimum === 11550, '33-64% amb movilitat: 5.550 + 6.000 = 11.550 €');
+
+    // Discapacitat 33-64% sense movilitat reduïda: només la base de 3.000 €
+    const trentaTres = createEmptyDeclaracion(2024);
+    trentaTres.personal.age = 40;
+    trentaTres.personal.disability = 40;
+    assert(calculateIRPF(trentaTres).totalMinimum === 8550, '33-64% sense movilitat: 5.550 + 3.000 = 8.550 €');
   });
 
   test('41.6 Antiaplicació Art. 33.5.f: detecta la recompra POSTERIOR dins dels 2 mesos', () => {
@@ -3425,6 +3440,110 @@ suite("41. Blindatge Fiscal: Startups, Donatius, Maternitat, Mínims i Antiaplic
     assert(second!.totalAcquisitionEUR === 10000, `Cost ajustat 10.000 €, obtingut: ${second!.totalAcquisitionEUR}`);
     assert(second!.totalGain === 0, `Guany de 0 €, obtingut: ${second!.totalGain}`);
   });
+});
+
+// ── 42. SUITE 42: AUDITORIA DE CÀLCULS AVANÇATS (Arts. 20, 26, 60, 61, 81 LIRPF) ──
+
+suite('42. Correcció dels Càlculs Fiscals Avançats (Arts. 20, 26, 60, 61, 81 LIRPF)', () => {
+
+  test('42.1 Gastos d\'administració i dipòsit de valors (Art. 26.1.a)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.capitalIncome.interests = 2000;
+    data.capitalIncome.dividends = 1000;
+    data.capitalIncome.securitiesManagementExpenses = 150;
+
+    const res = calculateIRPF(data);
+    // Estalvi net = 2.000 + 1.000 − 150 = 2.850 €
+    assert(res.savingsBase === 2850, `Base de l'estalvi neta de 2.850 €, obtinguda: ${res.savingsBase}`);
+  });
+
+  test('42.2 Tope de la deducció per maternitat per cotitzacions a la SS (Art. 81.3)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 5000, inKind: 0, withholdings: 0, socialSecurity: 500, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    data.personal.descendants = [{ id: 'd1', age: 1, disability: 0 }];
+    data.deductions.maternityDeduction = true;
+    data.deductions.maternityMonths = 12;
+    data.deductions.maternityNurseryExpenses = 800;
+
+    // Base (1.200) + guarderia (800) = 2.000 €, però el topall de cotitzacions és 500 €
+    assert(computeDeductions(data).maternityDeductionAmount === 500, `Topall de maternitat 500 €, obtingut: ${computeDeductions(data).maternityDeductionAmount}`);
+
+    // Amb una mare autònoma que cotitza 900 € (sense ocupadors) el topall són els 900 €
+    const autonom = createEmptyDeclaracion(2024);
+    autonom.activities.socialSecuritySelfEmployed = 900;
+    autonom.personal.descendants = [{ id: 'd1', age: 1, disability: 0 }];
+    autonom.deductions.maternityDeduction = true;
+    autonom.deductions.maternityMonths = 12;
+    assert(computeDeductions(autonom).maternityDeductionAmount === 900, `Topall RETA 900 €, obtingut: ${computeDeductions(autonom).maternityDeductionAmount}`);
+  });
+
+  test('42.3 Donatius recurrents: 45% només amb 2 exercicis previs d\'import ≥ (Llei 49/2002)', () => {
+    const acreditat = createEmptyDeclaracion(2024);
+    acreditat.deductions.donations = [
+      { id: 'd1', entity: 'Creu Roja', amount: 1000, recurring: false, priority: true, category: 'ley_49_2002', priorYearAmount: 1000, priorYear2Amount: 1200 },
+    ];
+    // 80% de 250 = 200 + 45% de 750 = 337,5 → 537,5 €
+    assertCloseTo(computeDeductions(acreditat).donationsDeductionAmount, 537.5, 0.01, 'Recurrència acreditada al 45%');
+
+    const noAcreditat = createEmptyDeclaracion(2024);
+    noAcreditat.deductions.donations = [
+      { id: 'd1', entity: 'Creu Roja', amount: 1000, recurring: true, priority: true, category: 'ley_49_2002', priorYearAmount: 500, priorYear2Amount: 1200 },
+    ];
+    // Un dels exercicis previs és inferior → 40% de 750 = 300 → 200 + 300 = 500 €
+    assertCloseTo(computeDeductions(noAcreditat).donationsDeductionAmount, 500, 0.01, 'Sense recurrència acreditada al 40%');
+  });
+
+  test('42.4 Reducció per rendiments del treball: altres rendes i discapacitat (Art. 20)', () => {
+    const casPla = createEmptyDeclaracion(2024);
+    casPla.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 16000, inKind: 0, withholdings: 0, socialSecurity: 1000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    // RNT = 16.000 − 1.000 − 2.000 = 13.000 ≤ 14.852 i sense altres rendes → 7.302 €
+    assert(calculateIRPF(casPla).workIncomeReduction === 7302, `Tram pla 7.302 €, obtingut: ${calculateIRPF(casPla).workIncomeReduction}`);
+
+    const casAltresRendes = createEmptyDeclaracion(2024);
+    casAltresRendes.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 16000, inKind: 0, withholdings: 0, socialSecurity: 1000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    casAltresRendes.capitalIncome.interests = 8000;
+    // 8.000 € d'altres rendes > 6.500 € → fórmula: 7.302 − 1,75 × (13.000 − 14.852) = 10.543 €
+    assertCloseTo(calculateIRPF(casAltresRendes).workIncomeReduction, 10543, 0.01, `Fórmula amb altres rendes, obtingut: ${calculateIRPF(casAltresRendes).workIncomeReduction}`);
+
+    const casDiscapacitat = createEmptyDeclaracion(2024);
+    casDiscapacitat.workIncome.employers = [{ id: 'e1', name: 'Empresa', grossSalary: 16000, inKind: 0, withholdings: 0, socialSecurity: 1000, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+    casDiscapacitat.personal.disability = 40;
+    // 7.302 + 3.500 (Art. 20.3) = 10.802 €
+    assert(calculateIRPF(casDiscapacitat).workIncomeReduction === 10802, `Increment per discapacitat: 10.802 €, obtingut: ${calculateIRPF(casDiscapacitat).workIncomeReduction}`);
+  });
+
+  test('42.5 Prorrateig del mínim per descendents pels mesos de convivència (Art. 61)', () => {
+    const data = createEmptyDeclaracion(2024);
+    data.personal.descendants = [
+      { id: 'd1', age: 5, disability: 0, coexistenceMonths: 6 },
+    ];
+    // Mínim 1r fill 2.400 € × 6/12 = 1.200 €
+    assert(calculateIRPF(data).descendantsMinimum === 1200, `Mínim prorratejat 1.200 €, obtingut: ${calculateIRPF(data).descendantsMinimum}`);
+  });
+
+  test('42.6 Reducció de lloguer: 60% transitori derogat per contractes post-26/05/2023 (Llei 12/2023)', () => {
+    assert(getRentalReductionRate('transitional_60', 'habitual', '2023-01-01') === 60, 'Contracte previ al 26/05/2023: 60%');
+    assert(getRentalReductionRate('transitional_60', 'habitual', '2023-06-01') === 50, 'Contracte posterior: règim general 50%');
+    assert(getRentalReductionRate(undefined, 'habitual', '2024-01-01') === 50, 'Inferit post-2023: 50%');
+    assert(getRentalReductionRate('general_50', 'tourist', '2024-01-01') === 0, 'Ús turístic: sense reducció');
+
+    const pre = createEmptyDeclaracion(2024);
+    pre.capitalIncome.rentalIncome = 10000;
+    pre.capitalIncome.rentalExpenses = 2000;
+    pre.capitalIncome.rentalReductionType = 'transitional_60';
+    pre.capitalIncome.rentalContractDate = '2022-01-01';
+    // Net 8.000 × (1 − 0,60) = 3.200 €
+    assert(calculateIRPF(pre).generalBase === 3200, `Fallback 60% → 3.200 €, obtingut: ${calculateIRPF(pre).generalBase}`);
+
+    const post = createEmptyDeclaracion(2024);
+    post.capitalIncome.rentalIncome = 10000;
+    post.capitalIncome.rentalExpenses = 2000;
+    post.capitalIncome.rentalReductionType = 'transitional_60';
+    post.capitalIncome.rentalContractDate = '2023-09-01';
+    // Net 8.000 × (1 − 0,50) = 4.000 €
+    assert(calculateIRPF(post).generalBase === 4000, `Fallback 50% → 4.000 €, obtingut: ${calculateIRPF(post).generalBase}`);
+  });
+
 });
 
 // ── INFORME I BALANÇ FINAL ──────────────────────────────────────────────────

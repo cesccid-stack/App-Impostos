@@ -499,6 +499,8 @@ function openDonationModal(listContainer: HTMLElement): void {
     recurring: false,
     priority: true,
     category: 'ley_49_2002',
+    priorYearAmount: 0,
+    priorYear2Amount: 0,
   };
 
   const fields = document.createElement('div');
@@ -544,10 +546,32 @@ function openDonationModal(listContainer: HTMLElement): void {
     }),
   );
 
+  // Art. 68.3 LIRPF / Llei 49/2002: el tipus del 45% exigeix donatius a la MATEIXA entitat en
+  // els DOS exercicis previs immediats per un import igual o superior al de l'exercici actual.
+  fields.appendChild(
+    createField({
+      id: 'donation-prior-1',
+      label: 'Import donat a la mateixa entitat l\'any anterior (N-1)',
+      suffix: '€',
+      placeholder: '0,00',
+      onChange: (val) => { form.priorYearAmount = parseFloat(val) || 0; },
+    }),
+  );
+
+  fields.appendChild(
+    createField({
+      id: 'donation-prior-2',
+      label: 'Import donat a la mateixa entitat fa dos anys (N-2)',
+      suffix: '€',
+      placeholder: '0,00',
+      onChange: (val) => { form.priorYear2Amount = parseFloat(val) || 0; },
+    }),
+  );
+
   fields.appendChild(
     createToggle({
       id: 'donation-recurring',
-      label: 'Donació recurrent (mateixa entitat durant ≥ 3 anys consecutius: 45% resta)',
+      label: 'Confirmar manualment la recurrència del 45% (només si no informes els imports previs)',
       checked: false,
       onChange: (checked) => { form.recurring = checked; },
     }),
@@ -571,6 +595,8 @@ function openDonationModal(listContainer: HTMLElement): void {
       recurring: form.recurring ?? false,
       priority: form.category === 'ley_49_2002',
       category: form.category ?? 'ley_49_2002',
+      priorYearAmount: form.priorYearAmount ?? 0,
+      priorYear2Amount: form.priorYear2Amount ?? 0,
     };
 
     const deductions = store.getData().deductions;

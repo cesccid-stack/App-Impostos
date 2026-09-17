@@ -79,7 +79,17 @@ function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): n
     if (category === 'ley_49_2002') {
       const firstTier = Math.min(amount, DONATION_FIRST_TIER);
       const rest = Math.max(0, amount - DONATION_FIRST_TIER);
-      const restRate = donation.recurring
+      // Art. 68.3 LIRPF i art. 19 Llei 49/2002: el tipus del 45% s'aplica quan en els DOS
+      // períodes impositius immediats anteriors es van fer donatius a la MATEIXA entitat per
+      // import igual o superior, en cada un d'ells, al del exercici actual. Si no es disposa
+      // de les dades dels exercicis previs, es respecta el flag manual `recurring`.
+      const hasPriorYearEvidence =
+        donation.priorYearAmount !== undefined && donation.priorYear2Amount !== undefined;
+      const isRecurring = hasPriorYearEvidence
+        ? (donation.priorYearAmount as number) >= amount &&
+          (donation.priorYear2Amount as number) >= amount
+        : donation.recurring;
+      const restRate = isRecurring
         ? DONATION_REST_RECURRING_RATE
         : DONATION_REST_RATE;
 
@@ -114,6 +124,8 @@ function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): n
  * Deducció per maternitat (Art. 81 LIRPF i STS 8/2024).
  * 100 €/mes per mare treballadora per cada fill < 3 anys (màx 1.200 € per descendent).
  * + Increment per despeses de guarderia / centres d'educació infantil (fins a 1.000 € addicionals per descendent).
+ * El conjunt de la deducció té com a límit les cotitzacions i quotes a la Seguretat Social
+ * (i mutualitats) devengades en el període impositiu (Art. 81.3 LIRPF).
  */
 function computeMaternityDeduction(data: DeclaracionData): number {
   if (!data.deductions.maternityDeduction) return 0;
@@ -128,7 +140,17 @@ function computeMaternityDeduction(data: DeclaracionData): number {
   const baseMaternity = Math.min(months * MATERNITY_DEDUCTION_PER_MONTH, maxBaseAllowed);
   const nurseryExtra = Math.min(data.deductions.maternityNurseryExpenses || 0, maxNurseryAllowed);
 
-  return baseMaternity + nurseryExtra;
+  const rawDeduction = baseMaternity + nurseryExtra;
+
+  // Art. 81.3 LIRPF: la deducció (base + increment de guarderia) no pot excedir les
+  // cotitzacions i quotes totals a la Seguretat Social i mutualitats devengades en el període.
+  const socialSecurityContributions =
+    (data.workIncome?.employers || []).reduce(
+      (sum, emp) => sum + (emp.socialSecurity || 0),
+      0,
+    ) + (data.activities?.socialSecuritySelfEmployed || 0);
+
+  return Math.min(rawDeduction, Math.max(0, socialSecurityContributions));
 }
 
 /**
