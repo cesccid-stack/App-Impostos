@@ -1,4 +1,15 @@
+/**
+ * @module fiscal/pensions-optimizer
+ * Motor d'optimització de rescat de plans de pensions.
+ * Calcula el tractament fiscal del rescat en Capital, Renda i Mixt, aplicant
+ * la reducció del 40% per aportacions anteriors a 31/12/2006 (DT 12a LIRPF)
+ * i calculant l'IRPF marginal exacte segons les escales vigents.
+ */
+
 import type { PensionRescueData } from '../types-strategy.ts';
+import { createEmptyDeclaracion } from './declaration-factory.ts';
+import { calculateIRPF } from './irpf.ts';
+import { round2 } from '../utils/exact-math.ts';
 
 export class PensionsOptimizerEngine {
   /**
@@ -7,21 +18,34 @@ export class PensionsOptimizerEngine {
   public static optimizeRescue(data: PensionRescueData): PensionRescueData {
     const totalValue = data.pensionFundValue;
     const pre2007 = data.pre2007Contributions;
-    
-    // Si han passat més de 2 anys (com a norma general/règim transitori, depèn de l'any de jubilació), 
-    // pot perdre's el dret a la reducció del 40% en forma de capital per contingències anteriors a 2007.
-    // Ho simplifiquem assumint que si anys <= 2, manté el dret.
-    const canApply40Reduction = data.yearsSinceRetirement <= 2;
-    
+
+    // DT 12a LIRPF: Terminis per aplicar la reducció del 40% en forma de capital per aportacions pre-2007:
+    // - Contingències esdevingudes fins a 2010: el termini va finalitzar el 31/12/2018 (extingit).
+    // - Contingències esdevingudes 2011-2014: 8 exercicis següents a aquell en què va succeir la contingència.
+    // - Contingències 2015 en endavant (inclòs 2022+): exercici de jubilació o els 2 següents (yearsSinceRetirement <= 2).
+    let canApply40Reduction = false;
+    const currentYear = 2024;
+    const retYear = data.retirementYear ?? currentYear - data.yearsSinceRetirement;
+
+    if (retYear <= 2010) {
+      canApply40Reduction = false;
+    } else if (retYear >= 2011 && retYear <= 2014) {
+      canApply40Reduction = data.yearsSinceRetirement <= 8;
+    } else {
+      canApply40Reduction = data.yearsSinceRetirement <= 2;
+    }
+
     // Reducció aplicable al rescat en forma de capital de prestacions anteriors a 31/12/2006
-    const reductionAmount = canApply40Reduction ? (pre2007 * 0.40) : 0;
-    
+    const reductionAmount = canApply40Reduction ? round2(pre2007 * 0.4) : 0;
+
     const scenarios = [];
 
     // --- ESCENARI 1: Rescat 100% en Capital ---
     // Tot de cop el primer any
     const baseCapital = totalValue - reductionAmount;
-    const taxCostCapital = this.estimarIRPF(baseCapital + data.otherYearlyIncome) - this.estimarIRPF(data.otherYearlyIncome);
+    const taxCostCapital = round2(
+      this.estimarIRPF(baseCapital + data.otherYearlyIncome) - this.estimarIRPF(data.otherYearlyIncome),
+    );
     scenarios.push({
       name: 'Rescat 100% Capital',
       description: 'Rescatar tot el fons en un únic pagament (Atenció al salt de tram IRPF).',
@@ -29,41 +53,49 @@ export class PensionsOptimizerEngine {
       capitalRescueAmount: totalValue,
       yearlyRentaAmount: 0,
       taxCost: taxCostCapital,
-      netReceivedFirstYear: totalValue - taxCostCapital
+      netReceivedFirstYear: round2(totalValue - taxCostCapital),
     });
 
     // --- ESCENARI 2: Rescat 100% en Renda (5 anys) ---
     // Repartit en 5 anys
-    const yearlyRenta = totalValue / 5;
-    const taxCostYearly = this.estimarIRPF(yearlyRenta + data.otherYearlyIncome) - this.estimarIRPF(data.otherYearlyIncome);
-    const taxCostRentaTotal = taxCostYearly * 5; // Estimació a 5 anys constants
+    const yearlyRenta = round2(totalValue / 5);
+    const taxCostYearly = round2(
+      this.estimarIRPF(yearlyRenta + data.otherYearlyIncome) - this.estimarIRPF(data.otherYearlyIncome),
+    );
+    const taxCostRentaTotal = round2(taxCostYearly * 5); // Estimació a 5 anys constants
     scenarios.push({
       name: 'Rescat Renda (5 anys)',
-      description: 'Repartir el rescat en 5 anualitats idèntiques per diluir l\'impacte fiscal.',
+      description: "Repartir el rescat en 5 anualitats idèntiques per diluir l'impacte fiscal.",
       rescueFormat: 'renta' as const,
       capitalRescueAmount: 0,
       yearlyRentaAmount: yearlyRenta,
       taxCost: taxCostRentaTotal,
-      netReceivedFirstYear: yearlyRenta - taxCostYearly
+      netReceivedFirstYear: round2(yearlyRenta - taxCostYearly),
     });
 
     // --- ESCENARI 3: Rescat Mixt (Capital pre-2007 + Renda post-2007) ---
     if (pre2007 > 0 && canApply40Reduction) {
       const restValue = totalValue - pre2007;
-      const yearlyRestRenta = restValue / 5; // Renda a 5 anys de la resta
-      
-      const taxCostMixtFirstYear = this.estimarIRPF(data.otherYearlyIncome + (pre2007 - reductionAmount) + yearlyRestRenta) - this.estimarIRPF(data.otherYearlyIncome);
-      const taxCostMixtSubsequentYears = this.estimarIRPF(data.otherYearlyIncome + yearlyRestRenta) - this.estimarIRPF(data.otherYearlyIncome);
-      const taxCostMixtTotal = taxCostMixtFirstYear + (taxCostMixtSubsequentYears * 4);
+      const yearlyRestRenta = round2(restValue / 5); // Renda a 5 anys de la resta
+
+      const taxCostMixtFirstYear = round2(
+        this.estimarIRPF(data.otherYearlyIncome + (pre2007 - reductionAmount) + yearlyRestRenta) -
+          this.estimarIRPF(data.otherYearlyIncome),
+      );
+      const taxCostMixtSubsequentYears = round2(
+        this.estimarIRPF(data.otherYearlyIncome + yearlyRestRenta) - this.estimarIRPF(data.otherYearlyIncome),
+      );
+      const taxCostMixtTotal = round2(taxCostMixtFirstYear + taxCostMixtSubsequentYears * 4);
 
       scenarios.push({
         name: 'Rescat Mixt Òptim',
-        description: 'Cobrar el capital pre-2007 de cop aprofitant el 40% de reducció, i la resta en rendes de 5 anys.',
+        description:
+          'Cobrar el capital pre-2007 de cop aprofitant el 40% de reducció, i la resta en rendes de 5 anys.',
         rescueFormat: 'mixto' as const,
         capitalRescueAmount: pre2007,
         yearlyRentaAmount: yearlyRestRenta,
         taxCost: taxCostMixtTotal,
-        netReceivedFirstYear: pre2007 + yearlyRestRenta - taxCostMixtFirstYear
+        netReceivedFirstYear: round2(pre2007 + yearlyRestRenta - taxCostMixtFirstYear),
       });
     }
 
@@ -78,17 +110,32 @@ export class PensionsOptimizerEngine {
     return {
       ...data,
       scenarios,
-      bestScenarioName: bestScenario.name
+      bestScenarioName: bestScenario.name,
     };
   }
 
-  // Càlcul ràpid marginal simplificat per IRPF (General)
+  /**
+   * Càlcul de la quota d'IRPF aplicant el motor oficial calculateIRPF
+   * sobre un declarant de referència per a una base de treball donada.
+   */
   private static estimarIRPF(base: number): number {
-    if (base <= 12450) return base * 0.19;
-    if (base <= 20200) return (12450 * 0.19) + ((base - 12450) * 0.24);
-    if (base <= 35200) return (12450 * 0.19) + (7750 * 0.24) + ((base - 20200) * 0.30);
-    if (base <= 60000) return (12450 * 0.19) + (7750 * 0.24) + (15000 * 0.30) + ((base - 35200) * 0.37);
-    if (base <= 300000) return (12450 * 0.19) + (7750 * 0.24) + (15000 * 0.30) + (24800 * 0.37) + ((base - 60000) * 0.45);
-    return (12450 * 0.19) + (7750 * 0.24) + (15000 * 0.30) + (24800 * 0.37) + (240000 * 0.45) + ((base - 300000) * 0.47);
+    if (base <= 0) return 0;
+    const decl = createEmptyDeclaracion(2024);
+    decl.workIncome.employers = [
+      {
+        id: 'pension_rescue_sim',
+        name: 'Rendiments / Fons Pensió',
+        grossSalary: base,
+        inKind: 0,
+        withholdings: 0,
+        socialSecurity: 0,
+        dietsIncome: 0,
+        dietsDays: 0,
+        mileageIncome: 0,
+        mileageKm: 0,
+      },
+    ];
+    const result = calculateIRPF(decl);
+    return round2(result.netTax);
   }
 }

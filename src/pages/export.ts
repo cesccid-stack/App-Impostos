@@ -11,6 +11,13 @@ import { generateCSV } from '../utils/export-csv.ts';
 import { generateAEATAnnexF2, generateAEATAnnexA } from '../utils/aeat-export.ts';
 import { generateTaxDefenseDossier } from '../fiscal/audit-dossier-generator.ts';
 import { explainTaxReturn } from '../fiscal/tax-explainer-engine.ts';
+import {
+  DIET_EXEMPT_NATIONAL_NO_PERNOCTATION,
+  DIET_EXEMPT_NATIONAL_PERNOCTATION,
+  DIET_EXEMPT_ABROAD_NO_PERNOCTATION,
+  DIET_EXEMPT_ABROAD_PERNOCTATION,
+  MILEAGE_EXEMPT_RATE_PER_KM,
+} from '../fiscal/constants.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
 
 export function renderExport(): HTMLElement {
@@ -31,13 +38,18 @@ export function renderExport(): HTMLElement {
   const defenseDossierCard = createExportCard({
     icon: '🛡️',
     title: 'Dossier de Defensa AEAT (Art. 34 LGT)',
-    description: 'Genera l\'informe d\'acreditació jurídica casella a casella amb la referència legal (LIRPF/DGT), inventari de justificants requerits i data de prescripció de 4 anys.',
+    description:
+      "Genera l'informe d'acreditació jurídica casella a casella amb la referència legal (LIRPF/DGT), inventari de justificants requerits i data de prescripció de 4 anys.",
     onClick: () => {
       try {
         const data = store.getData();
         const dossier = generateTaxDefenseDossier(data);
         const json = JSON.stringify(dossier, null, 2);
-        downloadFile(json, `dossier_defensa_aeat_${dossier.taxpayerNif}_${data.year}.json`, 'application/json');
+        downloadFile(
+          json,
+          `dossier_defensa_aeat_${dossier.taxpayerNif}_${data.year}.json`,
+          'application/json',
+        );
         showToast('Dossier de Defensa Tributària descarregat correctament', 'success');
       } catch {
         showToast('Error en generar el Dossier de Defensa', 'error');
@@ -50,7 +62,8 @@ export function renderExport(): HTMLElement {
   const explainerReportCard = createExportCard({
     icon: '🧭',
     title: 'Informe Didàctic & Viatge Fiscal (10 Passos)',
-    description: 'Descarrega l\'informe complet d\'explicació en llenguatge planer, desglossament de trams i cascada tributària per a clients o arxiu personal.',
+    description:
+      "Descarrega l'informe complet d'explicació en llenguatge planer, desglossament de trams i cascada tributària per a clients o arxiu personal.",
     onClick: () => {
       try {
         const data = store.getData();
@@ -60,7 +73,7 @@ export function renderExport(): HTMLElement {
         downloadFile(json, `informe_didactic_renda_${data.year}.json`, 'application/json');
         showToast('Informe didàctic descarregat correctament', 'success');
       } catch {
-        showToast('Error en generar l\'informe didàctic', 'error');
+        showToast("Error en generar l'informe didàctic", 'error');
       }
     },
   });
@@ -70,7 +83,8 @@ export function renderExport(): HTMLElement {
   const rentaWebCard = createExportCard({
     icon: '🏛️',
     title: 'Guia Global Renta Web (Migració)',
-    description: 'Genera un document complet amb el llistat exacte de "Casillas" (treball, capital, immobles, accions, deduccions).',
+    description:
+      'Genera un document complet amb el llistat exacte de "Casillas" (treball, capital, immobles, accions, deduccions).',
     onClick: () => {
       try {
         const data = store.getData();
@@ -89,7 +103,8 @@ export function renderExport(): HTMLElement {
   const annexACard = createExportCard({
     icon: '🏠',
     title: 'AEAT Annex A (Immobles en Lloguer)',
-    description: 'Descarrega el desglossament detallat de rendiments immobiliaris, amortització de construcció, obres i mobles (Caselles 0060-0105).',
+    description:
+      'Descarrega el desglossament detallat de rendiments immobiliaris, amortització de construcció, obres i mobles (Caselles 0060-0105).',
     onClick: () => {
       const data = store.getData();
       const { results } = calculateAllProperties(data.properties || [], data.year);
@@ -104,11 +119,12 @@ export function renderExport(): HTMLElement {
   const annexF2Card = createExportCard({
     icon: '📈',
     title: 'AEAT Annex F2 (Accions i Valors Negociats)',
-    description: 'Descarrega la guia oficial per a la Casella 0327 i següents, amb agrupació per ISIN i regla dels 2 mesos.',
+    description:
+      'Descarrega la guia oficial per a la Casella 0327 i següents, amb agrupació per ISIN i regla dels 2 mesos.',
     onClick: () => {
       const data = store.getData();
       const gains = data.gains.items || [];
-      const dummySummaries = gains.map(g => ({
+      const dummySummaries = gains.map((g) => ({
         isin: g.description.match(/\[(.*?)\]/)?.[1] || '',
         symbol: g.description.split(' ')[1] || g.description,
         name: g.description,
@@ -116,8 +132,13 @@ export function renderExport(): HTMLElement {
         totalBought: g.acquisitionValue,
         totalSold: g.transferValue,
         realizedGain: g.transferValue - g.acquisitionValue - g.expenses,
-        suspendedLosses: g.isNonComputableLoss ? Math.max(0, g.acquisitionValue + g.expenses - g.transferValue) : 0,
-        netTaxableGain: (g.isNonComputableLoss && (g.transferValue - g.acquisitionValue - g.expenses) < 0) ? 0 : (g.transferValue - g.acquisitionValue - g.expenses),
+        suspendedLosses: g.isNonComputableLoss
+          ? Math.max(0, g.acquisitionValue + g.expenses - g.transferValue)
+          : 0,
+        netTaxableGain:
+          g.isNonComputableLoss && g.transferValue - g.acquisitionValue - g.expenses < 0
+            ? 0
+            : g.transferValue - g.acquisitionValue - g.expenses,
         unrealizedGain: 0,
         openPosition: 0,
         tradesCount: 1,
@@ -133,7 +154,8 @@ export function renderExport(): HTMLElement {
   const csvCard = createExportCard({
     icon: '📊',
     title: 'Exportar a CSV',
-    description: 'Descarrega un fitxer CSV amb el desglossament complet del càlcul. Compatible amb Excel i Google Sheets.',
+    description:
+      'Descarrega un fitxer CSV amb el desglossament complet del càlcul. Compatible amb Excel i Google Sheets.',
     onClick: () => {
       try {
         const data = store.getData();
@@ -152,7 +174,8 @@ export function renderExport(): HTMLElement {
   const jsonCard = createExportCard({
     icon: '🗂',
     title: 'Exportar dades (JSON)',
-    description: 'Descarrega totes les dades introduïdes en format JSON. Útil per fer còpies de seguretat o importar a un altre navegador.',
+    description:
+      'Descarrega totes les dades introduïdes en format JSON. Útil per fer còpies de seguretat o importar a un altre navegador.',
     onClick: () => {
       try {
         const json = store.exportAll();
@@ -170,7 +193,8 @@ export function renderExport(): HTMLElement {
   const importCard = createExportCard({
     icon: '📥',
     title: 'Importar dades (JSON)',
-    description: 'Restaura les dades des d\'un fitxer JSON prèviament exportat. Sobreescriurà les dades actuals.',
+    description:
+      "Restaura les dades des d'un fitxer JSON prèviament exportat. Sobreescriurà les dades actuals.",
     onClick: () => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -198,7 +222,8 @@ export function renderExport(): HTMLElement {
   const printCard = createExportCard({
     icon: '🖨',
     title: 'Imprimir resum',
-    description: 'Obre el diàleg d\'impressió del navegador per imprimir o guardar com a PDF el resum de la declaració.',
+    description:
+      "Obre el diàleg d'impressió del navegador per imprimir o guardar com a PDF el resum de la declaració.",
     onClick: () => {
       window.print();
     },
@@ -223,7 +248,7 @@ export function renderExport(): HTMLElement {
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'btn btn--danger';
-  resetBtn.textContent = '🗑 Esborrar totes les dades de l\'exercici actual';
+  resetBtn.textContent = "🗑 Esborrar totes les dades de l'exercici actual";
   resetBtn.addEventListener('click', () => {
     if (confirm(`Segur que vols esborrar totes les dades de l'exercici ${store.getYear()}?`)) {
       store.reset();
@@ -279,30 +304,38 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
   let totalWithholdings = 0;
 
   for (const emp of data.workIncome.employers) {
-    const dietsExempt = emp.dietsDays * 26.67;
-    const mileageExempt = emp.mileageKm * 0.26;
+    let dietRate = DIET_EXEMPT_NATIONAL_NO_PERNOCTATION;
+    if (emp.dietsAbroad) {
+      dietRate = emp.dietsWithPernoctation
+        ? DIET_EXEMPT_ABROAD_PERNOCTATION
+        : DIET_EXEMPT_ABROAD_NO_PERNOCTATION;
+    } else if (emp.dietsWithPernoctation) {
+      dietRate = DIET_EXEMPT_NATIONAL_PERNOCTATION;
+    }
+    const dietsExempt = emp.dietsDays * dietRate;
+    const mileageExempt = emp.mileageKm * MILEAGE_EXEMPT_RATE_PER_KM;
     const taxableDiets = Math.max(0, emp.dietsIncome - dietsExempt);
     const taxableMileage = Math.max(0, emp.mileageIncome - mileageExempt);
     const empGross = emp.grossSalary + emp.inKind + taxableDiets + taxableMileage;
-    
+
     totalGross += empGross;
     totalSS += emp.socialSecurity;
     totalWithholdings += emp.withholdings;
-    
+
     if (emp.dietsIncome > 0 || emp.mileageIncome > 0) {
       guide += `\n[Nota Info Pagador: ${emp.name}]
   - Dietes Ingressades: ${emp.dietsIncome.toFixed(2)} €
-  - Dietes Exemptes per Llei (${emp.dietsDays} dies x 26,67 €): ${dietsExempt.toFixed(2)} €
+  - Dietes Exemptes per Llei (${emp.dietsDays} dies x ${dietRate.toFixed(2)} €): ${dietsExempt.toFixed(2)} €
   - Dietes Imputables a Base (Excés): ${taxableDiets.toFixed(2)} €
   - Km Ingressats: ${emp.mileageIncome.toFixed(2)} €
-  - Km Exempts per Llei (${emp.mileageKm} km x 0,26 €): ${mileageExempt.toFixed(2)} €
+  - Km Exempts per Llei (${emp.mileageKm} km x ${MILEAGE_EXEMPT_RATE_PER_KM.toFixed(2)} €): ${mileageExempt.toFixed(2)} €
   - Km Imputables a Base (Excés): ${taxableMileage.toFixed(2)} €\n`;
     }
   }
 
   guide += `[Casilla 0003] Retribucions dineràries: ${totalGross.toFixed(2)} €\n`;
   guide += `[Casilla 0013] Cotitzacions Seguretat Social: ${totalSS.toFixed(2)} €\n`;
-  
+
   if (data.workIncome.unionFees > 0) {
     guide += `[Casilla 0014] Quotes satisfetes a sindicats: ${data.workIncome.unionFees.toFixed(2)} €\n`;
   }
@@ -311,9 +344,12 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
   }
 
   guide += `\n=== RENDIMENTS DEL CAPITAL MOBILIARI ===\n`;
-  if (data.capitalIncome.interests > 0) guide += `[Casilla 0027] Interessos de comptes i dipòsits: ${data.capitalIncome.interests.toFixed(2)} €\n`;
-  if (data.capitalIncome.dividends > 0) guide += `[Casilla 0029] Dividends i accions: ${data.capitalIncome.dividends.toFixed(2)} €\n`;
-  if (data.capitalIncome.otherMobiliary > 0) guide += `[Casilla 0033/0040] Altres rendiments del capital mobiliari: ${data.capitalIncome.otherMobiliary.toFixed(2)} €\n`;
+  if (data.capitalIncome.interests > 0)
+    guide += `[Casilla 0027] Interessos de comptes i dipòsits: ${data.capitalIncome.interests.toFixed(2)} €\n`;
+  if (data.capitalIncome.dividends > 0)
+    guide += `[Casilla 0029] Dividends i accions: ${data.capitalIncome.dividends.toFixed(2)} €\n`;
+  if (data.capitalIncome.otherMobiliary > 0)
+    guide += `[Casilla 0033/0040] Altres rendiments del capital mobiliari: ${data.capitalIncome.otherMobiliary.toFixed(2)} €\n`;
 
   // Immobles
   const props = data.properties || [];
@@ -322,7 +358,7 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
     guide += `\n=== RENDIMENTS DEL CAPITAL IMMOBILIARI (ANNEX A) ===\n`;
     guide += `Total immobles en explotació: ${props.length}\n`;
     results.forEach((r, i) => {
-      guide += `  • Immoble #${i+1} (${r.property.name || r.property.address}) [Ref. Cadastral ${r.property.cadastralReference}]:\n`;
+      guide += `  • Immoble #${i + 1} (${r.property.name || r.property.address}) [Ref. Cadastral ${r.property.cadastralReference}]:\n`;
       guide += `    - [Casilla 0066] Ingressos: ${r.grossIncome.toFixed(2)} €\n`;
       guide += `    - [Casilla 0071] Despeses limitades aplicades: ${r.limitedExpensesDeducted.toFixed(2)} €\n`;
       guide += `    - [Casilla 0079] Amortització immoble: ${r.buildingAmortization.toFixed(2)} €\n`;
@@ -343,7 +379,7 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
     guide += `Has de detallar les següents agrupacions de vendes o introduir-les amb eines automàtiques (si tens més de 50). Verifica la regla dels 2 mesos on correspongui.\n`;
     for (const g of gains) {
       guide += `  - ${g.description}: Adquisició ${g.acquisitionValue.toFixed(2)}€, Transmissió ${g.transferValue.toFixed(2)}€`;
-      if (g.isNonComputableLoss && (g.transferValue - g.acquisitionValue - g.expenses) < 0) {
+      if (g.isNonComputableLoss && g.transferValue - g.acquisitionValue - g.expenses < 0) {
         guide += ` [ATENCIÓ: Casilla 0335/0336 "Pérdida patrimonial a integrar en ejercicios siguientes" per Regla de 2 mesos]\n`;
       } else {
         guide += `\n`;
@@ -368,7 +404,7 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
   if (sum130 > 0) {
     guide += `[Casilla 0600] Pagaments fraccionats d'activitats econòmiques (Model 130 1T-4T): ${sum130.toFixed(2)} €\n`;
   }
-  
+
   guide += `\n=== DEDUCCIONS AUTONÒMIQUES (CATALUNYA) ===\n`;
   if (data.deductions.catalanRentalDeduction) {
     guide += `[Casilla 1003] Lloguer d'habitatge habitual (Catalunya) - Quantitats: ${data.deductions.catalanRentalAmount.toFixed(2)} €\n`;
@@ -383,6 +419,6 @@ als formularis oficials de la Renta Web (Borrador d'Hisenda).
   guide += `\n===========================================================\n`;
   guide += `RESULTAT FINAL ESTIMAT PER L'APP: ${result.result.toFixed(2)} €\n`;
   guide += `(Positiu: a pagar, Negatiu: a tornar)\n`;
-  
+
   return guide;
 }

@@ -10,6 +10,7 @@ import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
 import { calculateEmployeeSalaryCost, type EmployeeRegimeType } from '../fiscal/social-security-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
+import { createInfoTooltip } from '../components/info-tooltip.ts';
 import type { EmployerItem } from '../types.ts';
 
 export function renderWorkIncome(): HTMLElement {
@@ -19,9 +20,22 @@ export function renderWorkIncome(): HTMLElement {
   const data = store.getData();
   const w = data.workIncome;
   const compliance = runAutomatedComplianceChecks(data);
-  const workIssues = compliance.issues.filter(i => i.id.startsWith('work') || i.id.startsWith('pension'));
+  const workIssues = compliance.issues.filter((i) => i.id.startsWith('work') || i.id.startsWith('pension'));
 
-  const totalGrossSalary = (w.employers || []).reduce((acc, e) => acc + (e.grossSalary || 0), 0);
+  const employers = w.employers || [];
+  const grossSalaryTotal = employers.reduce((acc, e) => acc + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  const ssTotal = employers.reduce((acc, e) => acc + (e.socialSecurity || 0), 0);
+  const otherExpenses =
+    (w.unionFees || 0) +
+    (w.professionalCollegeFees || 0) +
+    (w.legalDefenseFees || 0) +
+    (w.otherDeductible || 0);
+  const generalExpense2000 =
+    grossSalaryTotal > 0 ? Math.min(2000, Math.max(0, grossSalaryTotal - ssTotal)) : 0;
+  const netBeforeReduction = Math.max(
+    0,
+    grossSalaryTotal - ssTotal - generalExpense2000 - otherExpenses,
+  );
 
   page.innerHTML = `
     <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:var(--space-md);">
@@ -34,7 +48,51 @@ export function renderWorkIncome(): HTMLElement {
       </button>
     </div>
 
-    ${workIssues.length > 0 ? `
+    <!-- Banner Didàctic: Com es calcula el teu Rendiment Net del Treball -->
+    <div class="card" style="margin-bottom:var(--space-lg); background:linear-gradient(145deg, rgba(99, 102, 241, 0.04), var(--bg-surface-elevated)); border:1px solid var(--border-accent); padding:var(--space-md);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); margin-bottom:var(--space-sm);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.2rem;">💡</span>
+          <strong style="font-size:var(--text-sm); color:var(--text-primary);">Com es calcula el teu Rendiment Net del Treball?</strong>
+          <span class="tax-info-tooltip-mount" data-concept="rendiment_treball"></span>
+        </div>
+        <span class="badge badge--primary" style="font-size:0.75rem;">Art. 17-20 LIRPF</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:var(--space-sm); font-size:0.8rem;">
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➕ Sous Bruts Totals</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--text-primary);">${formatCurrency(grossSalaryTotal)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">${employers.length} pagador(s)</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➖ Seguretat Social</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-warning);">-${formatCurrency(ssTotal)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Cotització a càrrec teu</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem; display:flex; align-items:center; gap:4px;">
+            <span>➖ Despeses Generals</span>
+            <span class="tax-info-tooltip-mount" data-concept="despeses_generals_2000"></span>
+          </div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-success);">-${formatCurrency(generalExpense2000)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">2.000 € fixos per llei</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➖ Altres Despeses</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-warning);">-${formatCurrency(otherExpenses)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Sindicats, col·legis, defensa</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--color-primary); background:rgba(99,102,241,0.04);">
+          <div style="color:var(--color-primary); font-size:0.7rem; font-weight:700;">🟰 Rendiment Net Previ</div>
+          <div style="font-weight:900; font-size:1.1rem; color:var(--color-primary);">${formatCurrency(netBeforeReduction)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Casella 0022 AEAT</div>
+        </div>
+      </div>
+    </div>
+
+    ${
+      workIssues.length > 0
+        ? `
       <div class="card" style="margin-bottom:var(--space-lg); padding:10px 16px; border-left:4px solid var(--color-warning); background:var(--bg-surface-elevated); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
         <div style="display:flex; align-items:center; gap:var(--space-sm);">
           <span style="font-size:1.2rem;">⚠️</span>
@@ -47,7 +105,9 @@ export function renderWorkIncome(): HTMLElement {
           🔍 Veure Diagnòstic
         </button>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
   `;
 
   page.querySelector('#btn-open-work-compliance')?.addEventListener('click', () => {
@@ -90,7 +150,7 @@ export function renderWorkIncome(): HTMLElement {
           value: w.legalDefenseFees || 0,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Litigis laborals directes contra l\'ocupador (Art. 19.2.e LIRPF - Deduïble fins a 300,00 €)',
+          hint: "Litigis laborals directes contra l'ocupador (Art. 19.2.e LIRPF - Deduïble fins a 300,00 €)",
           onChange: (val) => store.update('workIncome', { legalDefenseFees: parseFloat(val) || 0 }),
         }),
         createField({
@@ -118,18 +178,18 @@ export function renderWorkIncome(): HTMLElement {
           value: w.severancePay || 0,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Exempt fins al límit obligatori de l\'ET (màx 180.000 €); l\'excés tributa amb reducció 30%',
+          hint: "Exempt fins al límit obligatori de l'ET (màx 180.000 €); l'excés tributa amb reducció 30%",
           onChange: (val) => store.update('workIncome', { severancePay: parseFloat(val) || 0 }),
         }),
       ),
       createFormRow(
         createField({
           id: 'foreign-work-7p',
-          label: 'Exempció treballs a l\'estranger (Art. 7.p LIRPF)',
+          label: "Exempció treballs a l'estranger (Art. 7.p LIRPF)",
           value: w.foreignWorkExemption7p || 0,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Sous per treballs efectius a l\'estranger per a empreses no residents (màx. 60.100 €)',
+          hint: "Sous per treballs efectius a l'estranger per a empreses no residents (màx. 60.100 €)",
           onChange: (val) => store.update('workIncome', { foreignWorkExemption7p: parseFloat(val) || 0 }),
         }),
         createField({
@@ -138,7 +198,7 @@ export function renderWorkIncome(): HTMLElement {
           value: w.irregularIncomeAmount || 0,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Bonus plurianuals, indemnitzacions no exemptes (s\'aplicarà reducció del 30%)',
+          hint: "Bonus plurianuals, indemnitzacions no exemptes (s'aplicarà reducció del 30%)",
           onChange: (val) => store.update('workIncome', { irregularIncomeAmount: parseFloat(val) || 0 }),
         }),
       ),
@@ -171,7 +231,7 @@ export function renderWorkIncome(): HTMLElement {
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:var(--space-sm); margin-bottom:var(--space-md); background:var(--bg-surface-elevated); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
       <div>
         <label class="form-label" style="font-size:0.75rem;">Sou Brut Anual a Simular</label>
-        <input type="number" class="form-input" id="calc-ss-gross" value="${totalGrossSalary > 0 ? totalGrossSalary : 30000}" style="padding:6px 10px; font-size:0.85rem;" />
+        <input type="number" class="form-input" id="calc-ss-gross" value="${grossSalaryTotal > 0 ? grossSalaryTotal : 30000}" style="padding:6px 10px; font-size:0.85rem;" />
       </div>
       <div>
         <label class="form-label" style="font-size:0.75rem;">Retenció IRPF Nòmina (%)</label>
@@ -205,9 +265,14 @@ export function renderWorkIncome(): HTMLElement {
 
   const renderSalaryBreakdown = () => {
     const grossVal = parseFloat((salaryCard.querySelector('#calc-ss-gross') as HTMLInputElement)?.value) || 0;
-    const irpfRate = parseFloat((salaryCard.querySelector('#calc-ss-irpf-rate') as HTMLInputElement)?.value) || 0;
-    const regime = ((salaryCard.querySelector('#calc-ss-contract') as HTMLSelectElement)?.value || 'private_indefinite') as EmployeeRegimeType;
-    const payments = parseInt((salaryCard.querySelector('#calc-ss-payments') as HTMLSelectElement)?.value || '12', 10) as 12 | 14;
+    const irpfRate =
+      parseFloat((salaryCard.querySelector('#calc-ss-irpf-rate') as HTMLInputElement)?.value) || 0;
+    const regime = ((salaryCard.querySelector('#calc-ss-contract') as HTMLSelectElement)?.value ||
+      'private_indefinite') as EmployeeRegimeType;
+    const payments = parseInt(
+      (salaryCard.querySelector('#calc-ss-payments') as HTMLSelectElement)?.value || '12',
+      10,
+    ) as 12 | 14;
 
     const breakdown = calculateEmployeeSalaryCost(grossVal, irpfRate, regime, data.year || 2024, payments);
     const container = salaryCard.querySelector('#salary-breakdown-container');
@@ -230,16 +295,24 @@ export function renderWorkIncome(): HTMLElement {
               <span>- ${breakdown.isClassesPassives ? 'Drets Passius + MUFACE:' : breakdown.isCivilServant ? 'Seguretat Social Funcionari (~4,92%):' : 'Seguretat Social (~6,47%):'}</span>
               <span>-${formatCurrency(breakdown.totalEmployeeSSAnnual)}</span>
             </div>
-            ${breakdown.isCivilServant && !breakdown.isClassesPassives ? `
+            ${
+              breakdown.isCivilServant && !breakdown.isClassesPassives
+                ? `
               <div style="font-size:0.75rem; color:var(--color-success); padding-left:8px;">
                 ✓ Atur: 0,00 € (Exempt de cotització segons Art. 264 LGSS)
               </div>
-            ` : ''}
-            ${breakdown.isClassesPassives ? `
+            `
+                : ''
+            }
+            ${
+              breakdown.isClassesPassives
+                ? `
               <div style="font-size:0.75rem; color:var(--text-muted); padding-left:8px;">
                 • Drets Passius: ${formatCurrency(breakdown.employeePassiveRightsAnnual)} | MUFACE: ${formatCurrency(breakdown.employeeMutualismAnnual)}
               </div>
-            ` : ''}
+            `
+                : ''
+            }
             <div style="display:flex; justify-content:space-between; color:var(--color-warning);">
               <span>- Retenció IRPF (${breakdown.irpfWithholdingRate}%):</span>
               <span>-${formatCurrency(breakdown.irpfWithholdingAnnual)}</span>
@@ -259,7 +332,7 @@ export function renderWorkIncome(): HTMLElement {
       <div style="background:var(--bg-surface-elevated); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-subtle); display:flex; flex-direction:column; justify-content:space-between;">
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <strong style="font-size:var(--text-sm); color:var(--text-primary);">${breakdown.isCivilServant ? '🏛️ Cost per a l\'Administració Pública' : '🏢 Cost Laboral per a l\'Empresa'}</strong>
+            <strong style="font-size:var(--text-sm); color:var(--text-primary);">${breakdown.isCivilServant ? "🏛️ Cost per a l'Administració Pública" : "🏢 Cost Laboral per a l'Empresa"}</strong>
             <span class="badge badge--primary" style="font-size:0.7rem;">${formatCurrency(breakdown.totalCompanyCostMonthly)} / mes</span>
           </div>
           <div style="font-size:0.8rem; display:flex; flex-direction:column; gap:4px; margin-bottom:12px;">
@@ -275,23 +348,27 @@ export function renderWorkIncome(): HTMLElement {
               <span>• Contingències comunes / Estat:</span>
               <span>${formatCurrency(breakdown.employerCommonContingencies)}</span>
             </div>
-            ${!breakdown.isCivilServant ? `
+            ${
+              !breakdown.isCivilServant
+                ? `
               <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); padding-left:8px;">
                 <span>• Atur + FOGASA + Formació:</span>
                 <span>${formatCurrency(breakdown.employerUnemployment + breakdown.employerFOGASA + breakdown.employerTraining)}</span>
               </div>
-            ` : `
+            `
+                : `
               <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--color-success); padding-left:8px;">
                 <span>• Atur & FOGASA Administració:</span>
                 <span>0,00 € (Exempt)</span>
               </div>
-            `}
+            `
+            }
             <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); padding-left:8px;">
               <span>• MEI / Formació:</span>
               <span>${formatCurrency(breakdown.employerMEI + breakdown.employerTraining)}</span>
             </div>
             <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border-default); padding-top:4px; font-weight:700; color:var(--text-primary); font-size:0.9rem;">
-              <span>= Cost Total ${breakdown.isCivilServant ? 'Administració:' : 'd\'Empresa:'}</span>
+              <span>= Cost Total ${breakdown.isCivilServant ? 'Administració:' : "d'Empresa:"}</span>
               <span>${formatCurrency(breakdown.totalCompanyCostAnnual)}</span>
             </div>
           </div>
@@ -304,7 +381,7 @@ export function renderWorkIncome(): HTMLElement {
     `;
   };
 
-  ['#calc-ss-gross', '#calc-ss-irpf-rate', '#calc-ss-contract', '#calc-ss-payments'].forEach(id => {
+  ['#calc-ss-gross', '#calc-ss-irpf-rate', '#calc-ss-contract', '#calc-ss-payments'].forEach((id) => {
     salaryCard.querySelector(id)?.addEventListener('input', renderSalaryBreakdown);
     salaryCard.querySelector(id)?.addEventListener('change', renderSalaryBreakdown);
   });
@@ -317,7 +394,7 @@ export function renderWorkIncome(): HTMLElement {
   employersCard.className = 'card';
   employersCard.style.marginTop = 'var(--space-lg)';
   const employersSection = createFormSection('Llista de Pagadors (Empreses)');
-  
+
   const addEmployerBtn = document.createElement('button');
   addEmployerBtn.className = 'btn btn--secondary btn--sm';
   addEmployerBtn.innerHTML = '＋ Afegir Pagador';
@@ -349,6 +426,14 @@ export function renderWorkIncome(): HTMLElement {
   employersCard.appendChild(employersSection);
   page.appendChild(employersCard);
 
+  // Mount tooltips
+  page.querySelectorAll<HTMLElement>('.tax-info-tooltip-mount').forEach((mount) => {
+    const concept = mount.dataset.concept;
+    if (concept) {
+      mount.appendChild(createInfoTooltip(concept));
+    }
+  });
+
   return page;
 }
 
@@ -378,15 +463,15 @@ function renderEmployersList(container: HTMLElement) {
     headerRow.style.display = 'flex';
     headerRow.style.justifyContent = 'space-between';
     headerRow.style.marginBottom = 'var(--space-md)';
-    
+
     headerRow.innerHTML = `<h3 style="margin:0; font-size:var(--text-md);">${emp.name || 'Nova Empresa'}</h3>`;
-    
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn--icon btn--ghost';
     delBtn.innerHTML = '🗑';
     delBtn.title = 'Eliminar pagador';
     delBtn.addEventListener('click', () => {
-      const arr = store.getData().workIncome.employers.filter(e => e.id !== emp.id);
+      const arr = store.getData().workIncome.employers.filter((e) => e.id !== emp.id);
       store.update('workIncome', { employers: arr });
       renderEmployersList(container);
     });
@@ -395,12 +480,14 @@ function renderEmployersList(container: HTMLElement) {
 
     const updateEmployer = <K extends keyof EmployerItem>(field: K, val: EmployerItem[K] | string) => {
       const arr = [...store.getData().workIncome.employers];
-      const target = arr.find(e => e.id === emp.id);
+      const target = arr.find((e) => e.id === emp.id);
       if (!target) return;
       if (field === 'name' || field === 'id') {
         (target[field] as string) = String(val);
+      } else if (field === 'dietsWithPernoctation' || field === 'dietsAbroad') {
+        (target[field] as boolean) = Boolean(val);
       } else {
-        (target[field] as number) = typeof val === 'number' ? val : (parseFloat(String(val)) || 0);
+        (target[field] as number) = typeof val === 'number' ? val : parseFloat(String(val)) || 0;
       }
       store.update('workIncome', { employers: arr });
     };
@@ -411,9 +498,9 @@ function renderEmployersList(container: HTMLElement) {
           id: `emp-${emp.id}-name`,
           label: 'Nom del pagador',
           value: emp.name,
-          onChange: (val) => updateEmployer('name', val)
+          onChange: (val) => updateEmployer('name', val),
         }),
-      )
+      ),
     );
 
     row.appendChild(
@@ -423,16 +510,16 @@ function renderEmployersList(container: HTMLElement) {
           label: 'Sou Brut',
           value: emp.grossSalary,
           suffix: '€',
-          onChange: (val) => updateEmployer('grossSalary', val)
+          onChange: (val) => updateEmployer('grossSalary', val),
         }),
         createField({
           id: `emp-${emp.id}-inkind`,
           label: 'Espècie',
           value: emp.inKind,
           suffix: '€',
-          onChange: (val) => updateEmployer('inKind', val)
+          onChange: (val) => updateEmployer('inKind', val),
         }),
-      )
+      ),
     );
 
     row.appendChild(
@@ -442,16 +529,16 @@ function renderEmployersList(container: HTMLElement) {
           label: 'Retencions IRPF',
           value: emp.withholdings,
           suffix: '€',
-          onChange: (val) => updateEmployer('withholdings', val)
+          onChange: (val) => updateEmployer('withholdings', val),
         }),
         createField({
           id: `emp-${emp.id}-ss`,
           label: 'Seguretat Social',
           value: emp.socialSecurity,
           suffix: '€',
-          onChange: (val) => updateEmployer('socialSecurity', val)
+          onChange: (val) => updateEmployer('socialSecurity', val),
         }),
-      )
+      ),
     );
 
     // Secció dietes i quilometratge
@@ -461,6 +548,54 @@ function renderEmployersList(container: HTMLElement) {
     dietSection.style.borderTop = '1px dashed var(--border-default)';
     dietSection.innerHTML = `<h4 style="margin:0 0 var(--space-sm) 0; font-size:var(--text-sm);">Dietes i Desplaçaments</h4>`;
 
+    const optionsRow = document.createElement('div');
+    optionsRow.style.display = 'flex';
+    optionsRow.style.gap = 'var(--space-md)';
+    optionsRow.style.marginBottom = 'var(--space-sm)';
+    optionsRow.style.flexWrap = 'wrap';
+
+    const pernoctLabel = document.createElement('label');
+    pernoctLabel.className = 'form-checkbox-label';
+    pernoctLabel.style.display = 'flex';
+    pernoctLabel.style.alignItems = 'center';
+    pernoctLabel.style.gap = 'var(--space-xs)';
+    pernoctLabel.style.fontSize = 'var(--text-xs)';
+    pernoctLabel.innerHTML = `
+      <input type="checkbox" id="emp-${emp.id}-pernoct" ${emp.dietsWithPernoctation ? 'checked' : ''} />
+      <span>Amb pernoctació (53,34 € nacional / 91,35 € estranger)</span>
+    `;
+    pernoctLabel.querySelector('input')?.addEventListener('change', (e) => {
+      updateEmployer('dietsWithPernoctation', (e.target as HTMLInputElement).checked);
+      renderEmployersList(container);
+    });
+
+    const abroadLabel = document.createElement('label');
+    abroadLabel.className = 'form-checkbox-label';
+    abroadLabel.style.display = 'flex';
+    abroadLabel.style.alignItems = 'center';
+    abroadLabel.style.gap = 'var(--space-xs)';
+    abroadLabel.style.fontSize = 'var(--text-xs)';
+    abroadLabel.innerHTML = `
+      <input type="checkbox" id="emp-${emp.id}-abroad" ${emp.dietsAbroad ? 'checked' : ''} />
+      <span>Desplaçament a l'estranger (48,08 € o 91,35 €)</span>
+    `;
+    abroadLabel.querySelector('input')?.addEventListener('change', (e) => {
+      updateEmployer('dietsAbroad', (e.target as HTMLInputElement).checked);
+      renderEmployersList(container);
+    });
+
+    optionsRow.appendChild(pernoctLabel);
+    optionsRow.appendChild(abroadLabel);
+    dietSection.appendChild(optionsRow);
+
+    const dietRateHint = emp.dietsAbroad
+      ? emp.dietsWithPernoctation
+        ? '91,35€/dia (estranger amb pernoctació)'
+        : '48,08€/dia (estranger sense pernoctació)'
+      : emp.dietsWithPernoctation
+        ? '53,34€/dia (nacional amb pernoctació)'
+        : '26,67€/dia (nacional sense pernoctació)';
+
     dietSection.appendChild(
       createFormRow(
         createField({
@@ -468,17 +603,17 @@ function renderEmployersList(container: HTMLElement) {
           label: 'Dietes Ingressades',
           value: emp.dietsIncome,
           suffix: '€',
-          onChange: (val) => updateEmployer('dietsIncome', val)
+          onChange: (val) => updateEmployer('dietsIncome', val),
         }),
         createField({
           id: `emp-${emp.id}-diets-days`,
-          label: 'Dies pernoctats / justificats',
+          label: 'Dies justificats',
           value: emp.dietsDays,
           suffix: 'dies',
-          hint: 'S\'aplicarà exempció de 26,67€ per dia segons llei',
-          onChange: (val) => updateEmployer('dietsDays', val)
+          hint: `S'aplicarà exempció de ${dietRateHint} segons Art. 9 RIRPF`,
+          onChange: (val) => updateEmployer('dietsDays', val),
         }),
-      )
+      ),
     );
 
     dietSection.appendChild(
@@ -488,17 +623,17 @@ function renderEmployersList(container: HTMLElement) {
           label: 'Quilometratge (Ingressos)',
           value: emp.mileageIncome,
           suffix: '€',
-          onChange: (val) => updateEmployer('mileageIncome', val)
+          onChange: (val) => updateEmployer('mileageIncome', val),
         }),
         createField({
           id: `emp-${emp.id}-mileage-km`,
           label: 'Quilòmetres recorreguts',
           value: emp.mileageKm,
           suffix: 'km',
-          hint: 'S\'aplicarà exempció de 0,26€ per km segons llei',
-          onChange: (val) => updateEmployer('mileageKm', val)
+          hint: "S'aplicarà exempció de 0,26€ per km segons llei",
+          onChange: (val) => updateEmployer('mileageKm', val),
         }),
-      )
+      ),
     );
 
     row.appendChild(dietSection);

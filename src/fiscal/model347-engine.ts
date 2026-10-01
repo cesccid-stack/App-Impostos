@@ -9,14 +9,14 @@ export class Model347Engine {
   public static calculateFromInvoices(
     year: number,
     issuedInvoices: IVAInvoiceIssued[],
-    receivedInvoices: IVAInvoiceReceived[]
+    receivedInvoices: IVAInvoiceReceived[],
   ): Model347Yearly {
     const entitiesMap = new Map<string, Model347Entity>();
 
     // Processar factures emeses (Clients)
     for (const inv of issuedInvoices) {
       if (!inv.date.startsWith(year.toString())) continue;
-      
+
       const nif = inv.clientNif.toUpperCase().trim();
       if (!entitiesMap.has(nif)) {
         entitiesMap.set(nif, {
@@ -28,13 +28,13 @@ export class Model347Engine {
           q2Amount: 0,
           q3Amount: 0,
           q4Amount: 0,
-          totalAmount: 0
+          totalAmount: 0,
         });
       }
-      
+
       const entity = entitiesMap.get(nif)!;
       entity.totalAmount += inv.totalInvoice;
-      
+
       if (inv.quarter === '1T') entity.q1Amount += inv.totalInvoice;
       else if (inv.quarter === '2T') entity.q2Amount += inv.totalInvoice;
       else if (inv.quarter === '3T') entity.q3Amount += inv.totalInvoice;
@@ -44,7 +44,7 @@ export class Model347Engine {
     // Processar factures rebudes (Proveïdors)
     for (const inv of receivedInvoices) {
       if (!inv.date.startsWith(year.toString())) continue;
-      
+
       const nif = inv.supplierNif.toUpperCase().trim();
       if (!entitiesMap.has(nif)) {
         entitiesMap.set(nif, {
@@ -56,13 +56,13 @@ export class Model347Engine {
           q2Amount: 0,
           q3Amount: 0,
           q4Amount: 0,
-          totalAmount: 0
+          totalAmount: 0,
         });
       }
-      
+
       const entity = entitiesMap.get(nif)!;
       entity.totalAmount += inv.totalInvoice;
-      
+
       if (inv.quarter === '1T') entity.q1Amount += inv.totalInvoice;
       else if (inv.quarter === '2T') entity.q2Amount += inv.totalInvoice;
       else if (inv.quarter === '3T') entity.q3Amount += inv.totalInvoice;
@@ -71,11 +71,11 @@ export class Model347Engine {
 
     // Filtrar només els que superen 3.005,06 €
     const threshold = 3005.06;
-    const finalEntities = Array.from(entitiesMap.values()).filter(e => e.totalAmount > threshold);
-    
+    const finalEntities = Array.from(entitiesMap.values()).filter((e) => e.totalAmount > threshold);
+
     let totalClientsVolume = 0;
     let totalSuppliersVolume = 0;
-    
+
     for (const e of finalEntities) {
       if (e.type === 'client') totalClientsVolume += e.totalAmount;
       if (e.type === 'supplier') totalSuppliersVolume += e.totalAmount;
@@ -85,7 +85,7 @@ export class Model347Engine {
       year,
       entities: finalEntities,
       totalClientsVolume,
-      totalSuppliersVolume
+      totalSuppliersVolume,
     };
   }
 }

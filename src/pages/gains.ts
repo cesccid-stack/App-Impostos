@@ -1,7 +1,7 @@
 /**
  * @module pages/gains
  * Gestió Avançada de Guanys i Pèrdues Patrimonials, Cartera de Valors, Bròkers i Compliment AEAT (Art. 33 a 38 LIRPF).
- * 
+ *
  * Funcionalitats d'Automatització Total:
  * - Hub Integrat de Bròkers (DEGIRO, IBKR, Trade Republic, Revolut, eToro, Scalable, Binance, Coinbase, etc.).
  * - Auto-sincronització instantània en 1 clic amb el mètode FIFO i les caselles oficials de la Renda Web (0328-0336).
@@ -17,10 +17,10 @@ import { openModal } from '../components/modal.ts';
 import { showToast } from '../components/toast.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { escapeHtml } from '../utils/dom.ts';
-import { 
-  autoParseBrokerCSV, 
-  syncTradesToStore, 
-  getStockPortfolioPresets
+import {
+  autoParseBrokerCSV,
+  syncTradesToStore,
+  getStockPortfolioPresets,
 } from '../import/portfolio-automator.ts';
 import { calculateTaxLossHarvesting, type OpenPosition } from '../fiscal/tax-loss-harvesting.ts';
 import type { GainItem } from '../types.ts';
@@ -40,15 +40,25 @@ export function renderGains(): HTMLElement {
 
   for (const item of items) {
     const raw = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
-    
+
     // Aplicació d'exempcions
     let net = raw;
     if (item.isPrimaryResidenceExemptOver65 && raw > 0) {
       net = 0;
-    } else if (item.isPrimaryResidenceReinvestment && raw > 0 && item.reinvestmentAmount && item.transferValue > 0) {
+    } else if (
+      item.isPrimaryResidenceReinvestment &&
+      raw > 0 &&
+      item.reinvestmentAmount &&
+      item.transferValue > 0
+    ) {
       const ratio = Math.min(1, item.reinvestmentAmount / item.transferValue);
       net = raw * (1 - ratio);
-    } else if (item.isLifeAnnuityExemptOver65 && raw > 0 && item.lifeAnnuityAmount && item.transferValue > 0) {
+    } else if (
+      item.isLifeAnnuityExemptOver65 &&
+      raw > 0 &&
+      item.lifeAnnuityAmount &&
+      item.transferValue > 0
+    ) {
       const ratio = Math.min(1, Math.min(240000, item.lifeAnnuityAmount) / item.transferValue);
       net = raw * (1 - ratio);
     }
@@ -60,7 +70,7 @@ export function renderGains(): HTMLElement {
       totalGrossLoss += Math.abs(raw);
       if (item.nonComputableLossAmount !== undefined && item.nonComputableLossAmount > 0) {
         totalSuspendedLosses += item.nonComputableLossAmount;
-        totalComputableNetGain += (raw + item.nonComputableLossAmount);
+        totalComputableNetGain += raw + item.nonComputableLossAmount;
       } else if (item.isNonComputableLoss) {
         totalSuspendedLosses += Math.abs(raw);
       } else {
@@ -72,9 +82,33 @@ export function renderGains(): HTMLElement {
   // Tax-Loss Harvesting potencial
   // Mock posicions obertes o estimades
   const defaultOpenPositions: OpenPosition[] = [
-    { id: 'pos-1', tickerOrName: 'Tesla Inc (TSLA)', assetType: 'shares', currentMarketValue: 6800, totalAcquisitionCost: 9500, unrealizedPnL: -2700, lastPurchaseDate: '2024-01-15' },
-    { id: 'pos-2', tickerOrName: 'Ethereum (ETH)', assetType: 'crypto', currentMarketValue: 2800, totalAcquisitionCost: 4000, unrealizedPnL: -1200, lastPurchaseDate: '2024-02-10' },
-    { id: 'pos-3', tickerOrName: 'Nvidia Corp (NVDA)', assetType: 'shares', currentMarketValue: 15000, totalAcquisitionCost: 8000, unrealizedPnL: +7000, lastPurchaseDate: '2023-10-10' },
+    {
+      id: 'pos-1',
+      tickerOrName: 'Tesla Inc (TSLA)',
+      assetType: 'shares',
+      currentMarketValue: 6800,
+      totalAcquisitionCost: 9500,
+      unrealizedPnL: -2700,
+      lastPurchaseDate: '2024-01-15',
+    },
+    {
+      id: 'pos-2',
+      tickerOrName: 'Ethereum (ETH)',
+      assetType: 'crypto',
+      currentMarketValue: 2800,
+      totalAcquisitionCost: 4000,
+      unrealizedPnL: -1200,
+      lastPurchaseDate: '2024-02-10',
+    },
+    {
+      id: 'pos-3',
+      tickerOrName: 'Nvidia Corp (NVDA)',
+      assetType: 'shares',
+      currentMarketValue: 15000,
+      totalAcquisitionCost: 8000,
+      unrealizedPnL: +7000,
+      lastPurchaseDate: '2023-10-10',
+    },
   ];
   const harvestPlan = calculateTaxLossHarvesting(items, defaultOpenPositions);
 
@@ -118,13 +152,17 @@ export function renderGains(): HTMLElement {
   const guideBtn = document.createElement('button');
   guideBtn.className = 'btn btn--secondary';
   guideBtn.innerHTML = '📄 Caselles Renta Web (0328-0336)';
-  guideBtn.addEventListener('click', () => openAEATBoxesModal(items, totalSuspendedLosses, totalComputableNetGain));
+  guideBtn.addEventListener('click', () =>
+    openAEATBoxesModal(items, totalSuspendedLosses, totalComputableNetGain),
+  );
 
   // 4. Botó Importar CSV
   const importBtn = document.createElement('button');
   importBtn.className = 'btn btn--secondary';
   importBtn.innerHTML = '📥 Importar CSV (Broker)';
-  importBtn.addEventListener('click', () => { window.location.hash = '#/importar'; });
+  importBtn.addEventListener('click', () => {
+    window.location.hash = '#/importar';
+  });
 
   // 5. Botó Afegir manual
   const addBtn = document.createElement('button');
@@ -146,7 +184,7 @@ export function renderGains(): HTMLElement {
   dropzoneCard.style.marginBottom = 'var(--space-xl)';
   dropzoneCard.style.background = 'linear-gradient(135deg, var(--bg-surface-elevated), var(--bg-surface))';
   dropzoneCard.style.border = '1px dashed var(--color-primary)';
-  
+
   dropzoneCard.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-md);">
       <div>
@@ -192,21 +230,23 @@ export function renderGains(): HTMLElement {
 
         if (parsed.trades.length === 0) {
           statusDiv.innerHTML = `<span class="text-error">⚠️ No s'han trobat operacions vàlides al CSV.</span>`;
-          showToast('No s\'han trobat operacions vàlides', 'error');
+          showToast("No s'han trobat operacions vàlides", 'error');
           return;
         }
 
         const syncResult = syncTradesToStore(parsed.trades, parsed.dividends, { append: false });
-        
+
         statusDiv.innerHTML = `
           <span class="text-success">✅ S'han importat ${parsed.trades.length} moviments de <strong>${parsed.detectedBroker.label}</strong> i s'han generat ${syncResult.itemsCreated} transmissions FIFO oficials.</span>
         `;
-        showToast(`Importades ${parsed.trades.length} operacions amb èxit (${parsed.detectedBroker.label})`, 'success');
-        
+        showToast(
+          `Importades ${parsed.trades.length} operacions amb èxit (${parsed.detectedBroker.label})`,
+          'success',
+        );
+
         setTimeout(() => {
           page.replaceWith(renderGains());
         }, 800);
-
       } catch (err) {
         console.error(err);
         statusDiv.innerHTML = `<span class="text-error">❌ Error en processar el fitxer CSV.</span>`;
@@ -359,7 +399,7 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
 
   const typeLabels: Record<string, string> = {
     shares: '📈 Accions / ETF',
-    funds: '📊 Fons d\'Inversió',
+    funds: "📊 Fons d'Inversió",
     real_estate: '🏠 Immoble',
     crypto: '₿ Criptomoneda',
     other: '📋 Altres Actius',
@@ -368,7 +408,7 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
   function updateView() {
     // 1. Filtrar
     const query = searchTerm.toLowerCase().trim();
-    const filtered = items.filter(item => {
+    const filtered = items.filter((item) => {
       // Filtre de text
       if (query) {
         const text = `${item.description || ''} ${item.type || ''} ${item.notes || ''}`.toLowerCase();
@@ -382,7 +422,12 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
       const rawGain = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
       if (selectedOutcome === 'PROFIT' && rawGain <= 0) return false;
       if (selectedOutcome === 'LOSS' && rawGain >= 0) return false;
-      if (selectedOutcome === 'WASH_SALE' && (!item.isNonComputableLoss && !(item.nonComputableLossAmount && item.nonComputableLossAmount > 0))) return false;
+      if (
+        selectedOutcome === 'WASH_SALE' &&
+        !item.isNonComputableLoss &&
+        !(item.nonComputableLossAmount && item.nonComputableLossAmount > 0)
+      )
+        return false;
 
       return true;
     });
@@ -560,8 +605,19 @@ function renderItemsList(container: HTMLElement, items: GainItem[], page?: HTMLE
 
   // Exportacions CSV i JSON
   controlsCard.querySelector('#btn-export-gains-csv')?.addEventListener('click', () => {
-    const headers = ['ID', 'Tipus', 'Descripció', 'Data Adquisició', 'Data Transmissió', 'Valor Adquisició', 'Valor Transmissió', 'Despeses', 'Rendiment Brut', 'Pèrdua Suspesa'];
-    const rows = items.map(i => {
+    const headers = [
+      'ID',
+      'Tipus',
+      'Descripció',
+      'Data Adquisició',
+      'Data Transmissió',
+      'Valor Adquisició',
+      'Valor Transmissió',
+      'Despeses',
+      'Rendiment Brut',
+      'Pèrdua Suspesa',
+    ];
+    const rows = items.map((i) => {
       const raw = (i.transferValue || 0) - (i.acquisitionValue || 0) - (i.expenses || 0);
       const susp = i.nonComputableLossAmount || (i.isNonComputableLoss ? Math.abs(raw) : 0);
       return [
@@ -650,7 +706,11 @@ function openHarvestingModal(plan: ReturnType<typeof calculateTaxLossHarvesting>
         </strong>
         
         <div style="display:flex; flex-direction:column; gap:var(--space-sm);">
-          ${plan.recommendedSales.length > 0 ? plan.recommendedSales.map(rec => `
+          ${
+            plan.recommendedSales.length > 0
+              ? plan.recommendedSales
+                  .map(
+                    (rec) => `
             <div style="background:var(--bg-surface); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-default); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
               <div>
                 <strong style="font-size:var(--text-md);">${rec.tickerOrName}</strong>
@@ -665,11 +725,15 @@ function openHarvestingModal(plan: ReturnType<typeof calculateTaxLossHarvesting>
                 ⚡ Simular Venda Fiscal
               </button>
             </div>
-          `).join('') : `
+          `,
+                  )
+                  .join('')
+              : `
             <div style="text-align:center; padding:var(--space-lg); color:var(--text-muted); background:var(--bg-surface); border-radius:var(--radius-md); border:1px solid var(--border-default);">
               🎉 Enhorabona! No tens guanys pendents de compensar o la teva base imposable ja està optimitzada a 0 €.
             </div>
-          `}
+          `
+          }
         </div>
       </div>
     </div>
@@ -685,10 +749,10 @@ function openHarvestingModal(plan: ReturnType<typeof calculateTaxLossHarvesting>
   modal.querySelector('#modal-close-btn')?.addEventListener('click', closeModal);
   modal.querySelector('#modal-close-action-btn')?.addEventListener('click', closeModal);
 
-  plan.recommendedSales.forEach(rec => {
+  plan.recommendedSales.forEach((rec) => {
     modal.querySelector(`#btn-simulate-sale-${rec.positionId}`)?.addEventListener('click', () => {
       const currentItems = [...(store.getData().gains?.items || [])];
-      
+
       currentItems.push({
         id: `harvest-${Date.now()}`,
         description: `[HARVESTING] Venda fiscal ${rec.tickerOrName}`,
@@ -704,7 +768,10 @@ function openHarvestingModal(plan: ReturnType<typeof calculateTaxLossHarvesting>
       store.update('gains', { items: currentItems });
       closeModal();
       page.replaceWith(renderGains());
-      showToast(`Simulada venda fiscal de ${rec.tickerOrName}. S'ha compensat la base de l'estalvi!`, 'success');
+      showToast(
+        `Simulada venda fiscal de ${rec.tickerOrName}. S'ha compensat la base de l'estalvi!`,
+        'success',
+      );
     });
   });
 }
@@ -736,7 +803,9 @@ function openStockPresetsModal(page: HTMLElement): void {
       </p>
 
       <div style="display:flex; flex-direction:column; gap:var(--space-sm);">
-        ${presets.map((preset, idx) => `
+        ${presets
+          .map(
+            (preset, idx) => `
           <div style="background:var(--bg-surface-elevated); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-default); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
             <div style="max-width:550px;">
               <div style="font-weight:700; font-size:var(--text-md);">${preset.name}</div>
@@ -749,7 +818,9 @@ function openStockPresetsModal(page: HTMLElement): void {
               📥 Carregar Aquesta
             </button>
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </div>
     </div>
     <div class="modal-footer" style="display:flex; justify-content:flex-end; padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--border-default);">
@@ -877,17 +948,19 @@ function openAddModal(page: HTMLElement): void {
   fields.appendChild(
     createField({
       id: 'gain-type',
-      label: 'Tipus d\'actiu',
+      label: "Tipus d'actiu",
       type: 'select',
       value: 'shares',
       options: [
         { value: 'shares', label: '📈 Accions / ETF' },
-        { value: 'funds', label: '📊 Fons d\'inversió' },
+        { value: 'funds', label: "📊 Fons d'inversió" },
         { value: 'real_estate', label: '🏠 Immoble / Habitatge' },
         { value: 'crypto', label: '₿ Criptomoneda' },
         { value: 'other', label: '📋 Altres actius' },
       ],
-      onChange: (val) => { form.type = val as GainItem['type']; },
+      onChange: (val) => {
+        form.type = val as GainItem['type'];
+      },
     }),
   );
 
@@ -897,7 +970,9 @@ function openAddModal(page: HTMLElement): void {
       label: 'Descripció',
       type: 'text',
       placeholder: 'Ex: Venda accions Telefónica o Venda pis',
-      onChange: (val) => { form.description = val; },
+      onChange: (val) => {
+        form.description = val;
+      },
     }),
   );
 
@@ -905,15 +980,19 @@ function openAddModal(page: HTMLElement): void {
     createFormRow(
       createField({
         id: 'gain-acquisition-date',
-        label: 'Data d\'adquisició',
+        label: "Data d'adquisició",
         type: 'date',
-        onChange: (val) => { form.acquisitionDate = val; },
+        onChange: (val) => {
+          form.acquisitionDate = val;
+        },
       }),
       createField({
         id: 'gain-transfer-date',
         label: 'Data de transmissió',
         type: 'date',
-        onChange: (val) => { form.transferDate = val; },
+        onChange: (val) => {
+          form.transferDate = val;
+        },
       }),
     ),
   );
@@ -922,11 +1001,13 @@ function openAddModal(page: HTMLElement): void {
     createFormRow(
       createField({
         id: 'gain-acquisition-val',
-        label: 'Valor d\'adquisició (€)',
+        label: "Valor d'adquisició (€)",
         value: 0,
         suffix: '€',
         placeholder: '0,00',
-        onChange: (val) => { form.acquisitionValue = parseFloat(val) || 0; },
+        onChange: (val) => {
+          form.acquisitionValue = parseFloat(val) || 0;
+        },
       }),
       createField({
         id: 'gain-transfer-val',
@@ -934,7 +1015,9 @@ function openAddModal(page: HTMLElement): void {
         value: 0,
         suffix: '€',
         placeholder: '0,00',
-        onChange: (val) => { form.transferValue = parseFloat(val) || 0; },
+        onChange: (val) => {
+          form.transferValue = parseFloat(val) || 0;
+        },
       }),
     ),
   );
@@ -946,7 +1029,9 @@ function openAddModal(page: HTMLElement): void {
       value: 0,
       suffix: '€',
       placeholder: '0,00',
-      onChange: (val) => { form.expenses = parseFloat(val) || 0; },
+      onChange: (val) => {
+        form.expenses = parseFloat(val) || 0;
+      },
     }),
   );
 

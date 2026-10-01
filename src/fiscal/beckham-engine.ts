@@ -10,15 +10,15 @@ import { applyTaxBracketsExact, exactAdd, exactSub, round2 } from '../utils/exac
 import { STATE_SAVINGS_TAX_BRACKETS, AUTONOMIC_SAVINGS_TAX_BRACKETS } from './constants.ts';
 
 export interface BeckhamComparisonResult {
-  ordinaryTax: number;             // Quota IRPF règim ordinari
-  ordinaryEffectiveRate: number;   // % Tipus efectiu règim ordinari
-  
-  beckhamWorkTax: number;          // Quota sobre la feina al 24%/47%
-  beckhamSavingsTax: number;       // Quota sobre l'estalvi espanyol
-  beckhamTotalTax: number;         // Quota total Llei Beckham
-  beckhamEffectiveRate: number;    // % Tipus efectiu Llei Beckham
-  
-  taxDifference: number;           // Estalvi (€)
+  ordinaryTax: number; // Quota IRPF règim ordinari
+  ordinaryEffectiveRate: number; // % Tipus efectiu règim ordinari
+
+  beckhamWorkTax: number; // Quota sobre la feina al 24%/47%
+  beckhamSavingsTax: number; // Quota sobre l'estalvi espanyol
+  beckhamTotalTax: number; // Quota total Llei Beckham
+  beckhamEffectiveRate: number; // % Tipus efectiu Llei Beckham
+
+  taxDifference: number; // Estalvi (€)
   isBeckhamBetter: boolean;
   explanation: string;
 }
@@ -41,7 +41,10 @@ export function compareBeckhamRegime(data: DeclaracionData): BeckhamComparisonRe
 
   // Càlcul Llei Beckham (Art. 93 LIRPF / Model 151)
   // 1. Salari brut del treball a Espanya (tipus fix 24% fins a 600.000 €, 47% per l'excés)
-  const totalSpanishSalary = (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  const totalSpanishSalary = (data.workIncome?.employers || []).reduce(
+    (s, e) => s + (e.grossSalary || 0) + (e.inKind || 0),
+    0,
+  );
 
   let beckhamWorkTax = 0;
   if (totalSpanishSalary <= 600_000) {
@@ -57,7 +60,11 @@ export function compareBeckhamRegime(data: DeclaracionData): BeckhamComparisonRe
   // Les rendes i guanys internacionals (foreignDividends, plusvàlues estrangeres) tributen al 0% a Espanya sota la Llei Beckham!
   const beckhamTotalTax = Math.max(0, exactAdd(beckhamWorkTax, beckhamSavingsTax));
 
-  const totalIncome = exactAdd(totalSpanishSalary, spanishSavingsBase, data.capitalIncome?.foreignDividends || 0);
+  const totalIncome = exactAdd(
+    totalSpanishSalary,
+    spanishSavingsBase,
+    data.capitalIncome?.foreignDividends || 0,
+  );
   const ordinaryEffectiveRate = totalIncome > 0 ? round2((ordinaryTax / totalIncome) * 100) : 0;
   const beckhamEffectiveRate = totalIncome > 0 ? round2((beckhamTotalTax / totalIncome) * 100) : 0;
 

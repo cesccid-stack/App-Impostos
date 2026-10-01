@@ -13,7 +13,7 @@ export class WithholdingsEngine {
     workWithholdings: number,
     profRecipientsCount: number,
     profBaseTotal: number,
-    profWithholdings: number
+    profWithholdings: number,
   ): Model111Quarterly {
     const totalToPay = workWithholdings + profWithholdings;
 
@@ -27,7 +27,7 @@ export class WithholdingsEngine {
       profBaseTotal,
       profWithholdings,
       totalToPay,
-      status: 'draft'
+      status: 'draft',
     };
   }
 
@@ -40,7 +40,7 @@ export class WithholdingsEngine {
     year: number,
     recipientsCount: number,
     baseTotal: number,
-    withholdingsTotal: number
+    withholdingsTotal: number,
   ): Model115Quarterly {
     return {
       quarter,
@@ -49,7 +49,7 @@ export class WithholdingsEngine {
       baseTotal,
       withholdingsTotal,
       totalToPay: withholdingsTotal,
-      status: 'draft'
+      status: 'draft',
     };
   }
 }

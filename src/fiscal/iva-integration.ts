@@ -7,14 +7,14 @@
  */
 
 import type { DeclaracionData } from '../types.ts';
-import type { 
-  IVAData, 
-  IVAInvoiceIssued, 
-  IVAInvoiceReceived, 
-  IVABienInversion, 
+import type {
+  IVAData,
+  IVAInvoiceIssued,
+  IVAInvoiceReceived,
+  IVABienInversion,
   FiscalQuarter,
   Model303QuarterResult,
-  WithholdingRate
+  WithholdingRate,
 } from '../types-iva.ts';
 import { calculateAllQuarters } from './iva-engine.ts';
 
@@ -36,8 +36,8 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
   }
 
   // Eliminar factures d'activitat prèviament auto-generades
-  currentIVA.issuedInvoices = currentIVA.issuedInvoices.filter(i => !i.id.startsWith('auto_act_'));
-  currentIVA.receivedInvoices = currentIVA.receivedInvoices.filter(i => !i.id.startsWith('auto_act_'));
+  currentIVA.issuedInvoices = currentIVA.issuedInvoices.filter((i) => !i.id.startsWith('auto_act_'));
+  currentIVA.receivedInvoices = currentIVA.receivedInvoices.filter((i) => !i.id.startsWith('auto_act_'));
 
   const quarters: FiscalQuarter[] = ['1T', '2T', '3T', '4T'];
   let addedIssued = 0;
@@ -47,11 +47,11 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
   if (act.income > 0) {
     const qIncome = act.income / 4;
     const withhRate = act.income > 0 && act.withholdings > 0 ? (act.withholdings / act.income) * 100 : 15;
-    const effectiveWithhRate = withhRate >= 14 ? 15 : (withhRate >= 6 ? 7 : 0);
+    const effectiveWithhRate = withhRate >= 14 ? 15 : withhRate >= 6 ? 7 : 0;
 
     for (let idx = 0; idx < quarters.length; idx++) {
       const q = quarters[idx];
-      const month = (idx * 3) + 3;
+      const month = idx * 3 + 3;
       const monthStr = month < 10 ? `0${month}` : `${month}`;
       const base = Math.round(qIncome * 100) / 100;
       const vatAmount = Math.round(base * 0.21 * 100) / 100;
@@ -64,7 +64,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
         date: `${year}-${monthStr}-15`,
         clientName: 'Clients Activitat Professional',
         clientNif: 'B-88997766',
-        concept: 'Serveis professionals d\'activitat econòmica',
+        concept: "Serveis professionals d'activitat econòmica",
         taxableBase: base,
         vatRate: 21,
         vatAmount: vatAmount,
@@ -72,7 +72,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
         withholdingAmount: withhAmount,
         totalInvoice: base + vatAmount - withhAmount,
         category: 'activity_service',
-        notes: 'Generat automàticament des del mòdul d\'Activitats Econòmiques',
+        notes: "Generat automàticament des del mòdul d'Activitats Econòmiques",
       };
 
       currentIVA.issuedInvoices.push(newInv);
@@ -86,7 +86,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
 
     for (let idx = 0; idx < quarters.length; idx++) {
       const q = quarters[idx];
-      const month = (idx * 3) + 2;
+      const month = idx * 3 + 2;
       const monthStr = month < 10 ? `0${month}` : `${month}`;
       const base = Math.round(qExpense * 100) / 100;
       const vatAmount = Math.round(base * 0.21 * 100) / 100;
@@ -98,7 +98,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
         date: `${year}-${monthStr}-20`,
         supplierName: 'Proveïdors de Serveis i Subministraments',
         supplierNif: 'A-28001122',
-        concept: 'Despeses d\'explotació i serveis necessaris per a l\'activitat',
+        concept: "Despeses d'explotació i serveis necessaris per a l'activitat",
         taxableBase: base,
         vatRate: 21,
         vatAmount: vatAmount,
@@ -106,7 +106,7 @@ export function syncActivitiesToIVA(data: DeclaracionData): {
         deductibleVatAmount: vatAmount,
         totalInvoice: base + vatAmount,
         category: 'activity_expense',
-        notes: 'Generat automàticament des del mòdul d\'Activitats Econòmiques',
+        notes: "Generat automàticament des del mòdul d'Activitats Econòmiques",
       };
 
       currentIVA.receivedInvoices.push(newRec);
@@ -137,18 +137,22 @@ export function syncIVAToActivities(data: DeclaracionData): {
 
   // Sumar bases de factures emeses d'activitat
   const actIssued = (iva.issuedInvoices || []).filter(
-    i => i.category === 'activity_service' || i.category === 'activity_goods'
+    (i) => i.category === 'activity_service' || i.category === 'activity_goods',
   );
   const totalBaseIncome = actIssued.reduce((s, i) => s + (i.taxableBase || 0), 0);
   const totalWithholdings = actIssued.reduce((s, i) => s + (i.withholdingAmount || 0), 0);
 
   // Sumar bases de despeses d'activitat (amb IVA no deduïble si n'hi ha)
   const actReceived = (iva.receivedInvoices || []).filter(
-    i => i.category === 'activity_expense' || i.category === 'activity_supplies' || i.category === 'professional_services' || i.category === 'vehicle_expense'
+    (i) =>
+      i.category === 'activity_expense' ||
+      i.category === 'activity_supplies' ||
+      i.category === 'professional_services' ||
+      i.category === 'vehicle_expense',
   );
   const totalBaseExpenses = actReceived.reduce((s, i) => {
     const base = i.taxableBase || 0;
-    const vat = i.vatAmount || (base * ((i.vatRate || 0) / 100));
+    const vat = i.vatAmount || base * ((i.vatRate || 0) / 100);
     const dedVat = i.deductibleVatAmount !== undefined ? i.deductibleVatAmount : vat;
     const nonDeductibleVat = Math.max(0, vat - dedVat);
     // En IRPF, l'IVA no deduïble forma part de la despesa deduïble
@@ -181,8 +185,8 @@ export function syncPropertiesToIVA(data: DeclaracionData): {
   const year = data.year || 2024;
 
   // Netejar factures d'immobles generades automàticament
-  currentIVA.issuedInvoices = currentIVA.issuedInvoices.filter(i => !i.id.startsWith('auto_prop_'));
-  currentIVA.investmentAssets = currentIVA.investmentAssets.filter(b => !b.id.startsWith('auto_prop_inv_'));
+  currentIVA.issuedInvoices = currentIVA.issuedInvoices.filter((i) => !i.id.startsWith('auto_prop_'));
+  currentIVA.investmentAssets = currentIVA.investmentAssets.filter((b) => !b.id.startsWith('auto_prop_inv_'));
 
   const quarters: FiscalQuarter[] = ['1T', '2T', '3T', '4T'];
   let addedCommercialRentals = 0;
@@ -191,19 +195,23 @@ export function syncPropertiesToIVA(data: DeclaracionData): {
   let addedInvestmentAssets = 0;
 
   for (const prop of properties) {
-    const isCommercial = prop.usageType === 'commercial' || prop.name?.toLowerCase().includes('local') || prop.name?.toLowerCase().includes('oficina') || prop.name?.toLowerCase().includes('nau');
+    const isCommercial =
+      prop.usageType === 'commercial' ||
+      prop.name?.toLowerCase().includes('local') ||
+      prop.name?.toLowerCase().includes('oficina') ||
+      prop.name?.toLowerCase().includes('nau');
     const isTourist = prop.usageType === 'tourist';
     const isResidential = prop.usageType === 'habitual' || prop.usageType === 'temporary';
 
     const annualIncome = prop.grossRentalIncome || 0;
-    const tenantNif = (prop.tenantNIFs && prop.tenantNIFs.length > 0) ? prop.tenantNIFs[0] : 'B-12345678';
+    const tenantNif = prop.tenantNIFs && prop.tenantNIFs.length > 0 ? prop.tenantNIFs[0] : 'B-12345678';
 
     if (annualIncome > 0) {
       const qIncome = annualIncome / 4;
 
       for (let idx = 0; idx < quarters.length; idx++) {
         const q = quarters[idx];
-        const month = (idx * 3) + 1;
+        const month = idx * 3 + 1;
         const monthStr = month < 10 ? `0${month}` : `${month}`;
         const base = Math.round(qIncome * 100) / 100;
 
@@ -233,7 +241,7 @@ export function syncPropertiesToIVA(data: DeclaracionData): {
           addedCommercialRentals++;
         } else if (isTourist) {
           // Lloguer turístic amb serveis: IVA 10%
-          const vatAmount = Math.round(base * 0.10 * 100) / 100;
+          const vatAmount = Math.round(base * 0.1 * 100) / 100;
 
           currentIVA.issuedInvoices.push({
             id: `auto_prop_tour_${prop.id}_${q}`,
@@ -303,7 +311,10 @@ export function syncPropertiesToIVA(data: DeclaracionData): {
   }
 
   // Si hi ha lloguers exempts d'habitatge i activitats comercials alhora, activar prorrata
-  if (addedExemptRentals > 0 && (addedCommercialRentals > 0 || currentIVA.issuedInvoices.some(i => i.vatRate > 0))) {
+  if (
+    addedExemptRentals > 0 &&
+    (addedCommercialRentals > 0 || currentIVA.issuedInvoices.some((i) => i.vatRate > 0))
+  ) {
     currentIVA.config.hasProrrata = true;
     currentIVA.config.prorrata.isRegulatedAutomatically = true;
   }
@@ -382,19 +393,31 @@ function createEmptyQuarterResult(quarter: FiscalQuarter): Model303QuarterResult
   return {
     quarter,
     year: 2024,
-    base21: 0, cuota21: 0,
-    base10: 0, cuota10: 0,
-    base4: 0, cuota4: 0,
-    base0: 0, cuota0: 0,
-    modBase: 0, modCuota: 0,
-    recargoBases: 0, recargoCuotas: 0,
-    intraEuBase: 0, intraEuCuota: 0,
-    ispBase: 0, ispCuota: 0,
+    base21: 0,
+    cuota21: 0,
+    base10: 0,
+    cuota10: 0,
+    base4: 0,
+    cuota4: 0,
+    base0: 0,
+    cuota0: 0,
+    modBase: 0,
+    modCuota: 0,
+    recargoBases: 0,
+    recargoCuotas: 0,
+    intraEuBase: 0,
+    intraEuCuota: 0,
+    ispBase: 0,
+    ispCuota: 0,
     totalDevengado: 0,
-    deducibleCorrienteBase: 0, deducibleCorrienteCuota: 0,
-    deducibleInversionBase: 0, deducibleInversionCuota: 0,
-    deducibleImportacionesBase: 0, deducibleImportacionesCuota: 0,
-    deducibleIntraEuBase: 0, deducibleIntraEuCuota: 0,
+    deducibleCorrienteBase: 0,
+    deducibleCorrienteCuota: 0,
+    deducibleInversionBase: 0,
+    deducibleInversionCuota: 0,
+    deducibleImportacionesBase: 0,
+    deducibleImportacionesCuota: 0,
+    deducibleIntraEuBase: 0,
+    deducibleIntraEuCuota: 0,
     rectificacionDeducciones: 0,
     regularizacionBienesInversion: 0,
     regularizacionProrrata: 0,

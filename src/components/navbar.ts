@@ -35,7 +35,7 @@ export function createSidebar(): HTMLElement {
 
   // Filtrar rutes segons les eines activades per a aquest usuari
   const allRoutes = router.getRoutes();
-  const visibleRoutes = allRoutes.filter(r => {
+  const visibleRoutes = allRoutes.filter((r) => {
     if (r.path === '/' || r.path === '/usuaris') return true; // Sempre visibles
     const mod = getModuleByPath(r.path);
     if (!mod) return true; // Si no té mòdul associat, mostrar per defecte
@@ -94,11 +94,15 @@ export function createSidebar(): HTMLElement {
 
         <div style="display:flex; gap:4px; align-items:center;">
           <select class="form-select" id="profile-select" style="flex:1; font-size:0.75rem; padding:4px 6px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary);">
-            ${profiles.map(p => `
+            ${profiles
+              .map(
+                (p) => `
               <option value="${p.id}" ${p.id === activeProfile.id ? 'selected' : ''}>
                 ${p.avatarIcon || '👤'} ${p.name}
               </option>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </select>
           <button class="btn btn--ghost btn--sm btn--icon" id="btn-go-to-users" title="Gestionar Declarants" style="padding:4px 6px; font-size:0.85rem;">👥</button>
         </div>
@@ -132,13 +136,13 @@ export function createSidebar(): HTMLElement {
 
     <!-- Badge d'Auditoria & Diagnòstic en Temps Real -->
     <div style="padding: 0 var(--space-md); margin-bottom: var(--space-sm);">
-      <button id="btn-open-compliance-sidebar" class="btn btn--secondary btn--sm" style="width:100%; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:6px 10px; border-radius:var(--radius-sm); border:1px solid ${compliance.criticalCount > 0 ? 'var(--color-error)' : (compliance.warningCount > 0 ? 'var(--color-warning)' : 'var(--color-success)')}; background:var(--bg-surface-elevated);">
+      <button id="btn-open-compliance-sidebar" class="btn btn--secondary btn--sm" style="width:100%; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; padding:6px 10px; border-radius:var(--radius-sm); border:1px solid ${compliance.criticalCount > 0 ? 'var(--color-error)' : compliance.warningCount > 0 ? 'var(--color-warning)' : 'var(--color-success)'}; background:var(--bg-surface-elevated);">
         <span style="display:flex; align-items:center; gap:4px;">
-          <span>${compliance.criticalCount > 0 ? '🔴' : (compliance.warningCount > 0 ? '🟡' : '🟢')}</span>
+          <span>${compliance.criticalCount > 0 ? '🔴' : compliance.warningCount > 0 ? '🟡' : '🟢'}</span>
           <span style="font-weight:600;">Auditoria Fiscal</span>
         </span>
-        <span class="badge ${compliance.criticalCount > 0 ? 'badge--error' : (compliance.warningCount > 0 ? 'badge--warning' : 'badge--success')}" style="font-size:0.65rem; padding:2px 6px;">
-          ${compliance.criticalCount > 0 ? `${compliance.criticalCount} errors` : (compliance.warningCount > 0 ? `${compliance.warningCount} avisos` : '100% OK')}
+        <span class="badge ${compliance.criticalCount > 0 ? 'badge--error' : compliance.warningCount > 0 ? 'badge--warning' : 'badge--success'}" style="font-size:0.65rem; padding:2px 6px;">
+          ${compliance.criticalCount > 0 ? `${compliance.criticalCount} errors` : compliance.warningCount > 0 ? `${compliance.warningCount} avisos` : '100% OK'}
         </span>
       </button>
     </div>
@@ -173,7 +177,7 @@ export function createSidebar(): HTMLElement {
         <select class="form-select sidebar-footer__year-select" id="year-select">
           ${FISCAL_YEARS.map(
             (y) =>
-              `<option value="${y}" ${y === store.getYear() ? 'selected' : ''}>${y}</option>`,
+              `<option value="${y}" ${y === store.getYear() ? 'selected' : ''}>${y}${y === 2026 ? ' (provisional)' : ''}</option>`,
           ).join('')}
         </select>
       </div>
@@ -221,7 +225,10 @@ export function createSidebar(): HTMLElement {
   themeBtn.addEventListener('click', () => {
     const newTheme = store.toggleTheme();
     themeBtn.textContent = THEME_INFO[newTheme]?.icon || '🌌';
-    themeBtn.setAttribute('title', `Tema actual: ${THEME_INFO[newTheme]?.name || 'Dark'} (Clica per canviar)`);
+    themeBtn.setAttribute(
+      'title',
+      `Tema actual: ${THEME_INFO[newTheme]?.name || 'Dark'} (Clica per canviar)`,
+    );
   });
 
   // Event delegation for nav items
@@ -235,12 +242,16 @@ export function createSidebar(): HTMLElement {
   });
 
   // Predictive prefetching on link hover
-  nav.addEventListener('pointerenter', (e) => {
-    const target = (e.target as HTMLElement).closest<HTMLElement>('.nav-item');
-    if (target?.dataset.path) {
-      router.prefetch(target.dataset.path);
-    }
-  }, true);
+  nav.addEventListener(
+    'pointerenter',
+    (e) => {
+      const target = (e.target as HTMLElement).closest<HTMLElement>('.nav-item');
+      if (target?.dataset.path) {
+        router.prefetch(target.dataset.path);
+      }
+    },
+    true,
+  );
 
   // Year selector
   const yearSelect = sidebar.querySelector<HTMLSelectElement>('#year-select')!;
@@ -339,4 +350,3 @@ if (typeof window !== 'undefined') {
     if (existing) existing.replaceWith(createSidebar());
   });
 }
-

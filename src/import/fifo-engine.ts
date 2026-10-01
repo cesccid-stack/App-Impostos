@@ -10,7 +10,7 @@ import type { GainItem } from '../types.ts';
 /**
  * Calculates capital gains using the FIFO method with full homogeneity across brokers.
  * Implements proportional wash-sale anti-application rules (Art. 33.5 LIRPF).
- * 
+ *
  * @param trades Array of all trades across all brokers.
  * @returns Matched sales, open positions, and asset summaries per ISIN.
  */
@@ -32,7 +32,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
   }> = [];
 
   // Pre-parse timestamps to avoid repetitive new Date allocations in sorting and matching
-  const indexedTrades = trades.map(t => ({
+  const indexedTrades = trades.map((t) => ({
     ...t,
     dateMs: new Date(t.date).getTime(),
   }));
@@ -103,7 +103,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
       while (remainingToSell > 0 && lots.length > 0) {
         const currentLot = lots[0];
         const qtyToMatch = Math.min(remainingToSell, currentLot.remainingQty);
-        
+
         const acquisitionValueEUR = qtyToMatch * currentLot.priceEUR;
         const transferValueEUR = qtyToMatch * sellPriceEURPerUnit;
         const gain = transferValueEUR - acquisitionValueEUR;
@@ -119,7 +119,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
         totalAcquisitionForSale += acquisitionValueEUR;
         totalTransferForSale += transferValueEUR;
         totalGainForThisSale += gain;
-        
+
         remainingToSell -= qtyToMatch;
         currentLot.remainingQty -= qtyToMatch;
 
@@ -129,7 +129,9 @@ export function calculateFIFO(trades: TradeRecord[]): {
       }
 
       if (remainingToSell > 0) {
-        console.warn(`[FIFO Engine] Posició curta o historial de compra incomplet per a ${assetId}. Qty restant: ${remainingToSell}`);
+        console.warn(
+          `[FIFO Engine] Posició curta o historial de compra incomplet per a ${assetId}. Qty restant: ${remainingToSell}`,
+        );
       }
 
       // Regla d'antiaplicació de pèrdues (Art. 33.5 LIRPF)
@@ -140,11 +142,11 @@ export function calculateFIFO(trades: TradeRecord[]): {
 
       if (totalGainForThisSale < 0) {
         const sellDate = new Date(trade.dateMs);
-        
+
         // Determinar finestra temporal (Art. 33.5.f LIRPF): 2 mesos per a valors admesos a
         // negociació en mercats regulats (espanyols, UE o equivalents de tercer país) i 1 any
         // per a valors no cotitzats.
-        const isListed = trade.isListed ?? (trade.marketType !== 'unregulated_or_foreign');
+        const isListed = trade.isListed ?? trade.marketType !== 'unregulated_or_foreign';
         const windowMonths = isListed ? 2 : 12;
 
         const windowStart = new Date(sellDate);
@@ -171,7 +173,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
           // Càlcul proporcional: només queda suspesa la pèrdua corresponent als títols recomprats
           const matchedSoldQty = trade.quantity - remainingToSell;
           const suspendedRatio = Math.min(1, repurchasedQuantity / (matchedSoldQty || 1));
-          
+
           suspendedLossEUR = Math.abs(totalGainForThisSale) * suspendedRatio;
           // La pèrdua computable és la part no recomprada (negativa)
           computedGainLossEUR = totalGainForThisSale + suspendedLossEUR;
@@ -181,7 +183,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
             assetId,
             suspendedLossEUR,
             windowBuys: (candidateBuys || []).filter(
-              b => b.id !== trade.id && b.dateMs >= windowStartMs && b.dateMs <= windowEndMs,
+              (b) => b.id !== trade.id && b.dateMs >= windowStartMs && b.dateMs <= windowEndMs,
             ),
           });
         }
@@ -212,7 +214,7 @@ export function calculateFIFO(trades: TradeRecord[]): {
       summary.realizedGain += totalGainForThisSale;
       summary.suspendedLosses += suspendedLossEUR;
       summary.netTaxableGain += computedGainLossEUR;
-      summary.openPosition -= (trade.quantity - remainingToSell);
+      summary.openPosition -= trade.quantity - remainingToSell;
     }
   }
 
@@ -278,14 +280,17 @@ export function calculateFIFO(trades: TradeRecord[]): {
  * Converteix els FIFOMatches en GainItems compatibles amb l'aplicació i el model IRPF.
  */
 export function matchesToGainItems(matches: FIFOMatch[]): GainItem[] {
-  return matches.map(match => {
+  return matches.map((match) => {
     let type: GainItem['type'] = 'shares';
     const c = match.sellTrade.assetClass;
     if (c === 'etf' || c === 'funds') type = 'funds';
     else if (c === 'crypto') type = 'crypto';
     else if (c === 'options' || c === 'futures' || c === 'cfd' || c === 'warrants') type = 'other';
 
-    const acquisitionDate = match.matchedLots.length > 0 ? match.matchedLots[0].lot.date.split('T')[0] : match.sellTrade.date.split('T')[0];
+    const acquisitionDate =
+      match.matchedLots.length > 0
+        ? match.matchedLots[0].lot.date.split('T')[0]
+        : match.sellTrade.date.split('T')[0];
     const isinPart = match.sellTrade.isin ? ` [${match.sellTrade.isin}]` : '';
     const description = `${match.sellTrade.quantity} ${match.sellTrade.symbol}${isinPart} (${match.sellTrade.broker})`;
 

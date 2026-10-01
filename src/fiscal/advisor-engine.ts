@@ -11,7 +11,16 @@ import { PENSION_PLAN_LIMIT, DONATION_FIRST_TIER, DONATION_FIRST_TIER_RATE } fro
 
 export interface FiscalAdviceItem {
   id: string;
-  category: 'pension' | 'donations' | 'savings_gains' | 'real_estate' | 'catalan' | 'energy' | 'joint' | 'wealth' | 'foreign';
+  category:
+    | 'pension'
+    | 'donations'
+    | 'savings_gains'
+    | 'real_estate'
+    | 'catalan'
+    | 'energy'
+    | 'joint'
+    | 'wealth'
+    | 'foreign';
   title: string;
   badge: string;
   badgeType: 'success' | 'warning' | 'info' | 'primary';
@@ -22,10 +31,10 @@ export interface FiscalAdviceItem {
 }
 
 export interface FiscalAdvisorAudit {
-  marginalGeneralRate: number;      // % Tipus marginal general (ex: 35%)
-  marginalSavingsRate: number;      // % Tipus marginal estalvi (ex: 21%)
-  effectiveRate: number;            // % Tipus mitjà efectiu
-  totalPotentialSavings: number;    // Estalvi total acumulable (€)
+  marginalGeneralRate: number; // % Tipus marginal general (ex: 35%)
+  marginalSavingsRate: number; // % Tipus marginal estalvi (ex: 21%)
+  effectiveRate: number; // % Tipus mitjà efectiu
+  totalPotentialSavings: number; // Estalvi total acumulable (€)
   adviceList: FiscalAdviceItem[];
 }
 
@@ -44,14 +53,33 @@ export function auditTaxReturn(data: DeclaracionData, currentResult: FiscalResul
   return audit;
 }
 
-function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: FiscalResult): FiscalAdvisorAudit {
+function computeAuditTaxReturnInternal(
+  data: DeclaracionData,
+  currentResult: FiscalResult,
+): FiscalAdvisorAudit {
   const adviceList: FiscalAdviceItem[] = [];
 
   // 1. Càlcul del Tipus Marginal General (Simulació ràpida amb shallow clone)
   const currentEmployers = data.workIncome?.employers || [];
-  const simEmployers = currentEmployers.length === 0
-    ? [{ id: 'sim', name: 'Sim', grossSalary: 100, inKind: 0, withholdings: 0, socialSecurity: 0, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }]
-    : currentEmployers.map((emp, i) => i === 0 ? { ...emp, grossSalary: (emp.grossSalary || 0) + 100 } : emp);
+  const simEmployers =
+    currentEmployers.length === 0
+      ? [
+          {
+            id: 'sim',
+            name: 'Sim',
+            grossSalary: 100,
+            inKind: 0,
+            withholdings: 0,
+            socialSecurity: 0,
+            dietsIncome: 0,
+            dietsDays: 0,
+            mileageIncome: 0,
+            mileageKm: 0,
+          },
+        ]
+      : currentEmployers.map((emp, i) =>
+          i === 0 ? { ...emp, grossSalary: (emp.grossSalary || 0) + 100 } : emp,
+        );
 
   const simDataGeneral: DeclaracionData = {
     ...data,
@@ -61,7 +89,10 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     },
   };
   const simResultGeneral = calculateIRPF(simDataGeneral);
-  const marginalGeneralRate = Math.max(0, Math.round(((simResultGeneral.netTax - currentResult.netTax) / 100) * 1000) / 10);
+  const marginalGeneralRate = Math.max(
+    0,
+    Math.round(((simResultGeneral.netTax - currentResult.netTax) / 100) * 1000) / 10,
+  );
 
   // 2. Càlcul del Tipus Marginal de l'Estalvi (Shallow clone ràpid)
   const simDataSavings: DeclaracionData = {
@@ -72,14 +103,20 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     },
   };
   const simResultSavings = calculateIRPF(simDataSavings);
-  const marginalSavingsRate = Math.max(0, Math.round(((simResultSavings.netTax - currentResult.netTax) / 100) * 1000) / 10);
+  const marginalSavingsRate = Math.max(
+    0,
+    Math.round(((simResultSavings.netTax - currentResult.netTax) / 100) * 1000) / 10,
+  );
 
-  const effectiveRate = currentResult.generalBase > 0 
-    ? Math.round((currentResult.netTax / (currentResult.generalBase + currentResult.savingsBase)) * 1000) / 10
-    : 0;
+  const effectiveRate =
+    currentResult.generalBase > 0
+      ? Math.round((currentResult.netTax / (currentResult.generalBase + currentResult.savingsBase)) * 1000) /
+        10
+      : 0;
 
   // ── AUDITORIA 1: Pla de Pensions Individual ──
-  const currentPension = (data.deductions?.pensionPlanContributions || 0) + (data.workIncome?.pensionContributions || 0);
+  const currentPension =
+    (data.deductions?.pensionPlanContributions || 0) + (data.workIncome?.pensionContributions || 0);
   const remainingPensionLimit = Math.max(0, PENSION_PLAN_LIMIT - currentPension);
 
   if (remainingPensionLimit > 0 && currentResult.liquidableGeneralBase > 0) {
@@ -133,7 +170,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     adviceList.push({
       id: 'tax_loss_harvesting',
       category: 'savings_gains',
-      title: 'Tax-Loss Harvesting: Redueix l\'Impost de l\'Estalvi a 0 €',
+      title: "Tax-Loss Harvesting: Redueix l'Impost de l'Estalvi a 0 €",
       badge: `Estalvi fins a ${estimatedSavingsHarvest.toFixed(2)} €`,
       badgeType: 'success',
       potentialSavingsEUR: estimatedSavingsHarvest,
@@ -150,7 +187,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     adviceList.push({
       id: 'catalan_rental',
       category: 'catalan',
-      title: 'Deducció per Lloguer d\'Habitatge Habitual (Catalunya)',
+      title: "Deducció per Lloguer d'Habitatge Habitual (Catalunya)",
       badge: `Fins a 300,00 €`,
       badgeType: 'warning',
       potentialSavingsEUR: 300,
@@ -161,7 +198,10 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
   }
 
   // ── AUDITORIA 5: Préstecs AGAUR Màster/Doctorat ──
-  if (!data.deductions?.catalanAgaurMasterLoanInterests || data.deductions.catalanAgaurMasterLoanInterests === 0) {
+  if (
+    !data.deductions?.catalanAgaurMasterLoanInterests ||
+    data.deductions.catalanAgaurMasterLoanInterests === 0
+  ) {
     adviceList.push({
       id: 'catalan_agaur',
       category: 'catalan',
@@ -177,7 +217,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
 
   // ── AUDITORIA 6: Immobles i Despeses de Reparació (Control 4 Anys) ──
   let totalPendingRepairs = 0;
-  (data.properties || []).forEach(p => {
+  (data.properties || []).forEach((p) => {
     totalPendingRepairs += p.pendingRepairsPreviousYears || 0;
   });
 
@@ -185,7 +225,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     adviceList.push({
       id: 'real_estate_repairs_carryover',
       category: 'real_estate',
-      title: 'Seguiment de Despeses de Reparació Pendents d\'Immobles',
+      title: "Seguiment de Despeses de Reparació Pendents d'Immobles",
       badge: `Pendent: ${totalPendingRepairs.toFixed(2)} €`,
       badgeType: 'warning',
       potentialSavingsEUR: totalPendingRepairs * (marginalGeneralRate / 100),
@@ -200,7 +240,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
     adviceList.push({
       id: 'energy_efficiency',
       category: 'energy',
-      title: 'Deduccions per Obres d\'Eficiència Energètica (20% - 60%)',
+      title: "Deduccions per Obres d'Eficiència Energètica (20% - 60%)",
       badge: `Fins a 3.000 €`,
       badgeType: 'info',
       potentialSavingsEUR: 1000,
@@ -211,7 +251,7 @@ function computeAuditTaxReturnInternal(data: DeclaracionData, currentResult: Fis
   }
 
   const totalPotentialSavings = adviceList
-    .filter(a => !a.isApplied)
+    .filter((a) => !a.isApplied)
     .reduce((sum, a) => sum + a.potentialSavingsEUR, 0);
 
   return {

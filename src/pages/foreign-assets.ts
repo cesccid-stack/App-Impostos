@@ -15,21 +15,49 @@ export function renderForeignAssets(): HTMLElement {
 
   const data = store.getData();
 
-  const foreignState: ForeignAssetsData = data.foreignAssets && data.foreignAssets.accounts && data.foreignAssets.accounts.length > 0
-    ? data.foreignAssets
-    : {
-        accounts: [
-          { id: '1', bankName: 'Trade Republic Bank GmbH', countryCode: 'DE', ibanOrNumber: 'DE89...', balanceYearEnd: 15400, averageBalanceQ4: 14200 },
-          { id: '2', bankName: 'Revolut Bank UAB', countryCode: 'LT', ibanOrNumber: 'LT45...', balanceYearEnd: 4800, averageBalanceQ4: 5100 },
-        ],
-        securities: [
-          { id: 's1', brokerName: 'Interactive Brokers Ireland', countryCode: 'IE', assetDescription: 'Accions Apple, Microsoft & ETF S&P 500', units: 150, totalValueYearEnd: 42000 },
-        ],
-        realEstate: [],
-        crypto: [
-          { id: 'c1', exchangeName: 'Binance (No Resident)', cryptoSymbol: 'BTC / ETH', units: 0.85, valueYearEndEUR: 32000 },
-        ],
-      };
+  const foreignState: ForeignAssetsData =
+    data.foreignAssets && data.foreignAssets.accounts && data.foreignAssets.accounts.length > 0
+      ? data.foreignAssets
+      : {
+          accounts: [
+            {
+              id: '1',
+              bankName: 'Trade Republic Bank GmbH',
+              countryCode: 'DE',
+              ibanOrNumber: 'DE89...',
+              balanceYearEnd: 15400,
+              averageBalanceQ4: 14200,
+            },
+            {
+              id: '2',
+              bankName: 'Revolut Bank UAB',
+              countryCode: 'LT',
+              ibanOrNumber: 'LT45...',
+              balanceYearEnd: 4800,
+              averageBalanceQ4: 5100,
+            },
+          ],
+          securities: [
+            {
+              id: 's1',
+              brokerName: 'Interactive Brokers Ireland',
+              countryCode: 'IE',
+              assetDescription: 'Accions Apple, Microsoft & ETF S&P 500',
+              units: 150,
+              totalValueYearEnd: 42000,
+            },
+          ],
+          realEstate: [],
+          crypto: [
+            {
+              id: 'c1',
+              exchangeName: 'Binance (No Resident)',
+              cryptoSymbol: 'BTC / ETH',
+              units: 0.85,
+              valueYearEndEUR: 32000,
+            },
+          ],
+        };
 
   function saveAndRender() {
     store.update('foreignAssets', foreignState);
@@ -59,11 +87,15 @@ export function renderForeignAssets(): HTMLElement {
 
       <!-- Alertes i Dictamen -->
       <div style="display:flex; flex-direction:column; gap:var(--space-sm); margin-bottom:var(--space-xl);">
-        ${audit.summaryAlerts.map(a => `
+        ${audit.summaryAlerts
+          .map(
+            (a) => `
           <div style="background:var(--bg-surface-elevated); border-left:4px solid ${audit.model720Obligation || audit.model721MustDeclare ? 'var(--color-warning)' : 'var(--color-success)'}; padding:12px 16px; border-radius:var(--radius-sm); font-size:var(--text-sm);">
             ${a}
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </div>
 
       <!-- 4 Cards dels Blocs de 50.000 € -->
@@ -120,7 +152,9 @@ export function renderForeignAssets(): HTMLElement {
           <button class="btn btn--secondary btn--sm" id="btn-add-account">＋ Afegir Compte</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${foreignState.accounts.map(acc => `
+          ${foreignState.accounts
+            .map(
+              (acc) => `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--border-default); font-size:var(--text-sm);">
               <div>
                 <strong>${acc.bankName}</strong> <span class="badge badge--secondary">${acc.countryCode}</span>
@@ -131,7 +165,9 @@ export function renderForeignAssets(): HTMLElement {
                 <button class="btn btn--ghost btn--sm btn--icon" data-del-account="${acc.id}">🗑</button>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
 
@@ -142,7 +178,9 @@ export function renderForeignAssets(): HTMLElement {
           <button class="btn btn--secondary btn--sm" id="btn-add-security">＋ Afegir Valor</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${foreignState.securities.map(sec => `
+          ${foreignState.securities
+            .map(
+              (sec) => `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--border-default); font-size:var(--text-sm);">
               <div>
                 <strong>${sec.brokerName}</strong> <span class="badge badge--secondary">${sec.countryCode}</span>
@@ -153,7 +191,9 @@ export function renderForeignAssets(): HTMLElement {
                 <button class="btn btn--ghost btn--sm btn--icon" data-del-sec="${sec.id}">🗑</button>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
 
@@ -164,7 +204,9 @@ export function renderForeignAssets(): HTMLElement {
           <button class="btn btn--secondary btn--sm" id="btn-add-crypto">＋ Afegir Cripto</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${foreignState.crypto.map(cr => `
+          ${foreignState.crypto
+            .map(
+              (cr) => `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--border-default); font-size:var(--text-sm);">
               <div>
                 <strong>${cr.exchangeName}</strong> <span class="badge badge--warning">${cr.cryptoSymbol}</span>
@@ -175,14 +217,16 @@ export function renderForeignAssets(): HTMLElement {
                 <button class="btn btn--ghost btn--sm btn--icon" data-del-crypto="${cr.id}">🗑</button>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
     `;
 
     // Listeners
     page.querySelector('#btn-add-account')?.addEventListener('click', () => {
-      const name = prompt('Nom de l\'entitat bancària (ex: Revolut Bank UAB):');
+      const name = prompt("Nom de l'entitat bancària (ex: Revolut Bank UAB):");
       if (name) {
         const bal = parseFloat(prompt('Saldo a 31 de desembre (€):') || '0') || 0;
         foreignState.accounts.push({
@@ -216,7 +260,7 @@ export function renderForeignAssets(): HTMLElement {
     });
 
     page.querySelector('#btn-add-crypto')?.addEventListener('click', () => {
-      const exch = prompt('Nom de l\'exchange no resident (ex: Binance):');
+      const exch = prompt("Nom de l'exchange no resident (ex: Binance):");
       if (exch) {
         const val = parseFloat(prompt('Valoració a 31 de desembre (€):') || '0') || 0;
         foreignState.crypto.push({
@@ -231,26 +275,26 @@ export function renderForeignAssets(): HTMLElement {
       }
     });
 
-    page.querySelectorAll('[data-del-account]').forEach(btn => {
+    page.querySelectorAll('[data-del-account]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.delAccount;
-        foreignState.accounts = foreignState.accounts.filter(a => a.id !== id);
+        foreignState.accounts = foreignState.accounts.filter((a) => a.id !== id);
         saveAndRender();
       });
     });
 
-    page.querySelectorAll('[data-del-sec]').forEach(btn => {
+    page.querySelectorAll('[data-del-sec]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.delSec;
-        foreignState.securities = foreignState.securities.filter(s => s.id !== id);
+        foreignState.securities = foreignState.securities.filter((s) => s.id !== id);
         saveAndRender();
       });
     });
 
-    page.querySelectorAll('[data-del-crypto]').forEach(btn => {
+    page.querySelectorAll('[data-del-crypto]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.delCrypto;
-        foreignState.crypto = foreignState.crypto.filter(c => c.id !== id);
+        foreignState.crypto = foreignState.crypto.filter((c) => c.id !== id);
         saveAndRender();
       });
     });

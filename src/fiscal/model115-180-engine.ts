@@ -1,12 +1,12 @@
 /**
  * @module fiscal/model115-180-engine
  * Motor de Càlcul, Validació i Conciliació dels Models 115 i 180 de l'AEAT.
- * 
+ *
  * Normativa:
  * - Art. 75.2.a i Art. 100 del Reglament de l'IRPF (RD 439/2007).
  * - Art. 58 a 62 del Reglament de l'Impost sobre Societats (RD 634/2015).
  * - Ordre EHA/3895/2004 (Aprovació del Model 180).
- * 
+ *
  * Finalitat:
  * - Model 115 (Trimestral): Retencions sobre rendiments de l'arrendament d'immobles urbans (tipus oficial general del 19%).
  * - Model 180 (Resum Anual): Declaració informativa anual amb desglossament per arrendador, referència cadastral i immoble.
@@ -98,10 +98,12 @@ export class Model115And180Engine {
     quarter: FiscalQuarter,
     year: number,
     leases: readonly Model115LeaseInput[],
-    previousQuarterAdjustments = 0
+    previousQuarterAdjustments = 0,
   ): Model115Quarterly {
     // Filtrem contractes actius subjectes a retenció
-    const subjectLeases = leases.filter(l => !l.isExempt && (l.monthlyRent * 12) > LEASE_EXEMPTION_ANNUAL_THRESHOLD);
+    const subjectLeases = leases.filter(
+      (l) => !l.isExempt && l.monthlyRent * 12 > LEASE_EXEMPTION_ANNUAL_THRESHOLD,
+    );
 
     let baseTotal = 0;
     let withholdingsTotal = 0;
@@ -138,10 +140,10 @@ export class Model115And180Engine {
    */
   public static calculateModel115AllQuarters(
     year: number,
-    leases: readonly Model115LeaseInput[]
+    leases: readonly Model115LeaseInput[],
   ): Model115Quarterly[] {
     const quarters: FiscalQuarter[] = ['1T', '2T', '3T', '4T'];
-    return quarters.map(q => this.calculateModel115Quarterly(q, year, leases));
+    return quarters.map((q) => this.calculateModel115Quarterly(q, year, leases));
   }
 
   /**
@@ -150,9 +152,11 @@ export class Model115And180Engine {
   public static generateModel180Annual(
     year: number,
     leases: readonly Model115LeaseInput[],
-    quarters115?: readonly Model115Quarterly[]
+    quarters115?: readonly Model115Quarterly[],
   ): Model180Annual {
-    const subjectLeases = leases.filter(l => !l.isExempt && (l.monthlyRent * 12) > LEASE_EXEMPTION_ANNUAL_THRESHOLD);
+    const subjectLeases = leases.filter(
+      (l) => !l.isExempt && l.monthlyRent * 12 > LEASE_EXEMPTION_ANNUAL_THRESHOLD,
+    );
 
     const perceptors: Model180PerceptorItem[] = [];
     let totalBase = 0;
@@ -198,7 +202,7 @@ export class Model115And180Engine {
       }
     }
 
-    const uniqueLandlords = new Set(perceptors.map(p => p.landlordNif));
+    const uniqueLandlords = new Set(perceptors.map((p) => p.landlordNif));
 
     return {
       year,
@@ -216,7 +220,7 @@ export class Model115And180Engine {
    */
   public static reconcileModel115vs180(
     quarters115: readonly Model115Quarterly[],
-    model180: Model180Annual
+    model180: Model180Annual,
   ): Model115vs180Reconciliation {
     const sum115Bases = quarters115.reduce((sum, q) => exactAdd(sum, q.baseTotal), 0);
     const sum115Withholdings = quarters115.reduce((sum, q) => exactAdd(sum, q.withholdingsTotal), 0);
@@ -249,7 +253,7 @@ export class Model115And180Engine {
    */
   public static reconcileModel180vsLandlordDeclaracion(
     model180: Model180Annual,
-    landlordData: DeclaracionData
+    landlordData: DeclaracionData,
   ): { isMatching: boolean; expectedWithholding: number; declaredWithholding: number; difference: number } {
     const expectedWithholding = model180.totalWithholdingsAnnual;
     const declaredWithholding = landlordData.capitalIncome?.realEstateWithholdings || 0;

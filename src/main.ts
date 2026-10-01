@@ -87,7 +87,7 @@ const routes: Route[] = [
   },
   {
     path: '/iva',
-    label: 'Gestió de l\'IVA (303/390)',
+    label: "Gestió de l'IVA (303/390)",
     icon: '🧾',
     section: 'Fiscal',
     load: ivaPage,
@@ -127,7 +127,7 @@ const routes: Route[] = [
   },
   {
     path: '/model720',
-    label: 'Béns a l\'Estranger (720/721)',
+    label: "Béns a l'Estranger (720/721)",
     icon: '🌍',
     section: 'Fiscal',
     load: foreignAssetsPage,

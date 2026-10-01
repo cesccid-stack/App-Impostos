@@ -46,7 +46,9 @@ export function renderUsersPage(): HTMLElement {
     // Càlcul de KPIs globals
     const totalProfiles = profiles.length;
     const mainCount = profiles.filter((p) => p.relation === 'main').length;
-    const familyCount = profiles.filter((p) => p.relation === 'spouse' || p.relation === 'child' || p.relation === 'parent').length;
+    const familyCount = profiles.filter(
+      (p) => p.relation === 'spouse' || p.relation === 'child' || p.relation === 'parent',
+    ).length;
     const clientCount = profiles.filter((p) => p.relation === 'client').length;
     const readyCount = profiles.filter((p) => p.status === 'ready' || p.status === 'filed').length;
 
@@ -177,18 +179,30 @@ export function renderUsersPage(): HTMLElement {
                   try {
                     fiscalRes = calculateIRPF(pData);
                   } catch {
-                    fiscalRes = { result: 0, generalBase: 0, savingsBase: 0, netTax: 0, totalWithholdings: 0 };
+                    fiscalRes = {
+                      result: 0,
+                      generalBase: 0,
+                      savingsBase: 0,
+                      netTax: 0,
+                      totalWithholdings: 0,
+                    };
                   }
 
                   const isRefund = fiscalRes.result < 0;
                   const grossTotal = (fiscalRes.generalBase || 0) + (fiscalRes.savingsBase || 0);
 
                   const relationLabel =
-                    profile.relation === 'main' ? 'Titular Principal' :
-                    profile.relation === 'spouse' ? 'Cònjuge' :
-                    profile.relation === 'child' ? 'Descendent' :
-                    profile.relation === 'parent' ? 'Ascendent' :
-                    profile.relation === 'client' ? 'Client' : 'Declarant';
+                    profile.relation === 'main'
+                      ? 'Titular Principal'
+                      : profile.relation === 'spouse'
+                        ? 'Cònjuge'
+                        : profile.relation === 'child'
+                          ? 'Descendent'
+                          : profile.relation === 'parent'
+                            ? 'Ascendent'
+                            : profile.relation === 'client'
+                              ? 'Client'
+                              : 'Declarant';
 
                   return `
             <div class="card profile-card ${isActive ? 'profile-card--active' : ''}" data-id="${profile.id}" style="
@@ -360,7 +374,8 @@ export function renderUsersPage(): HTMLElement {
         </div>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:var(--space-sm);">
-          ${MODULE_PRESETS.map(p => `
+          ${MODULE_PRESETS.map(
+            (p) => `
             <div style="background:var(--bg-surface-elevated); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);">
               <div style="font-weight:700; font-size:0.85rem; color:var(--text-primary); margin-bottom:2px;">
                 ${p.icon} ${p.name}
@@ -372,7 +387,8 @@ export function renderUsersPage(): HTMLElement {
                 ${p.moduleIds.length} eines incloses
               </div>
             </div>
-          `).join('')}
+          `,
+          ).join('')}
         </div>
       </div>
     `;
@@ -450,7 +466,11 @@ export function renderUsersPage(): HTMLElement {
 
     // Netejar totes les dades i reiniciar l'aplicació
     page.querySelector('#btn-purge-all-data')?.addEventListener('click', () => {
-      if (confirm('Vols esborrar TOTES les dades i començar completament de zero? Aquesta acció deixarà l\'aplicació 100% neta.')) {
+      if (
+        confirm(
+          "Vols esborrar TOTES les dades i començar completament de zero? Aquesta acció deixarà l'aplicació 100% neta.",
+        )
+      ) {
         store.clearAllApplicationData();
         showToast('Aplicació reiniciada: totes les dades han estat esborrades', 'info');
         render();
@@ -790,7 +810,7 @@ function openProfileModal(profileToEdit: UserProfile | null, onSaved: () => void
             </span>
           </div>
           <span class="badge badge--primary" id="modal-module-counter" style="font-size:0.75rem;">
-            ${(profileToEdit?.enabledModules || ALL_APP_MODULES.map(m => m.id)).length} de ${ALL_APP_MODULES.length} eines actives
+            ${(profileToEdit?.enabledModules || ALL_APP_MODULES.map((m) => m.id)).length} de ${ALL_APP_MODULES.length} eines actives
           </span>
         </div>
 
@@ -818,8 +838,8 @@ function openProfileModal(profileToEdit: UserProfile | null, onSaved: () => void
 
         <!-- Graella de Mòduls amb Checkboxes -->
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:6px; max-height:260px; overflow-y:auto; padding-right:4px;">
-          ${ALL_APP_MODULES.map(m => {
-            const initialEnabled = profileToEdit?.enabledModules || ALL_APP_MODULES.map(item => item.id);
+          ${ALL_APP_MODULES.map((m) => {
+            const initialEnabled = profileToEdit?.enabledModules || ALL_APP_MODULES.map((item) => item.id);
             const isChecked = initialEnabled.includes(m.id);
             return `
               <label style="
@@ -885,13 +905,22 @@ function openProfileModal(profileToEdit: UserProfile | null, onSaved: () => void
 
       let targetIds: string[] = [];
       if (presetType === 'all') {
-        targetIds = ALL_APP_MODULES.map(m => m.id);
+        targetIds = ALL_APP_MODULES.map((m) => m.id);
       } else if (presetType === 'none') {
         targetIds = [];
       } else if (presetType === 'employee') {
         targetIds = ['work_income', 'deductions', 'simulator', 'result', 'caselles', 'personal'];
       } else if (presetType === 'freelance') {
-        targetIds = ['activities', 'iva', 'work_income', 'deductions', 'simulator', 'caselles', 'calendari', 'result'];
+        targetIds = [
+          'activities',
+          'iva',
+          'work_income',
+          'deductions',
+          'simulator',
+          'caselles',
+          'calendari',
+          'result',
+        ];
       } else if (presetType === 'landlord') {
         targetIds = ['properties', 'iva', 'deductions', 'simulator', 'caselles', 'result'];
       } else if (presetType === 'investor') {
@@ -939,7 +968,9 @@ function openProfileModal(profileToEdit: UserProfile | null, onSaved: () => void
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const selectedModules = Array.from(modalContent.querySelectorAll<HTMLInputElement>('.modal-module-checkbox:checked')).map(cb => cb.value);
+    const selectedModules = Array.from(
+      modalContent.querySelectorAll<HTMLInputElement>('.modal-module-checkbox:checked'),
+    ).map((cb) => cb.value);
 
     const payload: Partial<UserProfile> & { name: string } = {
       name: nameVal,
@@ -960,10 +991,16 @@ function openProfileModal(profileToEdit: UserProfile | null, onSaved: () => void
 
     if (isEditing && profileToEdit) {
       store.updateProfile(profileToEdit.id, payload);
-      showToast(`Declarant "${payload.name}" actualitzat amb ${payload.enabledModules?.length || 0} eines actives`, 'success');
+      showToast(
+        `Declarant "${payload.name}" actualitzat amb ${payload.enabledModules?.length || 0} eines actives`,
+        'success',
+      );
     } else {
       const created = store.createProfile(payload);
-      showToast(`Nou declarant "${created.name}" creat amb ${created.enabledModules?.length || 0} eines actives`, 'success');
+      showToast(
+        `Nou declarant "${created.name}" creat amb ${created.enabledModules?.length || 0} eines actives`,
+        'success',
+      );
     }
 
     closeModal();

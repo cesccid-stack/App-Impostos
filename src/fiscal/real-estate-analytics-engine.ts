@@ -21,15 +21,15 @@ export interface PropertyFinancialMetrics {
   mortgageInterests: number;
   totalAmortization: number;
   netOperatingIncome: number; // NOI (Gross - OpEx)
-  netTaxableIncome: number;   // Rendiment Net IRPF abans de reduccions
-  reductionAmount: number;    // Reducció 50%/60%/70%/90% Llei 12/2023
-  netReducedIncome: number;   // Rendiment net computable a la Renda (Casella 0150)
-  taxShieldSavings: number;   // Estalvi fiscal per amortització (Amortització * Tipus Marginal ~37%)
-  cashFlowAnnual: number;     // Cash Flow real de butxaca
+  netTaxableIncome: number; // Rendiment Net IRPF abans de reduccions
+  reductionAmount: number; // Reducció 50%/60%/70%/90% Llei 12/2023
+  netReducedIncome: number; // Rendiment net computable a la Renda (Casella 0150)
+  taxShieldSavings: number; // Estalvi fiscal per amortització (Amortització * Tipus Marginal ~37%)
+  cashFlowAnnual: number; // Cash Flow real de butxaca
   cashFlowMonthly: number;
-  grossYieldPercent: number;  // (Gross Income / Acquisition Cost) * 100
-  netYieldPercent: number;    // (NOI / Acquisition Cost) * 100
-  postTaxYieldPercent: number;// ((Cash Flow + Tax Shield) / Acquisition Cost) * 100
+  grossYieldPercent: number; // (Gross Income / Acquisition Cost) * 100
+  netYieldPercent: number; // (NOI / Acquisition Cost) * 100
+  postTaxYieldPercent: number; // ((Cash Flow + Tax Shield) / Acquisition Cost) * 100
   operatingExpenseRatio: number; // (OpEx / Gross Income) * 100
   breakEvenOccupancyMonths: number; // Mesos necessaris per cobrir despeses fixes
   strategicRecommendation: string;
@@ -76,7 +76,11 @@ export interface PortfolioAnalyticsReport {
 /**
  * Calcula les mètriques financeres i de rendibilitat d'un immoble individual.
  */
-export function analyzePropertyFinances(p: RentalProperty, fiscalYear: number = 2024, marginalTaxRate: number = 0.37): PropertyAnalyticsReport {
+export function analyzePropertyFinances(
+  p: RentalProperty,
+  fiscalYear: number = 2024,
+  marginalTaxRate: number = 0.37,
+): PropertyAnalyticsReport {
   const fiscal: PropertyFiscalResult = calculatePropertyFiscalResult(p, fiscalYear);
   const cost = Math.max(1, p.acquisitionCost || p.totalCadastralValue || 150000);
   const gross = fiscal.grossIncome;
@@ -106,12 +110,14 @@ export function analyzePropertyFinances(p: RentalProperty, fiscalYear: number = 
   let risk: 'low' | 'medium' | 'high' = 'low';
 
   if (p.usageType === 'habitual' && p.reductionType === 'general_50') {
-    strat = 'Lloguer d\'habitatge habitual amb reducció del 50% (Llei 12/2023). Elevada seguretat jurídica.';
+    strat = "Lloguer d'habitatge habitual amb reducció del 50% (Llei 12/2023). Elevada seguretat jurídica.";
   } else if (p.usageType === 'commercial') {
-    strat = 'Local comercial subjecte a retenció del 19% (Model 115/180) i IVA del 21%. Rendibilitat bruta atractiva.';
+    strat =
+      'Local comercial subjecte a retenció del 19% (Model 115/180) i IVA del 21%. Rendibilitat bruta atractiva.';
     risk = 'medium';
   } else if (p.usageType === 'tourist') {
-    strat = 'Lloguer turístic sense reducció del 50%. Vigilar compliment municipal i retencions de plataformes (Model 179).';
+    strat =
+      'Lloguer turístic sense reducció del 50%. Vigilar compliment municipal i retencions de plataformes (Model 179).';
     risk = 'high';
   }
 
@@ -192,7 +198,11 @@ export function analyzePropertyFinances(p: RentalProperty, fiscalYear: number = 
 /**
  * Genera l'informe integral d'anàlisi de rendibilitat de tota la cartera immobiliària.
  */
-export function analyzePortfolioFinances(properties: RentalProperty[], fiscalYear: number = 2024, marginalTaxRate: number = 0.37): PortfolioAnalyticsReport {
+export function analyzePortfolioFinances(
+  properties: RentalProperty[],
+  fiscalYear: number = 2024,
+  marginalTaxRate: number = 0.37,
+): PortfolioAnalyticsReport {
   if (properties.length === 0) {
     return {
       totalProperties: 0,
@@ -213,8 +223,8 @@ export function analyzePortfolioFinances(properties: RentalProperty[], fiscalYea
     };
   }
 
-  const reports = properties.map(p => analyzePropertyFinances(p, fiscalYear, marginalTaxRate));
-  const metricsList = reports.map(r => r.propertyMetrics);
+  const reports = properties.map((p) => analyzePropertyFinances(p, fiscalYear, marginalTaxRate));
+  const metricsList = reports.map((r) => r.propertyMetrics);
 
   const totalCost = metricsList.reduce((s, m) => s + m.acquisitionCost, 0);
   const totalGross = metricsList.reduce((s, m) => s + m.grossIncome, 0);
@@ -237,14 +247,38 @@ export function analyzePortfolioFinances(properties: RentalProperty[], fiscalYea
   const portfolioProjection: MultiYearProjectionYear[] = [];
   for (let i = 0; i < 5; i++) {
     const calYear = fiscalYear + i;
-    const projGross = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedGrossIncome, 0), 2);
-    const projExp = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedOperatingExpenses, 0), 2);
-    const projAmort = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedAmortization, 0), 2);
-    const projNOI = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedNetOperatingIncome, 0), 2);
-    const projCF = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedCashFlow, 0), 2);
-    const cumCF = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].cumulativeCashFlow, 0), 2);
-    const projVal = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedPropertyValue, 0), 2);
-    const cumGain = round2(reports.reduce((s, r) => s + r.fiveYearProjection[i].cumulativeCapitalGain, 0), 2);
+    const projGross = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedGrossIncome, 0),
+      2,
+    );
+    const projExp = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedOperatingExpenses, 0),
+      2,
+    );
+    const projAmort = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedAmortization, 0),
+      2,
+    );
+    const projNOI = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedNetOperatingIncome, 0),
+      2,
+    );
+    const projCF = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedCashFlow, 0),
+      2,
+    );
+    const cumCF = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].cumulativeCashFlow, 0),
+      2,
+    );
+    const projVal = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].projectedPropertyValue, 0),
+      2,
+    );
+    const cumGain = round2(
+      reports.reduce((s, r) => s + r.fiveYearProjection[i].cumulativeCapitalGain, 0),
+      2,
+    );
     const totalReturn = round2(cumCF + cumGain, 2);
 
     portfolioProjection.push({

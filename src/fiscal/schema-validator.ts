@@ -5,7 +5,17 @@
  * when loading from localStorage or importing third-party JSON files.
  */
 
-import type { DeclaracionData, PersonalData, WorkIncomeData, CapitalIncomeData, ActivitiesData, DeductionsData, GainsData, LossCarryoversData, PriorLossItem } from '../types.ts';
+import type {
+  DeclaracionData,
+  PersonalData,
+  WorkIncomeData,
+  CapitalIncomeData,
+  ActivitiesData,
+  DeductionsData,
+  GainsData,
+  LossCarryoversData,
+  PriorLossItem,
+} from '../types.ts';
 import { createEmptyDeclaracion } from './declaration-factory.ts';
 import { FISCAL_YEARS, type FiscalYear } from './constants.ts';
 
@@ -67,7 +77,7 @@ export function sanitizeString(value: unknown, fallback = ''): string {
 export function validateAndSanitizeDeclaration(
   raw: unknown,
   fallbackYear: FiscalYear = 2024,
-  fallbackProfileId: string = 'profile_main'
+  fallbackProfileId: string = 'profile_main',
 ): DeclaracionData {
   const defaults = createEmptyDeclaracion(fallbackYear, fallbackProfileId);
   if (!raw || typeof raw !== 'object') {
@@ -94,9 +104,10 @@ export function validateAndSanitizeDeclaration(
     disability: sanitizeNumber(pSrc.disability, 0, 0, 100),
     reducedMobility: pSrc.reducedMobility === true,
     community: sanitizeString(pSrc.community, 'CAT'),
-    taxDeclarationType: pSrc.taxDeclarationType === 'joint' || pSrc.taxDeclarationType === 'single_parent'
-      ? pSrc.taxDeclarationType
-      : 'individual',
+    taxDeclarationType:
+      pSrc.taxDeclarationType === 'joint' || pSrc.taxDeclarationType === 'single_parent'
+        ? pSrc.taxDeclarationType
+        : 'individual',
     descendants: Array.isArray(pSrc.descendants)
       ? pSrc.descendants.map((d, idx) => ({
           id: sanitizeString(d?.id, `desc_${idx + 1}`),
@@ -136,6 +147,8 @@ export function validateAndSanitizeDeclaration(
           socialSecurity: sanitizeNumber(e?.socialSecurity, 0),
           dietsIncome: sanitizeNumber(e?.dietsIncome, 0),
           dietsDays: sanitizeNumber(e?.dietsDays, 0, 0, 365),
+          dietsWithPernoctation: sanitizeBoolean(e?.dietsWithPernoctation, false),
+          dietsAbroad: sanitizeBoolean(e?.dietsAbroad, false),
           mileageIncome: sanitizeNumber(e?.mileageIncome, 0),
           mileageKm: sanitizeNumber(e?.mileageKm, 0),
         }))
@@ -172,7 +185,8 @@ export function validateAndSanitizeDeclaration(
     expenses: sanitizeNumber(aSrc.expenses, 0),
     withholdings: sanitizeNumber(aSrc.withholdings, 0),
     socialSecuritySelfEmployed: sanitizeNumber(aSrc.socialSecuritySelfEmployed, 0),
-    estimationType: aSrc.estimationType === 'direct_normal' ? ('direct_normal' as const) : ('direct_simplified' as const),
+    estimationType:
+      aSrc.estimationType === 'direct_normal' ? ('direct_normal' as const) : ('direct_simplified' as const),
   };
 
   // Gains
@@ -234,13 +248,22 @@ export function validateAndSanitizeDeclaration(
   const lSrc = (src.lossCarryovers || {}) as Partial<LossCarryoversData>;
   const lossCarryovers: LossCarryoversData = {
     pendingGeneralLosses: Array.isArray(lSrc.pendingGeneralLosses)
-      ? lSrc.pendingGeneralLosses.map((l: PriorLossItem) => ({ year: sanitizeNumber(l?.year, validYear - 1), amount: sanitizeNumber(l?.amount, 0) }))
+      ? lSrc.pendingGeneralLosses.map((l: PriorLossItem) => ({
+          year: sanitizeNumber(l?.year, validYear - 1),
+          amount: sanitizeNumber(l?.amount, 0),
+        }))
       : [],
     pendingMobiliaryLosses: Array.isArray(lSrc.pendingMobiliaryLosses)
-      ? lSrc.pendingMobiliaryLosses.map((l: PriorLossItem) => ({ year: sanitizeNumber(l?.year, validYear - 1), amount: sanitizeNumber(l?.amount, 0) }))
+      ? lSrc.pendingMobiliaryLosses.map((l: PriorLossItem) => ({
+          year: sanitizeNumber(l?.year, validYear - 1),
+          amount: sanitizeNumber(l?.amount, 0),
+        }))
       : [],
     pendingCapitalLosses: Array.isArray(lSrc.pendingCapitalLosses)
-      ? lSrc.pendingCapitalLosses.map((l: PriorLossItem) => ({ year: sanitizeNumber(l?.year, validYear - 1), amount: sanitizeNumber(l?.amount, 0) }))
+      ? lSrc.pendingCapitalLosses.map((l: PriorLossItem) => ({
+          year: sanitizeNumber(l?.year, validYear - 1),
+          amount: sanitizeNumber(l?.amount, 0),
+        }))
       : [],
   };
 

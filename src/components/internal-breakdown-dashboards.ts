@@ -72,7 +72,7 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
     `;
 
     // Attach tab click events
-    container.querySelectorAll('.tab-btn').forEach(btn => {
+    container.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
         activeTab = (target.dataset.tab as typeof activeTab) || 'immobles';
@@ -101,7 +101,8 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
   // ── 1. QUADRE D'IMMOBLES & AMORTITZACIÓ 3% ───────────────────────────────
   function renderRealEstateBreakdown(d: DeclaracionData, yr: number): string {
     const props = d.properties || [];
-    const { results, totalGrossIncome, totalExpenses, totalAmortization, totalNetReducedIncome } = calculateAllProperties(props, yr);
+    const { results, totalGrossIncome, totalExpenses, totalAmortization, totalNetReducedIncome } =
+      calculateAllProperties(props, yr);
 
     return `
       <div>
@@ -124,11 +125,14 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
           </div>
         </div>
 
-        ${props.length === 0 ? `
+        ${
+          props.length === 0
+            ? `
           <div style="padding:var(--space-md); text-align:center; color:var(--text-secondary); background:var(--bg-surface); border-radius:var(--radius-sm);">
             No hi ha immobles registrats. Afegeix immobles a la secció <a href="#/immobles" style="color:var(--color-primary); font-weight:600;">Immobles en Lloguer</a>.
           </div>
-        ` : `
+        `
+            : `
           <div style="overflow-x:auto;">
             <table class="table" style="width:100%; font-size:0.75rem;">
               <thead>
@@ -143,9 +147,16 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
                 </tr>
               </thead>
               <tbody>
-                ${props.map((p, idx) => {
-                  const r = results[idx] || { grossIncome: 0, limitedExpensesDeducted: 0, buildingAmortization: 0, reductionAmount: 0, netReducedIncome: 0 };
-                  return `
+                ${props
+                  .map((p, idx) => {
+                    const r = results[idx] || {
+                      grossIncome: 0,
+                      limitedExpensesDeducted: 0,
+                      buildingAmortization: 0,
+                      reductionAmount: 0,
+                      netReducedIncome: 0,
+                    };
+                    return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                       <td style="padding:6px 8px;">
                         <div style="font-weight:700; color:var(--text-primary);">${p.name || p.address}</div>
@@ -161,19 +172,28 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
                       <td style="padding:6px 8px; text-align:right; font-family:var(--font-mono); font-weight:700; color:var(--text-primary);">${formatCurrency(r.netReducedIncome)}</td>
                     </tr>
                   `;
-                }).join('')}
+                  })
+                  .join('')}
               </tbody>
             </table>
           </div>
-        `}
+        `
+        }
       </div>
     `;
   }
 
   // ── 2. QUADRE DE BOSSA DE PÈRDUES DE 4 ANYS (ART. 49 LIRPF) ──────────────
   function renderLossCarryoverBreakdown(d: DeclaracionData, r: FiscalResult): string {
-    const carryovers = d.lossCarryovers || { pendingGeneralLosses: [], pendingMobiliaryLosses: [], pendingCapitalLosses: [] };
-    const capitalGainsTotal = (d.gains?.items || []).reduce((s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses), 0);
+    const carryovers = d.lossCarryovers || {
+      pendingGeneralLosses: [],
+      pendingMobiliaryLosses: [],
+      pendingCapitalLosses: [],
+    };
+    const capitalGainsTotal = (d.gains?.items || []).reduce(
+      (s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses),
+      0,
+    );
 
     return `
       <div>
@@ -221,14 +241,16 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
                 </tr>
               </thead>
               <tbody>
-                ${[2020, 2021, 2022, 2023].map(y => {
-                  const item = carryovers.pendingCapitalLosses.find(p => p.year === y);
-                  const initial = item ? item.amount : 0;
-                  const comp = initial > 0 ? Math.min(initial, capitalGainsTotal > 0 ? capitalGainsTotal : 0) : 0;
-                  const remaining = Math.max(0, initial - comp);
-                  const isExpired = y < (year - 4);
+                ${[2020, 2021, 2022, 2023]
+                  .map((y) => {
+                    const item = carryovers.pendingCapitalLosses.find((p) => p.year === y);
+                    const initial = item ? item.amount : 0;
+                    const comp =
+                      initial > 0 ? Math.min(initial, capitalGainsTotal > 0 ? capitalGainsTotal : 0) : 0;
+                    const remaining = Math.max(0, initial - comp);
+                    const isExpired = y < year - 4;
 
-                  return `
+                    return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                       <td style="padding:4px 6px; font-weight:700;">Exercici ${y}</td>
                       <td style="padding:4px 6px; font-family:var(--font-mono); color:var(--text-muted);">045${y - 2020}</td>
@@ -242,7 +264,8 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
                       </td>
                     </tr>
                   `;
-                }).join('')}
+                  })
+                  .join('')}
               </tbody>
             </table>
           </div>
@@ -253,9 +276,16 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
 
   // ── 3. QUADRE D'ACTIVITATS ECONÒMIQUES & 130 ──────────────────────────────
   function renderActivitiesBreakdown(d: DeclaracionData): string {
-    const act = d.activities || { income: 0, expenses: 0, withholdings: 0, socialSecuritySelfEmployed: 0, estimationType: 'direct_simplified' };
+    const act = d.activities || {
+      income: 0,
+      expenses: 0,
+      withholdings: 0,
+      socialSecuritySelfEmployed: 0,
+      estimationType: 'direct_simplified',
+    };
     const netPrev = Math.max(0, act.income - act.expenses - (act.socialSecuritySelfEmployed || 0));
-    const difficultExpenses5Percent = act.estimationType === 'direct_simplified' ? Math.min(2000, netPrev * 0.05) : 0;
+    const difficultExpenses5Percent =
+      act.estimationType === 'direct_simplified' ? Math.min(2000, netPrev * 0.05) : 0;
     const netFinal = Math.max(0, netPrev - difficultExpenses5Percent);
 
     return `
@@ -367,7 +397,7 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
             </div>
             <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:4px;">25% recerca biomèdica i universitats + 15% foment llengua catalana</div>
             <div style="font-weight:700; font-family:var(--font-mono); font-size:0.85rem; color:${(ded.catalanBiomedicalDonations || 0) + (ded.catalanLanguageDonations || 0) > 0 ? 'var(--color-success)' : 'var(--text-muted)'};">
-              ${formatCurrency(((ded.catalanBiomedicalDonations || 0) * 0.25) + ((ded.catalanLanguageDonations || 0) * 0.15))}
+              ${formatCurrency((ded.catalanBiomedicalDonations || 0) * 0.25 + (ded.catalanLanguageDonations || 0) * 0.15)}
             </div>
           </div>
 
@@ -378,12 +408,21 @@ export function createInternalBreakdownDashboards(data: DeclaracionData, result?
 
   // ── 5. QUADRE DE DISTRIBUCIÓ FISCAL: ESTAT VS CATALUNYA ──────────────────
   function renderTaxDistributionBreakdown(r: FiscalResult): string {
-    const stateNet = Math.max(0, (r.stateGeneralTax || 0) + (r.stateSavingsTax || 0) - (r.stateMinimumTaxCredit || 0));
-    const catNet = Math.max(0, (r.autonomicGeneralTax || 0) + (r.autonomicSavingsTax || 0) - (r.autonomicMinimumTaxCredit || 0) - (r.catalanDeductionsAmount || 0));
+    const stateNet = Math.max(
+      0,
+      (r.stateGeneralTax || 0) + (r.stateSavingsTax || 0) - (r.stateMinimumTaxCredit || 0),
+    );
+    const catNet = Math.max(
+      0,
+      (r.autonomicGeneralTax || 0) +
+        (r.autonomicSavingsTax || 0) -
+        (r.autonomicMinimumTaxCredit || 0) -
+        (r.catalanDeductionsAmount || 0),
+    );
     const totalNet = stateNet + catNet;
 
     const statePct = totalNet > 0 ? Math.round((stateNet / totalNet) * 100) : 50;
-    const catPct = totalNet > 0 ? (100 - statePct) : 50;
+    const catPct = totalNet > 0 ? 100 - statePct : 50;
 
     return `
       <div>

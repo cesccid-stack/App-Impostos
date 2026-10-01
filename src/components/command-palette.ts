@@ -15,7 +15,13 @@ import type { AppTheme } from '../types.ts';
 
 export interface CommandItem {
   id: string;
-  category: 'Pàgines & Mòduls' | 'Caselles AEAT' | 'Configuració d\'Eines' | 'Declarants & Perfils' | 'Eines & Accions' | 'Temes Visuals';
+  category:
+    | 'Pàgines & Mòduls'
+    | 'Caselles AEAT'
+    | "Configuració d'Eines"
+    | 'Declarants & Perfils'
+    | 'Eines & Accions'
+    | 'Temes Visuals';
   title: string;
   subtitle?: string;
   badge?: string;
@@ -200,7 +206,7 @@ export function openCommandPalette(): void {
               (k) =>
                 k.toLowerCase().includes(q) ||
                 (strippedNum && k.toLowerCase().includes(strippedNum)) ||
-                (paddedNum && k.toLowerCase().includes(paddedNum))
+                (paddedNum && k.toLowerCase().includes(paddedNum)),
             ))
         );
       });
@@ -275,7 +281,9 @@ function renderResults(container: HTMLElement): void {
               overflow: hidden;
               text-overflow: ellipsis;
             ">${item.title}</div>
-            ${item.subtitle ? `
+            ${
+              item.subtitle
+                ? `
               <div style="
                 font-size: 0.7rem;
                 color: var(--text-muted);
@@ -283,12 +291,18 @@ function renderResults(container: HTMLElement): void {
                 overflow: hidden;
                 text-overflow: ellipsis;
               ">${item.subtitle}</div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
         </div>
-        ${item.badge ? `
+        ${
+          item.badge
+            ? `
           <span class="badge badge--primary" style="font-size: 0.65rem; padding: 2px 6px; flex-shrink: 0;">${item.badge}</span>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   });
@@ -331,8 +345,8 @@ function buildCommandItems(): CommandItem[] {
   items.push(
     {
       id: 'tool_manager',
-      category: 'Configuració d\'Eines',
-      title: '⚙️ Obrir Configurador d\'Eines & Mòduls Actius',
+      category: "Configuració d'Eines",
+      title: "⚙️ Obrir Configurador d'Eines & Mòduls Actius",
       subtitle: 'Activa o desactiva eines a la carta per a ' + activeProfile.name,
       badge: 'Espai de Treball',
       icon: '⚙️',
@@ -346,9 +360,9 @@ function buildCommandItems(): CommandItem[] {
     },
     {
       id: 'tool_preset_all',
-      category: 'Configuració d\'Eines',
+      category: "Configuració d'Eines",
       title: '🚀 Activar Totes les Eines (Suite Completa)',
-      subtitle: 'Habilita el 100% de les funcionalitats tributàries i d\'inversió',
+      subtitle: "Habilita el 100% de les funcionalitats tributàries i d'inversió",
       badge: 'Tot Actiu',
       icon: '🌟',
       keywords: ['tot', 'activar tot', 'suite completa'],
@@ -361,7 +375,7 @@ function buildCommandItems(): CommandItem[] {
     },
     {
       id: 'tool_preset_freelance',
-      category: 'Configuració d\'Eines',
+      category: "Configuració d'Eines",
       title: '🏢 Plantilla: Autònom, Facturació & IVA 303',
       subtitle: 'Activa eines per a professionals independents i gestió trimestral',
       badge: 'Autònom',
@@ -376,7 +390,7 @@ function buildCommandItems(): CommandItem[] {
     },
     {
       id: 'tool_preset_investor',
-      category: 'Configuració d\'Eines',
+      category: "Configuració d'Eines",
       title: '📈 Plantilla: Inversor Financer, FIFO & Cripto',
       subtitle: 'Activa carteres, guanys patrimonials, Trading i models 720/721',
       badge: 'Inversor',
@@ -388,7 +402,7 @@ function buildCommandItems(): CommandItem[] {
         refreshSidebar();
         router.navigate(router.getCurrentPath());
       },
-    }
+    },
   );
 
   // 2. Pàgines & Mòduls
@@ -407,19 +421,64 @@ function buildCommandItems(): CommandItem[] {
   // 3. Caselles Principals AEAT
   const irpf = calculateIRPF(state);
   const caselles = [
-    { num: '0001', label: 'Retribucions dineràries del treball', val: state.workIncome.employers.reduce((s, e) => s + (e.grossSalary || 0), 0), path: '/treball' },
-    { num: '0019', label: 'Cotitzacions a la Seguretat Social', val: state.workIncome.employers.reduce((s, e) => s + (e.socialSecurity || 0), 0), path: '/treball' },
-    { num: '0027', label: 'Interessos de comptes i dipòsits', val: state.capitalIncome.interests || 0, path: '/capital' },
-    { num: '0029', label: 'Dividends i participació en beneficis', val: state.capitalIncome.dividends || 0, path: '/capital' },
-    { num: '0102', label: 'Ingressos d\'immobles en lloguer', val: state.properties.reduce((s, p) => s + (p.grossRentalIncome || 0), 0), path: '/immobles' },
-    { num: '0230', label: 'Ingressos d\'Activitats Econòmiques', val: state.activities.income || 0, path: '/activitats' },
+    {
+      num: '0001',
+      label: 'Retribucions dineràries del treball',
+      val: state.workIncome.employers.reduce((s, e) => s + (e.grossSalary || 0), 0),
+      path: '/treball',
+    },
+    {
+      num: '0019',
+      label: 'Cotitzacions a la Seguretat Social',
+      val: state.workIncome.employers.reduce((s, e) => s + (e.socialSecurity || 0), 0),
+      path: '/treball',
+    },
+    {
+      num: '0027',
+      label: 'Interessos de comptes i dipòsits',
+      val: state.capitalIncome.interests || 0,
+      path: '/capital',
+    },
+    {
+      num: '0029',
+      label: 'Dividends i participació en beneficis',
+      val: state.capitalIncome.dividends || 0,
+      path: '/capital',
+    },
+    {
+      num: '0102',
+      label: "Ingressos d'immobles en lloguer",
+      val: state.properties.reduce((s, p) => s + (p.grossRentalIncome || 0), 0),
+      path: '/immobles',
+    },
+    {
+      num: '0230',
+      label: "Ingressos d'Activitats Econòmiques",
+      val: state.activities.income || 0,
+      path: '/activitats',
+    },
     { num: '0435', label: 'Base Imposable General', val: irpf.generalBase, path: '/resultat' },
-    { num: '0460', label: 'Base Imposable de l\'Estalvi', val: irpf.savingsBase, path: '/resultat' },
+    { num: '0460', label: "Base Imposable de l'Estalvi", val: irpf.savingsBase, path: '/resultat' },
     { num: '0519', label: 'Mínim Personal i Familiar Total', val: irpf.totalMinimum, path: '/personal' },
     { num: '0545', label: 'Quota Líquida Total', val: irpf.netTax, path: '/resultat' },
-    { num: '0588', label: 'Deducció per Doble Imposició Internacional', val: irpf.foreignTaxCredit || 0, path: '/capital' },
-    { num: '0595', label: 'Retencions suportades del treball', val: state.workIncome.employers.reduce((s, e) => s + (e.withholdings || 0), 0), path: '/treball' },
-    { num: '0610', label: 'Resultat de la Declaració (a ingressar/tornar)', val: irpf.result, path: '/resultat' },
+    {
+      num: '0588',
+      label: 'Deducció per Doble Imposició Internacional',
+      val: irpf.foreignTaxCredit || 0,
+      path: '/capital',
+    },
+    {
+      num: '0595',
+      label: 'Retencions suportades del treball',
+      val: state.workIncome.employers.reduce((s, e) => s + (e.withholdings || 0), 0),
+      path: '/treball',
+    },
+    {
+      num: '0610',
+      label: 'Resultat de la Declaració (a ingressar/tornar)',
+      val: irpf.result,
+      path: '/resultat',
+    },
   ];
 
   for (const c of caselles) {
@@ -465,7 +524,7 @@ function buildCommandItems(): CommandItem[] {
       id: 'action_pdf',
       category: 'Eines & Accions',
       title: 'Descarregar Informe Oficial PDF Model 100',
-      subtitle: 'Genera document complet d\'auditoria amb liquidació, caselles i gràfics',
+      subtitle: "Genera document complet d'auditoria amb liquidació, caselles i gràfics",
       badge: 'PDF Oficial',
       icon: '📄',
       keywords: ['pdf', 'descarregar', 'informe', 'imprimir', 'exportar pdf', 'model 100'],
@@ -505,15 +564,30 @@ function buildCommandItems(): CommandItem[] {
       icon: '💾',
       keywords: ['backup', 'copia', 'exportar', 'json', 'descarregar'],
       action: () => router.navigate('/exportar'),
-    }
+    },
   );
 
   // 6. Temes visuals
   const themes: { id: AppTheme; name: string; icon: string; desc: string }[] = [
-    { id: 'dark', name: 'Tema Dark Nebula (Indigo)', icon: '🌌', desc: 'Fosc profund amb tocs violeta i vidre' },
-    { id: 'emerald', name: 'Tema Cyber Fintech (Emerald)', icon: '💚', desc: 'Alta tecnologia amb tocs verds menta' },
+    {
+      id: 'dark',
+      name: 'Tema Dark Nebula (Indigo)',
+      icon: '🌌',
+      desc: 'Fosc profund amb tocs violeta i vidre',
+    },
+    {
+      id: 'emerald',
+      name: 'Tema Cyber Fintech (Emerald)',
+      icon: '💚',
+      desc: 'Alta tecnologia amb tocs verds menta',
+    },
     { id: 'nord', name: 'Tema Nord Arctic (Slate)', icon: '❄️', desc: 'Equilibri àrtic blau i gris elegant' },
-    { id: 'light', name: 'Tema Light Studio (Clean)', icon: '☀️', desc: 'Mode clar d\'alt contrast i claredat' },
+    {
+      id: 'light',
+      name: 'Tema Light Studio (Clean)',
+      icon: '☀️',
+      desc: "Mode clar d'alt contrast i claredat",
+    },
   ];
 
   for (const t of themes) {

@@ -262,8 +262,12 @@ function renderModulesMarkdown(entries: ModuleEntry[]): string {
   out.push('# CODE_INDEX — Índice de módulos y mapa de secciones');
   out.push('');
   out.push('> **Fichero generado automáticamente. No lo edites a mano: usa `npm run index`.**');
-  out.push('> **Búscalo** (`search_codebase`) para localizar un módulo o una sección; **no lo leas entero.**');
-  out.push('> Índice alfabético de símbolos: **`docs/SYMBOLS.md`**. Contexto y convenciones: **`AGENTS.md`**.');
+  out.push(
+    '> **Búscalo** (`search_codebase`) para localizar un módulo o una sección; **no lo leas entero.**',
+  );
+  out.push(
+    '> Índice alfabético de símbolos: **`docs/SYMBOLS.md`**. Contexto y convenciones: **`AGENTS.md`**.',
+  );
   out.push('');
   out.push(`- Módulos indexados: **${entries.length}**`);
   out.push(`- Símbolos exportados: **${totalSymbols}**`);

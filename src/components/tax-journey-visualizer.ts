@@ -5,7 +5,11 @@
  * intuïtiva, amb gràfics en cascada, barres de trams, targetes explicatives i oportunitats d'estalvi.
  */
 
-import { explainTaxReturn, type TaxExplainerReport, type TaxFlowStep } from '../fiscal/tax-explainer-engine.ts';
+import {
+  explainTaxReturn,
+  type TaxExplainerReport,
+  type TaxFlowStep,
+} from '../fiscal/tax-explainer-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import type { DeclaracionData, FiscalResult } from '../types.ts';
 
@@ -27,7 +31,7 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="font-size:1.4rem;">🧭</span>
               <h2 style="margin:0; font-size:1.25rem; font-weight:800; color:var(--text-primary);">
-                Cuadro de Mando Visual & Explicador Didáctico de la Renta
+                Quadre de Comandament Didàctic & Viatge dels teus Impostos
               </h2>
               <span class="badge badge--primary" style="font-size:0.75rem;">Model 100 AEAT</span>
             </div>
@@ -129,7 +133,7 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
               📝 Resum Executiu de la teva Renda ${report.year}
             </h3>
             <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; line-height:1.6; color:var(--text-secondary);">
-              ${report.plainLanguageSummary.map(item => `<li style="margin-bottom:6px;">${item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`).join('')}
+              ${report.plainLanguageSummary.map((item) => `<li style="margin-bottom:6px;">${item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`).join('')}
             </ul>
           </div>
 
@@ -177,14 +181,20 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
 
           <!-- Progress Bar Dividit -->
           <div style="height:18px; border-radius:var(--radius-full); overflow:hidden; display:flex; margin-bottom:var(--space-md); background:var(--bg-base);">
-            ${report.taxBreakdownPie.map(p => `
+            ${report.taxBreakdownPie
+              .map(
+                (p) => `
               <div style="width:${p.percentage}%; background:${p.color}; height:100%;" title="${p.label}: ${p.percentage}% (${formatCurrency(p.amount)})"></div>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </div>
 
           <!-- Llegenda -->
           <div style="display:flex; flex-direction:column; gap:8px; font-size:0.8rem;">
-            ${report.taxBreakdownPie.map(p => `
+            ${report.taxBreakdownPie
+              .map(
+                (p) => `
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span style="width:10px; height:10px; border-radius:50%; background:${p.color}; display:inline-block;"></span>
@@ -192,11 +202,15 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                 </div>
                 <div style="font-weight:700; font-family:var(--font-mono);">${formatCurrency(p.amount)} <span style="font-size:0.7rem; color:var(--text-muted);">(${p.percentage}%)</span></div>
               </div>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </div>
 
           <!-- Alerta d'Oportunitat d'Estalvi -->
-          ${report.unclaimedSavingsOpportunities.length > 0 ? `
+          ${
+            report.unclaimedSavingsOpportunities.length > 0
+              ? `
             <div style="margin-top:var(--space-md); padding-top:var(--space-sm); border-top:1px dashed var(--border-default);">
               <div style="font-size:0.75rem; font-weight:700; color:var(--color-warning); margin-bottom:4px;">
                 ⚡ Oportunitat d'Estalvi Identificada:
@@ -208,7 +222,9 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                 Aplicar ara a la declaració ➡️
               </a>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
         </div>
 
@@ -225,10 +241,11 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
         </p>
 
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${report.flowSteps.map((step: TaxFlowStep) => {
-            const isNegative = step.deltaAmount < 0;
+          ${report.flowSteps
+            .map((step: TaxFlowStep) => {
+              const isNegative = step.deltaAmount < 0;
 
-            return `
+              return `
               <div class="waterfall-step-card" style="background:var(--bg-surface); border-radius:var(--radius-md); border:1px solid var(--border-default); padding:12px 16px; transition:all 0.2s ease;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                   
@@ -247,7 +264,7 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                   </div>
 
                   <div style="text-align:right;">
-                    <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:${isNegative ? 'var(--color-success)' : (step.category === 'final' ? (report.isRefund ? 'var(--color-success)' : 'var(--color-error)') : 'var(--text-primary)')};">
+                    <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:${isNegative ? 'var(--color-success)' : step.category === 'final' ? (report.isRefund ? 'var(--color-success)' : 'var(--color-error)') : 'var(--text-primary)'};">
                       ${isNegative ? '- ' : ''}${formatCurrency(step.amount)}
                     </div>
                     <div style="font-size:0.7rem; color:var(--text-secondary);">
@@ -269,7 +286,8 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
 
               </div>
             `;
-          }).join('')}
+            })
+            .join('')}
         </div>
       </div>
     `;
@@ -293,22 +311,27 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
               <span class="badge badge--warning" style="font-size:0.8rem; font-weight:700;">
                 El teu Tipus Marginal: ${report.marginalRateGeneral}%
               </span>
-              ${report.eurosToNextBracket > 0 ? `
+              ${
+                report.eurosToNextBracket > 0
+                  ? `
                 <div style="font-size:0.7rem; color:var(--text-secondary); margin-top:2px;">
                   Queden <strong>${formatCurrency(report.eurosToNextBracket)}</strong> per saltar al tram del ${report.nextBracketRate}%
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
           </div>
 
           <!-- Escala Visual de Trams -->
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:var(--space-md);">
-            ${report.generalBracketBreakdown.map((b) => {
-              const isFilled = b.taxedAmountInBracket > 0;
-              const isCurrent = b.isCurrentBracket;
+            ${report.generalBracketBreakdown
+              .map((b) => {
+                const isFilled = b.taxedAmountInBracket > 0;
+                const isCurrent = b.isCurrentBracket;
 
-              return `
-                <div style="background:${isCurrent ? 'rgba(99, 102, 241, 0.12)' : (isFilled ? 'var(--bg-surface-elevated)' : 'var(--bg-base)')}; border:1px solid ${isCurrent ? 'var(--color-primary)' : 'var(--border-default)'}; border-radius:var(--radius-md); padding:10px 14px; display:grid; grid-template-columns: 140px 80px 1fr 120px; align-items:center; gap:var(--space-md);">
+                return `
+                <div style="background:${isCurrent ? 'rgba(99, 102, 241, 0.12)' : isFilled ? 'var(--bg-surface-elevated)' : 'var(--bg-base)'}; border:1px solid ${isCurrent ? 'var(--color-primary)' : 'var(--border-default)'}; border-radius:var(--radius-md); padding:10px 14px; display:grid; grid-template-columns: 140px 80px 1fr 120px; align-items:center; gap:var(--space-md);">
                   
                   <div style="font-weight:${isCurrent ? '800' : '600'}; font-size:0.8rem; color:${isCurrent ? 'var(--color-primary)' : 'var(--text-primary)'};">
                     ${isCurrent ? '👉 ' : ''}Tram ${b.bracketIndex}
@@ -327,7 +350,7 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                       <strong style="font-family:var(--font-mono);">${formatCurrency(b.taxedAmountInBracket)}</strong>
                     </div>
                     <div style="height:6px; background:var(--bg-base); border-radius:var(--radius-full); overflow:hidden;">
-                      <div style="height:100%; width:${b.limitMax === Infinity ? (b.taxedAmountInBracket > 0 ? 100 : 0) : Math.min(100, (b.taxedAmountInBracket / (b.limitMax - b.limitMin)) * 100)}%; background:${isCurrent ? 'var(--color-primary)' : (isFilled ? 'var(--color-info)' : 'transparent')}; border-radius:var(--radius-full);"></div>
+                      <div style="height:100%; width:${b.limitMax === Infinity ? (b.taxedAmountInBracket > 0 ? 100 : 0) : Math.min(100, (b.taxedAmountInBracket / (b.limitMax - b.limitMin)) * 100)}%; background:${isCurrent ? 'var(--color-primary)' : isFilled ? 'var(--color-info)' : 'transparent'}; border-radius:var(--radius-full);"></div>
                     </div>
                   </div>
 
@@ -340,7 +363,8 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
 
                 </div>
               `;
-            }).join('')}
+              })
+              .join('')}
           </div>
         </div>
 
@@ -353,7 +377,9 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
             <span class="badge badge--info">Base Estalvi: ${formatCurrency(report.liquidableSavingsBase)}</span>
           </div>
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:var(--space-sm);">
-            ${report.savingsBracketBreakdown.map(sb => `
+            ${report.savingsBracketBreakdown
+              .map(
+                (sb) => `
               <div style="padding:8px 10px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid ${sb.isCurrentBracket ? 'var(--color-primary)' : 'var(--border-default)'}; font-size:0.75rem;">
                 <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:2px;">
                   <span>${sb.rangeLabel}</span>
@@ -362,7 +388,9 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                 <div style="color:var(--text-muted); font-size:0.7rem;">Gravat: ${formatCurrency(sb.taxedAmountInBracket)}</div>
                 <div style="color:var(--text-primary); font-weight:700; font-family:var(--font-mono); margin-top:2px;">Impost: ${formatCurrency(sb.taxPaidInBracket)}</div>
               </div>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </div>
         </div>
 
@@ -379,7 +407,9 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
         </p>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:var(--space-md);">
-          ${report.keyDrivers.map((d) => `
+          ${report.keyDrivers
+            .map(
+              (d) => `
             <div style="background:var(--bg-surface); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between;">
               <div>
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:var(--space-xs);">
@@ -396,20 +426,26 @@ export function createTaxJourneyVisualizer(data: DeclaracionData, result?: Fisca
                 </p>
               </div>
 
-              ${d.recommendation ? `
+              ${
+                d.recommendation
+                  ? `
                 <div style="padding:6px 10px; background:var(--bg-base); border-radius:var(--radius-sm); border-left:3px solid var(--color-primary); font-size:0.7rem; color:var(--text-secondary); margin-top:var(--space-xs);">
                   💡 <strong>Consell expert:</strong> ${d.recommendation}
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
     `;
   }
 
   function attachEvents() {
-    container.querySelectorAll('.btn-mode-toggle').forEach(btn => {
+    container.querySelectorAll('.btn-mode-toggle').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const mode = (e.currentTarget as HTMLElement).getAttribute('data-mode') as typeof activeViewMode;
         if (mode && mode !== activeViewMode) {

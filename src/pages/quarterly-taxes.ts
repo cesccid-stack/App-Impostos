@@ -3,14 +3,20 @@ import { Model130Engine } from '../fiscal/model130-engine.ts';
 import { WithholdingsEngine } from '../fiscal/model111-engine.ts';
 import { Model115And180Engine } from '../fiscal/model115-180-engine.ts';
 import { Model347Engine } from '../fiscal/model347-engine.ts';
-import type { Model130Quarterly, Model111Quarterly, Model115Quarterly, Model347Entity, Model115LeaseInput } from '../types-quarterly.ts';
+import type {
+  Model130Quarterly,
+  Model111Quarterly,
+  Model115Quarterly,
+  Model347Entity,
+  Model115LeaseInput,
+} from '../types-quarterly.ts';
 import type { EmployerItem } from '../types.ts';
 import type { RentalProperty } from '../types-properties.ts';
 
 export function renderQuarterlyTaxes(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'page-container slide-in';
-  
+
   const header = document.createElement('div');
   header.className = 'flex justify-between items-center mb-6';
   header.innerHTML = `
@@ -55,12 +61,22 @@ export function renderQuarterlyTaxes(): HTMLElement {
 
   function renderData() {
     const data = store.getData();
-    
+
     // 1. Mod 130 View
     let mod130Html = `<h2 class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mb-4 border-b pb-2">Model 130 - Pagament Fraccionat IRPF (20%)</h2>`;
     if (!data.quarterlyTaxes?.mod130 || data.quarterlyTaxes.mod130.length === 0) {
       mod130Html += `<p class="text-gray-500">No hi ha dades calculades. Fes clic a Calcular i Conciliar Models.</p>`;
     } else {
+      if (data.quarterlyTaxes.mod130.some((q: Model130Quarterly) => q.isLinearSimulation)) {
+        mod130Html += `
+          <div class="mb-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <span class="text-base">⚠️</span>
+            <div>
+              <strong>Avís d'estimació lineal:</strong> Aquestes quotes del Model 130 s'han calculat distribuint linealment (25% cada trimestre) els rendiments anuals declarats. Per a la presentació oficial a l'AEAT, s'han de computar les factures per data real d'operació de cada trimestre.
+            </div>
+          </div>
+        `;
+      }
       mod130Html += `<div class="grid grid-cols-1 md:grid-cols-4 gap-4">`;
       data.quarterlyTaxes.mod130.forEach((q: Model130Quarterly) => {
         mod130Html += `
@@ -91,9 +107,11 @@ export function renderQuarterlyTaxes(): HTMLElement {
           <h2 class="text-xl font-bold text-amber-600 dark:text-amber-400">Control de Lloguers: Model 115 (Trimestral 19%) i Model 180 (Resum Anual)</h2>
           <p class="text-xs text-gray-500 mt-1">Art. 75.2.a RIRPF - Retencions sobre arrendaments d'immobles urbans afectes a activitats.</p>
         </div>
-        ${mod180?.reconciliationWith115Status === 'perfect' 
-          ? '<span class="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 text-xs font-bold rounded-full">✓ 115 i 180 Conciliats</span>'
-          : '<span class="px-3 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 text-xs font-bold rounded-full">Pendent de Conciliació</span>'}
+        ${
+          mod180?.reconciliationWith115Status === 'perfect'
+            ? '<span class="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 text-xs font-bold rounded-full">✓ 115 i 180 Conciliats</span>'
+            : '<span class="px-3 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 text-xs font-bold rounded-full">Pendent de Conciliació</span>'
+        }
       </div>
     `;
 
@@ -139,7 +157,9 @@ export function renderQuarterlyTaxes(): HTMLElement {
     if (!data.quarterlyTaxes?.mod111 || data.quarterlyTaxes.mod111.length === 0) {
       withHtml += `<p class="text-gray-500">Sense dades calculades.</p>`;
     } else {
-      const q4_111 = data.quarterlyTaxes.mod111.find((q: Model111Quarterly) => q.quarter === '4T') || data.quarterlyTaxes.mod111[0];
+      const q4_111 =
+        data.quarterlyTaxes.mod111.find((q: Model111Quarterly) => q.quarter === '4T') ||
+        data.quarterlyTaxes.mod111[0];
       withHtml += `
         <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-2 text-sm">
           <h3 class="font-bold text-blue-800 dark:text-blue-300">Model 111 (${q4_111?.quarter || '1T'})</h3>
@@ -186,15 +206,34 @@ export function renderQuarterlyTaxes(): HTMLElement {
   setTimeout(() => {
     document.getElementById('recalc-btn')?.addEventListener('click', () => {
       const data = store.getData();
-      
+
       // 1. Calculate Model 130
-      const mod130 = Model130Engine.calculateFromYearlyActivities(data.activities, data.year, data.deductions.housingDeduction);
-      
+      const mod130 = Model130Engine.calculateFromYearlyActivities(
+        data.activities,
+        data.year,
+        data.deductions.housingDeduction,
+      );
+
       // 2. Calculate Model 111
-      const workWithhold = data.workIncome.employers.reduce((sum: number, e: EmployerItem) => sum + e.withholdings, 0);
-      const workGross = data.workIncome.employers.reduce((s: number, e: EmployerItem) => s + e.grossSalary, 0);
-      const mod111_quarters = (['1T', '2T', '3T', '4T'] as const).map(q => 
-        WithholdingsEngine.calculateModel111(q, data.year, data.workIncome.employers.length, workGross / 4, workWithhold / 4, 0, 0, 0)
+      const workWithhold = data.workIncome.employers.reduce(
+        (sum: number, e: EmployerItem) => sum + e.withholdings,
+        0,
+      );
+      const workGross = data.workIncome.employers.reduce(
+        (s: number, e: EmployerItem) => s + e.grossSalary,
+        0,
+      );
+      const mod111_quarters = (['1T', '2T', '3T', '4T'] as const).map((q) =>
+        WithholdingsEngine.calculateModel111(
+          q,
+          data.year,
+          data.workIncome.employers.length,
+          workGross / 4,
+          workWithhold / 4,
+          0,
+          0,
+          0,
+        ),
       );
 
       // 3. Calculate Model 115 & Model 180 (Arrendaments)
@@ -218,7 +257,11 @@ export function renderQuarterlyTaxes(): HTMLElement {
       const mod180_annual = Model115And180Engine.generateModel180Annual(data.year, leases, mod115_quarters);
 
       // 4. Calculate Model 347
-      const mod347 = Model347Engine.calculateFromInvoices(data.year, data.iva?.issuedInvoices || [], data.iva?.receivedInvoices || []);
+      const mod347 = Model347Engine.calculateFromInvoices(
+        data.year,
+        data.iva?.issuedInvoices || [],
+        data.iva?.receivedInvoices || [],
+      );
 
       store.update('quarterlyTaxes', {
         mod130,
@@ -227,7 +270,7 @@ export function renderQuarterlyTaxes(): HTMLElement {
         mod180: mod180_annual,
         mod347,
       });
-      
+
       renderData();
     });
 
@@ -236,4 +279,3 @@ export function renderQuarterlyTaxes(): HTMLElement {
 
   return container;
 }
-

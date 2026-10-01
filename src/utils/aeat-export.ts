@@ -15,7 +15,7 @@ import { getAEATAssetGroup, calculateItemAnnualAmortization } from '../fiscal/am
 export function generateAEATAnnexF2(
   summaries: AssetSummary[],
   matches: FIFOMatch[],
-  mode: 'grouped_by_isin' | 'detailed_trades' = 'grouped_by_isin'
+  mode: 'grouped_by_isin' | 'detailed_trades' = 'grouped_by_isin',
 ): string {
   let doc = `================================================================================
 AGÈNCIA TRIBUTÀRIA (AEAT) - RENTA WEB
@@ -28,7 +28,7 @@ Instruccions de càrrega:
 
   if (mode === 'grouped_by_isin') {
     doc += `--- MODE: AGRUPAT PER VALOR HOMOGENI / ISIN (Recomanat per a Renta Web) ---\n\n`;
-    
+
     let totalTransmissio = 0;
     let totalAdquisicio = 0;
     let totalGuanys = 0;
@@ -39,7 +39,7 @@ Instruccions de càrrega:
 
       const gain = s.realizedGain;
       totalTransmissio += s.totalSold;
-      totalAdquisicio += (s.totalSold - s.realizedGain);
+      totalAdquisicio += s.totalSold - s.realizedGain;
       totalGuanys += s.netTaxableGain;
       totalSuspeses += s.suspendedLosses;
 
@@ -64,7 +64,6 @@ Instruccions de càrrega:
     doc += `• Total Adquisicions: ${totalAdquisicio.toFixed(2)} €\n`;
     doc += `• Pèrdues suspeses a diferir: ${totalSuspeses.toFixed(2)} €\n`;
     doc += `• Rendiment net computable a la Base de l'Estalvi: ${totalGuanys.toFixed(2)} €\n`;
-
   } else {
     doc += `--- MODE: DETALLAT OPERACIÓ PER OPERACIÓ ---\n\n`;
     matches.forEach((m, idx) => {
@@ -133,7 +132,7 @@ ANNEX A: RENDIMENTS DEL CAPITAL IMMOBILIARI (LLOGUERS I AMORTITZACIONS)
     doc += `  • [Casella 0079] Amortització de l'immoble (3% construcció): ${r.buildingAmortization.toFixed(2)} €\n`;
     doc += `  • [Casella 0080] Amortització d'obres de millora (3% anual): ${r.improvementsAmortization.toFixed(2)} €\n`;
     doc += `  • [Casella 0081] Amortització de mobles, estris, equips i eines: ${r.furnitureAmortization.toFixed(2)} €\n`;
-    
+
     if (r.inventoryBreakdown) {
       doc += `      - Grup 6 Útils i eines (30% màx): ${r.inventoryBreakdown.group6Tools30.toFixed(2)} €\n`;
       doc += `      - Grup 5 Equips TI / Domòtica / TV (26% màx): ${r.inventoryBreakdown.group5Computer26.toFixed(2)} €\n`;
@@ -142,7 +141,7 @@ ANNEX A: RENDIMENTS DEL CAPITAL IMMOBILIARI (LLOGUERS I AMORTITZACIONS)
       doc += `      - Grup 2 Mobiliari i electrodomèstics (10% màx): ${r.inventoryBreakdown.group2Furniture10.toFixed(2)} €\n`;
       doc += `      - Grup 1 Obres de millora (3% màx): ${r.inventoryBreakdown.group1Improvements3.toFixed(2)} €\n`;
     }
-    
+
     doc += `  • Total amortitzacions deduïdes: ${r.totalAmortization.toFixed(2)} €\n`;
 
     doc += `\n  --- RENDIMENT I REDUCCIONS ---\n`;
@@ -163,7 +162,10 @@ ANNEX A: RENDIMENTS DEL CAPITAL IMMOBILIARI (LLOGUERS I AMORTITZACIONS)
  * Genera el Llibre Registre Oficial de Béns d'Inversió i Amortitzacions de l'AEAT per als immobles en lloguer.
  * Document formal per a requeriments o inspeccions tributàries.
  */
-export function generateAEATAmortizationBook(properties: RentalProperty[], fiscalYear: number = 2024): string {
+export function generateAEATAmortizationBook(
+  properties: RentalProperty[],
+  fiscalYear: number = 2024,
+): string {
   let doc = `========================================================================================================================
 LLIBRE REGISTRE DE BÉNS D'INVERSIÓ I AMORTITZACIONS (ART. 23.1.b LIRPF)
 AGÈNCIA ESTATAL D'ADMINISTRACIÓ TRIBUTÀRIA (AEAT) - EXERCICI ${fiscalYear}
@@ -187,13 +189,14 @@ AGÈNCIA ESTATAL D'ADMINISTRACIÓ TRIBUTÀRIA (AEAT) - EXERCICI ${fiscalYear}
     let totalPending = 0;
 
     // 1. Inmoble / Construcció
-    const constructionPercentage = (p.totalCadastralValue > 0 && p.constructionCadastralValue > 0)
-      ? Math.min(1, Math.max(0.1, p.constructionCadastralValue / p.totalCadastralValue))
-      : 0.7;
+    const constructionPercentage =
+      p.totalCadastralValue > 0 && p.constructionCadastralValue > 0
+        ? Math.min(1, Math.max(0.1, p.constructionCadastralValue / p.totalCadastralValue))
+        : 0.7;
     const acqWithoutLand = (p.acquisitionCost || 0) * constructionPercentage;
     const baseConst = Math.max(p.constructionCadastralValue || 0, acqWithoutLand);
     const constAmort = baseConst * 0.03 * ((p.ownershipPercentage || 100) / 100);
-    
+
     if (baseConst > 0) {
       doc += `${'Escriptura'.padEnd(16)} | ${'—'.padEnd(10)} | ${'Compra immoble'.padEnd(24)} | ${'Construcció (exclòs sòl)'.padEnd(30)} | ${'Grup 1 (3%)'.padEnd(20)} | ${baseConst.toFixed(2).padStart(10)} | ${'3.00%'.padStart(6)} | ${constAmort.toFixed(2).padStart(14)} | ${'—'.padStart(12)}\n`;
       totalCost += baseConst;
@@ -201,14 +204,14 @@ AGÈNCIA ESTATAL D'ADMINISTRACIÓ TRIBUTÀRIA (AEAT) - EXERCICI ${fiscalYear}
     }
 
     // 2. Elements d'inventari
-    (p.inventory || []).forEach(item => {
+    (p.inventory || []).forEach((item) => {
       const grp = getAEATAssetGroup(item.category);
       const calc = calculateItemAnnualAmortization(
         item.amount,
         item.amortizationRate,
         item.previousAmortization,
         fiscalYear,
-        item.acquisitionDate
+        item.acquisitionDate,
       );
       const annual = calc.annualAmount * ((p.ownershipPercentage || 100) / 100);
 
@@ -218,7 +221,9 @@ AGÈNCIA ESTATAL D'ADMINISTRACIÓ TRIBUTÀRIA (AEAT) - EXERCICI ${fiscalYear}
 
       const invNo = (item.invoiceNumber || 'S/N').slice(0, 15).padEnd(16);
       const date = (item.acquisitionDate || '—').slice(0, 10).padEnd(10);
-      const prov = `${item.supplierName || 'Proveïdor'} (${item.supplierNif || 'S/N'})`.slice(0, 23).padEnd(24);
+      const prov = `${item.supplierName || 'Proveïdor'} (${item.supplierNif || 'S/N'})`
+        .slice(0, 23)
+        .padEnd(24);
       const concept = (item.concept || 'Element inventari').slice(0, 29).padEnd(30);
       const grpStr = grp.shortName.slice(0, 19).padEnd(20);
 
@@ -236,7 +241,10 @@ AGÈNCIA ESTATAL D'ADMINISTRACIÓ TRIBUTÀRIA (AEAT) - EXERCICI ${fiscalYear}
 /**
  * Exporta la totalitat de l'inventari a format CSV descarregable.
  */
-export function exportPropertiesInventoryCSV(properties: RentalProperty[], fiscalYear: number = 2024): string {
+export function exportPropertiesInventoryCSV(
+  properties: RentalProperty[],
+  fiscalYear: number = 2024,
+): string {
   const headers = [
     'Immoble',
     'Referència Cadastral',
@@ -256,15 +264,15 @@ export function exportPropertiesInventoryCSV(properties: RentalProperty[], fisca
 
   const rows: string[][] = [headers];
 
-  properties.forEach(p => {
-    (p.inventory || []).forEach(item => {
+  properties.forEach((p) => {
+    (p.inventory || []).forEach((item) => {
       const grp = getAEATAssetGroup(item.category);
       const calc = calculateItemAnnualAmortization(
         item.amount,
         item.amortizationRate,
         item.previousAmortization,
         fiscalYear,
-        item.acquisitionDate
+        item.acquisitionDate,
       );
 
       rows.push([
@@ -286,5 +294,5 @@ export function exportPropertiesInventoryCSV(properties: RentalProperty[], fisca
     });
   });
 
-  return rows.map(r => r.join(';')).join('\r\n');
+  return rows.map((r) => r.join(';')).join('\r\n');
 }

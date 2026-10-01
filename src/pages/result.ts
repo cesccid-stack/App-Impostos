@@ -47,7 +47,9 @@ export function renderResult(): HTMLElement {
     const heroColorClass = isRefund ? 'result-hero__amount--negative' : 'result-hero__amount--positive';
     const heroLabelClass = isRefund ? 'result-hero__label--negative' : 'result-hero__label--positive';
 
-    let heroLabel = isRefund ? '↩ A tornar per Hisenda (Casella 0610)' : '↗ A ingressar a Hisenda (Casella 0610)';
+    let heroLabel = isRefund
+      ? '↩ A tornar per Hisenda (Casella 0610)'
+      : '↗ A ingressar a Hisenda (Casella 0610)';
     if (isComplementary) {
       if (compCalc.type === 'to_pay_higher') {
         heroLabel = `⚡ Import diferencial a ingressar a la Complementària (Casella 0610 - Declaració Prèvia)`;
@@ -83,27 +85,37 @@ export function renderResult(): HTMLElement {
       <!-- Hero result card -->
       <div class="card card--accent">
         <div class="result-hero">
-          ${isComplementary ? `
+          ${
+            isComplementary
+              ? `
             <div style="font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.08em; background:rgba(234, 179, 8, 0.15); color:var(--color-warning); padding:4px 12px; border-radius:var(--radius-full); display:inline-block; margin-bottom:var(--space-xs); font-weight:700;">
               Autoliquidació Complementària Activa (Art. 120-122 LGT)
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           <div class="result-hero__amount ${heroColorClass}">
             ${formatCurrency(Math.abs(displayAmount))}
           </div>
           <div class="result-hero__label ${heroLabelClass}">
             ${heroLabel}
           </div>
-          ${isComplementary && compCalc.surcharge.finalSurchargeAmount > 0 ? `
+          ${
+            isComplementary && compCalc.surcharge.finalSurchargeAmount > 0
+              ? `
             <div style="font-size:var(--text-xs); color:var(--text-secondary); margin-top:var(--space-xs);">
               Inclou recàrrec d'extemporaneïtat Art. 27 LGT: <strong>+${formatCurrency(compCalc.surcharge.finalSurchargeAmount)}</strong> (${compCalc.surcharge.nominalRatePercentage}% - 25% bonificació)
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
 
       <!-- Panell d'Autoliquidació Complementària i Rectificativa (si està activa) -->
-      ${isComplementary ? `
+      ${
+        isComplementary
+          ? `
         <div class="card" id="complementary-card" style="margin-top:var(--space-lg); border:2px solid var(--color-warning); background:linear-gradient(180deg, rgba(234, 179, 8, 0.04) 0%, transparent 100%);">
           <div class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm); margin-bottom:var(--space-md);">
             <div>
@@ -177,7 +189,9 @@ export function renderResult(): HTMLElement {
                     ${formatCurrency(compCalc.differentialAmount)}
                   </td>
                 </tr>
-                ${compCalc.surcharge.finalSurchargeAmount > 0 ? `
+                ${
+                  compCalc.surcharge.finalSurchargeAmount > 0
+                    ? `
                   <tr>
                     <td>
                       <div>(+) Recàrrec per Declaració Extemporània (Art. 27 LGT)</div>
@@ -188,7 +202,9 @@ export function renderResult(): HTMLElement {
                       +${formatCurrency(compCalc.surcharge.finalSurchargeAmount)}
                     </td>
                   </tr>
-                ` : ''}
+                `
+                    : ''
+                }
                 <tr style="background:${compCalc.finalAmountDue > 0 ? 'rgba(234, 179, 8, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; font-weight:800; font-size:var(--text-base);">
                   <td>TOTAL EFECTIU A LIQUIDAR / INGRESAR</td>
                   <td><span class="badge badge--warning">TOTAL</span></td>
@@ -200,7 +216,9 @@ export function renderResult(): HTMLElement {
             </table>
           </div>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <!-- Explicador Didàctic & Cuadro de Mando Visual de la Renta -->
       <div id="result-tax-journey-mount" style="margin-top:var(--space-lg);"></div>
@@ -221,7 +239,11 @@ export function renderResult(): HTMLElement {
 
         <!-- Alertes de risc detectades -->
         <div style="display:flex; flex-direction:column; gap:var(--space-sm); margin-bottom:var(--space-lg);">
-          ${auditRisk.alerts.length > 0 ? auditRisk.alerts.map(al => `
+          ${
+            auditRisk.alerts.length > 0
+              ? auditRisk.alerts
+                  .map(
+                    (al) => `
             <div style="background:var(--bg-surface-elevated); border-left:4px solid ${al.severity === 'high' ? 'var(--color-error)' : 'var(--color-warning)'}; padding:10px 14px; border-radius:var(--radius-sm); font-size:var(--text-sm);">
               <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px;">${al.title}</div>
               <div style="color:var(--text-secondary); margin-bottom:4px;">${al.description}</div>
@@ -230,19 +252,27 @@ export function renderResult(): HTMLElement {
                 <strong>🛡️ Prova Recomanada:</strong> ${al.recommendedProof}
               </div>
             </div>
-          `).join('') : '<div class="text-success text-sm">✅ Declaració extremadament neta: No s\'han detectat patrons d\'alt risc.</div>'}
+          `,
+                  )
+                  .join('')
+              : '<div class="text-success text-sm">✅ Declaració extremadament neta: No s\'han detectat patrons d\'alt risc.</div>'
+          }
         </div>
 
         <!-- Checklist documental 4 anys -->
         <div style="border-top:1px dashed var(--border-default); padding-top:var(--space-md);">
           <h4 style="margin:0 0 var(--space-xs) 0; font-size:var(--text-sm);">📂 Justificants Obligatoris a Conservar durant 4 Anys (Art. 66-70 LGT)</h4>
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:6px;">
-            ${auditRisk.documentaryChecklist.map(doc => `
+            ${auditRisk.documentaryChecklist
+              .map(
+                (doc) => `
               <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-secondary);">
                 <span>📁</span>
                 <span>${doc.documentName}</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </div>
         </div>
       </div>
@@ -253,7 +283,7 @@ export function renderResult(): HTMLElement {
           <div>
             <div class="card__title" style="display:flex; align-items:center; gap:var(--space-xs);">
               <span>🔗 Matriu d'Homogeneïtat & Conciliació Inter-Model</span>
-              <span class="badge ${reconReport.isFullyReconciled ? 'badge--success' : (reconReport.discrepancies.some(d => d.severity === 'critical') ? 'badge--error' : 'badge--warning')}">
+              <span class="badge ${reconReport.isFullyReconciled ? 'badge--success' : reconReport.discrepancies.some((d) => d.severity === 'critical') ? 'badge--error' : 'badge--warning'}">
                 ${reconReport.passedChecks} / ${reconReport.totalChecks} Creuaments Quadrats
               </span>
             </div>
@@ -261,20 +291,29 @@ export function renderResult(): HTMLElement {
               Auditoria preventiva transversal entre IRPF (Model 100), Retencions (190/111/115/180), Pagaments Fraccionats (130), IVA (303/390), Tercers (347), Estranger (720/721) i Veri*Factu.
             </div>
           </div>
-          ${!reconReport.isFullyReconciled ? `
+          ${
+            !reconReport.isFullyReconciled
+              ? `
             <button class="btn btn--primary btn--sm" id="btn-reconcile-all-models-result" style="font-weight:700;">
               ⚡ Executar Cuadre Automàtic Integral
             </button>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
 
         <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:var(--space-md);">
           ${reconReport.summaryText}
         </div>
 
-        ${reconReport.discrepancies.length > 0 ? `
+        ${
+          reconReport.discrepancies.length > 0
+            ? `
           <div style="display:flex; flex-direction:column; gap:8px;">
-            ${reconReport.discrepancies.slice(0, 8).map(d => `
+            ${reconReport.discrepancies
+              .slice(0, 8)
+              .map(
+                (d) => `
               <div style="background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-default); padding:10px 14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
                   <div style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">
@@ -295,19 +334,27 @@ export function renderResult(): HTMLElement {
                   <span>Diferència: <strong>${formatCurrency(d.difference)}</strong></span>
                 </div>
               </div>
-            `).join('')}
-            ${reconReport.discrepancies.length > 8 ? `
+            `,
+              )
+              .join('')}
+            ${
+              reconReport.discrepancies.length > 8
+                ? `
               <div style="text-align:center; font-size:0.75rem; color:var(--text-muted); padding:4px;">
                 + ${reconReport.discrepancies.length - 8} comprovacions addicionals verificades
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
-        ` : `
+        `
+            : `
           <div style="display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--color-success-soft); border-radius:var(--radius-sm); color:var(--color-success); font-size:0.85rem;">
             <span>🛡️</span>
             <span><strong>Homogeneïtat Total Verificada:</strong> No hi ha cap desquadrament entre la declaració de la Renda i la resta de models censals i declaracions periòdiques.</span>
           </div>
-        `}
+        `
+        }
       </div>
 
       <!-- Tipus efectius d'imposició -->
@@ -339,17 +386,23 @@ export function renderResult(): HTMLElement {
         <div style="overflow-x:auto;">
           <table class="table" style="width:100%;">
             <tbody>
-              ${tableSection('BASE IMPOSABLE GENERAL I DE L\'ESTALVI')}
-              ${tableRow('Rendiments nets del treball (Casella 0022)', (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) - (e.socialSecurity || 0), 0))}
+              ${tableSection("BASE IMPOSABLE GENERAL I DE L'ESTALVI")}
+              ${tableRow(
+                'Rendiments nets del treball (Casella 0022)',
+                (data.workIncome?.employers || []).reduce(
+                  (s, e) => s + (e.grossSalary || 0) - (e.socialSecurity || 0),
+                  0,
+                ),
+              )}
               ${tableRow('Rendiments del capital immobiliari (Casella 0156)', result.generalBase > 0 ? result.generalBase * 0.3 : 0)}
-              ${tableRow('Rendiments d\'activitats econòmiques (Casella 0235)', data.activities?.income ? data.activities.income - data.activities.expenses : 0)}
+              ${tableRow("Rendiments d'activitats econòmiques (Casella 0235)", data.activities?.income ? data.activities.income - data.activities.expenses : 0)}
               ${tableRow('Base imposable general (Casella 0435)', result.generalBase, true)}
-              ${tableRow('Base imposable de l\'estalvi (Casella 0460)', result.savingsBase, true)}
+              ${tableRow("Base imposable de l'estalvi (Casella 0460)", result.savingsBase, true)}
               
               ${tableSection('REDUCCIONS I BASES LIQUIDABLES')}
               ${result.jointTaxationReduction ? tableRow('Reducció tributació conjunta (Casella 0495)', -result.jointTaxationReduction) : ''}
               ${tableRow('Base liquidable general (Casella 0500)', result.liquidableGeneralBase, true)}
-              ${tableRow('Base liquidable de l\'estalvi (Casella 0510)', result.liquidableSavingsBase, true)}
+              ${tableRow("Base liquidable de l'estalvi (Casella 0510)", result.liquidableSavingsBase, true)}
               
               ${tableSection('MÍNIM PERSONAL I FAMILIAR')}
               ${tableRow('Mínim del contribuent (Casella 0511)', 5550)}
@@ -358,7 +411,7 @@ export function renderResult(): HTMLElement {
               
               ${tableSection('QUOTES ÍNTEGRES')}
               ${tableRow('Quota íntegra general (Casella 0545/0546)', result.generalTax)}
-              ${tableRow('Quota íntegra de l\'estalvi (Casella 0550/0551)', result.savingsTax)}
+              ${tableRow("Quota íntegra de l'estalvi (Casella 0550/0551)", result.savingsTax)}
               ${tableRow('Minoració per mínim personal i familiar', -result.minimumTaxCredit)}
               ${tableRow('Suma quotes íntegres (Casella 0552)', result.generalTax + result.savingsTax, true)}
               
@@ -373,7 +426,7 @@ export function renderResult(): HTMLElement {
               ${tableRow('Retencions i pagaments a compte (Casella 0609)', -result.totalWithholdings)}
               <tr style="background:${isRefund ? 'var(--color-success-soft)' : 'var(--color-error-soft)'}">
                 <td style="font-weight:700;font-size:var(--text-base);">
-                  ${isRefund ? '🔄 RESULTAT DE L\'EXERCICI (Casella 0610)' : '📤 RESULTAT DE L\'EXERCICI (Casella 0610)'}
+                  ${isRefund ? "🔄 RESULTAT DE L'EXERCICI (Casella 0610)" : "📤 RESULTAT DE L'EXERCICI (Casella 0610)"}
                 </td>
                 <td class="mono" style="text-align:right;font-weight:700;font-size:var(--text-base);color:${isRefund ? 'var(--color-success)' : 'var(--color-error)'};">
                   ${formatCurrency(Math.abs(result.result))}
@@ -383,6 +436,9 @@ export function renderResult(): HTMLElement {
           </table>
         </div>
       </div>
+
+      <!-- Viatge Fiscal dels teus Impostos & Explicador Didàctic Integral -->
+      <div id="result-tax-journey-mount" style="margin-top:var(--space-lg);"></div>
 
       <!-- Distribució per trams IRPF -->
       <div class="card" id="brackets-card-container" style="margin-top:var(--space-lg);">
@@ -401,13 +457,15 @@ export function renderResult(): HTMLElement {
     if (bracketsCard) {
       const bracketItems = STATE_GENERAL_TAX_BRACKETS.map((bracket: TaxBracket, i: number) => {
         const prevLimit = i === 0 ? 0 : STATE_GENERAL_TAX_BRACKETS[i - 1].upTo;
-        const tierSize = bracket.upTo === Infinity ? result.liquidableGeneralBase - prevLimit : bracket.upTo - prevLimit;
+        const tierSize =
+          bracket.upTo === Infinity ? result.liquidableGeneralBase - prevLimit : bracket.upTo - prevLimit;
         const taxableInTier = Math.max(0, Math.min(result.liquidableGeneralBase - prevLimit, tierSize));
 
         return {
-          label: bracket.upTo === Infinity
-            ? `> ${formatCurrency(prevLimit)} (${(bracket.rate * 100).toFixed(0)}%)`
-            : `${formatCurrency(prevLimit)} – ${formatCurrency(bracket.upTo)} (${(bracket.rate * 100).toFixed(0)}%)`,
+          label:
+            bracket.upTo === Infinity
+              ? `> ${formatCurrency(prevLimit)} (${(bracket.rate * 100).toFixed(0)}%)`
+              : `${formatCurrency(prevLimit)} – ${formatCurrency(bracket.upTo)} (${(bracket.rate * 100).toFixed(0)}%)`,
           value: taxableInTier,
         };
       }).filter((item: { label: string; value: number }) => item.value > 0);
@@ -453,7 +511,12 @@ export function renderResult(): HTMLElement {
         previousResult: compData.previousResult || 0,
         monthsLate: compData.monthsLate || 0,
       });
-      showToast(isComplementary ? 'Declaració ordinària restaurada' : 'Modalitat de Declaració Complementària activada', 'info');
+      showToast(
+        isComplementary
+          ? 'Declaració ordinària restaurada'
+          : 'Modalitat de Declaració Complementària activada',
+        'info',
+      );
       render();
     });
 
@@ -539,4 +602,3 @@ function tableSection(title: string): string {
     </tr>
   `;
 }
-

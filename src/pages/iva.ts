@@ -5,19 +5,19 @@
  */
 
 import { store } from '../store.ts';
-import { 
-  QUARTERS, 
-  IVA_FILING_DEADLINES, 
-  calculateAllQuarters, 
-  calculateModel390Annual, 
-  extractModel349Entries, 
-  auditIVARisks 
+import {
+  QUARTERS,
+  IVA_FILING_DEADLINES,
+  calculateAllQuarters,
+  calculateModel390Annual,
+  extractModel349Entries,
+  auditIVARisks,
 } from '../fiscal/iva-engine.ts';
-import { 
-  exportIssuedInvoicesCSV, 
-  exportReceivedInvoicesCSV, 
-  exportInvestmentAssetsCSV, 
-  exportModel303SummaryCSV 
+import {
+  exportIssuedInvoicesCSV,
+  exportReceivedInvoicesCSV,
+  exportInvestmentAssetsCSV,
+  exportModel303SummaryCSV,
 } from '../utils/iva-books-generator.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
@@ -27,19 +27,19 @@ import { openComplianceModal } from '../components/compliance-modal.ts';
 import { openInvoiceDocumentModal } from '../components/invoice-document-modal.ts';
 import { generateAndDownloadInspectionPackage } from '../utils/inspection-package-generator.ts';
 import { saveInvoiceDocument } from '../utils/document-vault.ts';
-import type { 
-  IVAData, 
-  IVAInvoiceIssued, 
-  IVAInvoiceReceived, 
-  IVABienInversion, 
-  FiscalQuarter, 
-  IVARate, 
+import type {
+  IVAData,
+  IVAInvoiceIssued,
+  IVAInvoiceReceived,
+  IVABienInversion,
+  FiscalQuarter,
+  IVARate,
   WithholdingRate,
   IssuedInvoiceCategory,
   ReceivedInvoiceCategory,
   Model303QuarterResult,
   Model390AnnualSummary,
-  Model349Entry 
+  Model349Entry,
 } from '../types-iva.ts';
 
 export function renderIVA(): HTMLElement {
@@ -89,7 +89,9 @@ export function renderIVA(): HTMLElement {
       </div>
 
       <!-- Banner de Comprovacions Automàtiques en Temps Real -->
-      ${compliance.status === 'perfect' ? `
+      ${
+        compliance.status === 'perfect'
+          ? `
         <div style="margin-bottom:var(--space-md); padding:8px 14px; border-radius:var(--radius-md); background:var(--bg-surface-elevated); border-left:4px solid var(--color-success); display:flex; justify-content:space-between; align-items:center; font-size:0.75rem;">
           <div style="display:flex; align-items:center; gap:6px;">
             <span>✅</span>
@@ -99,7 +101,8 @@ export function renderIVA(): HTMLElement {
             🔍 Diagnòstic
           </button>
         </div>
-      ` : `
+      `
+          : `
         <div style="margin-bottom:var(--space-md); padding:10px 16px; border-radius:var(--radius-md); background:var(--bg-surface-elevated); border-left:4px solid ${compliance.criticalCount > 0 ? 'var(--color-error)' : 'var(--color-warning)'}; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
           <div style="display:flex; align-items:center; gap:var(--space-sm);">
             <span style="font-size:1.3rem;">${compliance.criticalCount > 0 ? '🔴' : '🟡'}</span>
@@ -112,7 +115,8 @@ export function renderIVA(): HTMLElement {
             🔍 Veure Diagnòstic & Corregir
           </button>
         </div>
-      `}
+      `
+      }
 
       <!-- Barra de Filtre de Període i Any Fiscal -->
       <div class="card" style="margin-bottom:var(--space-lg); padding:10px 16px; background:var(--bg-surface-elevated); border:1px solid var(--border-default); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-md);">
@@ -120,7 +124,7 @@ export function renderIVA(): HTMLElement {
           <div style="display:flex; align-items:center; gap:var(--space-xs);">
             <span style="font-weight:600; font-size:var(--text-xs); color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">📅 Any Fiscal:</span>
             <select class="form-select" id="iva-year-selector" style="font-weight:bold; font-size:var(--text-xs); padding:4px 10px; background:var(--bg-base); color:var(--text-primary); border:1px solid var(--border-default); border-radius:var(--radius-sm); cursor:pointer;">
-              ${FISCAL_YEARS.map(y => `<option value="${y}" ${y === year ? 'selected' : ''}>Exercici ${y}</option>`).join('')}
+              ${FISCAL_YEARS.map((y) => `<option value="${y}" ${y === year ? 'selected' : ''}>Exercici ${y}</option>`).join('')}
             </select>
           </div>
 
@@ -191,7 +195,7 @@ export function renderIVA(): HTMLElement {
     model349: Model349Entry[],
     riskAlerts: ReturnType<typeof auditIVARisks>,
     finalPendingCarryover: number,
-    year: number
+    year: number,
   ): string {
     switch (activeTab) {
       case 'dashboard':
@@ -219,7 +223,7 @@ export function renderIVA(): HTMLElement {
     quarters: Record<FiscalQuarter, Model303QuarterResult>,
     riskAlerts: ReturnType<typeof auditIVARisks>,
     finalPendingCarryover: number,
-    year: number
+    year: number,
   ): string {
     const totalDevengado = QUARTERS.reduce((s, q) => s + quarters[q].totalDevengado, 0);
     const totalDeducible = QUARTERS.reduce((s, q) => s + quarters[q].totalDeducible, 0);
@@ -257,20 +261,20 @@ export function renderIVA(): HTMLElement {
         <span>📅 Estat de les Liquidacions Trimestrals (Model 303)</span>
       </h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl);">
-        ${QUARTERS.map(q => {
+        ${QUARTERS.map((q) => {
           const qr = quarters[q];
           const dl = IVA_FILING_DEADLINES[q];
           const isPositive = qr.resultadoLiquidacion > 0;
           const isZero = qr.resultadoLiquidacion === 0;
 
           return `
-            <div class="card" style="border-top:4px solid ${isPositive ? 'var(--color-warning)' : (isZero ? 'var(--border-default)' : 'var(--color-success)')};">
+            <div class="card" style="border-top:4px solid ${isPositive ? 'var(--color-warning)' : isZero ? 'var(--border-default)' : 'var(--color-success)'};">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:var(--space-sm);">
                 <div>
                   <h4 style="margin:0; font-size:var(--text-base);">${dl.label}</h4>
                   <span style="font-size:0.75rem; color:var(--text-muted);">Termini: ${dl.deadline}</span>
                 </div>
-                <span class="badge ${isPositive ? 'badge--warning' : (isZero ? 'badge--info' : 'badge--success')}">
+                <span class="badge ${isPositive ? 'badge--warning' : isZero ? 'badge--info' : 'badge--success'}">
                   ${qr.paymentType.toUpperCase()}
                 </span>
               </div>
@@ -284,12 +288,16 @@ export function renderIVA(): HTMLElement {
                   <span style="color:var(--text-muted);">IVA Deduïble:</span>
                   <strong>-${formatCurrency(qr.totalDeducible)}</strong>
                 </div>
-                ${qr.cuotasCompensarPeriodosAnteriores > 0 ? `
+                ${
+                  qr.cuotasCompensarPeriodosAnteriores > 0
+                    ? `
                   <div style="display:flex; justify-content:space-between; color:var(--color-info);">
                     <span>Compensat previ:</span>
                     <strong>-${formatCurrency(qr.cuotasCompensarPeriodosAnteriores)}</strong>
                   </div>
-                ` : ''}
+                `
+                    : ''
+                }
                 <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border-subtle); padding-top:4px; font-weight:bold; font-size:var(--text-sm);">
                   <span>Resultat (Casella 71):</span>
                   <span class="${isPositive ? 'text-warning' : 'text-success'}">${formatCurrency(qr.resultadoLiquidacion)}</span>
@@ -313,17 +321,21 @@ export function renderIVA(): HTMLElement {
           <p class="card__subtitle" style="margin:0;">Comprovacions automàtiques segons criteris d'inspecció de l'AEAT</p>
         </div>
         <div style="display:flex; flex-direction:column; gap:var(--space-sm);">
-          ${riskAlerts.map(alert => `
+          ${riskAlerts
+            .map(
+              (alert) => `
             <div style="display:flex; gap:var(--space-sm); align-items:flex-start; padding:var(--space-sm) var(--space-md); border-radius:var(--radius-md); background:var(--bg-surface-elevated); border-left:4px solid var(--color-${alert.type});">
               <span style="font-size:1.2rem;">
-                ${alert.type === 'error' ? '❌' : (alert.type === 'warning' ? '⚠️' : (alert.type === 'info' ? 'ℹ️' : '✅'))}
+                ${alert.type === 'error' ? '❌' : alert.type === 'warning' ? '⚠️' : alert.type === 'info' ? 'ℹ️' : '✅'}
               </span>
               <div>
                 <strong style="font-size:var(--text-sm);">${alert.title}</strong>
                 <p style="margin:2px 0 0 0; font-size:0.8rem; color:var(--text-secondary);">${alert.message}</p>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -335,21 +347,24 @@ export function renderIVA(): HTMLElement {
   function renderModel303Tab(
     quarters: Record<FiscalQuarter, Model303QuarterResult>,
     selectedQuarter: FiscalQuarter,
-    year: number
+    year: number,
   ): string {
     const q = quarters[selectedQuarter];
     const isComp = !!q.isComplementary;
-    const finalCompResult = q.resultadoComplementaria ?? (q.resultadoLiquidacion - (q.previousResultIngressat || 0));
+    const finalCompResult =
+      q.resultadoComplementaria ?? q.resultadoLiquidacion - (q.previousResultIngressat || 0);
 
     return `
       <!-- Selector de Trimestre i Botó de Complementària -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm); margin-bottom:var(--space-lg);">
         <div style="display:flex; gap:var(--space-xs); flex-wrap:wrap;">
-          ${QUARTERS.map(t => `
+          ${QUARTERS.map(
+            (t) => `
             <button class="btn ${selectedQuarter === t ? 'btn--primary' : 'btn--secondary'} btn--sm btn-select-303-quarter" data-quarter="${t}">
               Trimestre ${t} ${quarters[t].isComplementary ? '⚡' : ''}
             </button>
-          `).join('')}
+          `,
+          ).join('')}
         </div>
         <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap;">
           <button class="btn ${isComp ? 'btn--warning' : 'btn--secondary'} btn--sm" id="btn-toggle-303-complementary">
@@ -540,7 +555,9 @@ export function renderIVA(): HTMLElement {
         </div>
 
         <!-- Bloc d'Autoliquidació Complementària del Trimestre (Caselles 70 / 71) -->
-        ${isComp ? `
+        ${
+          isComp
+            ? `
           <div style="margin-top:var(--space-lg); background:var(--bg-surface-elevated); border-radius:var(--radius-md); padding:var(--space-md); border:2px solid var(--color-warning);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:var(--space-md);">
               <h3 style="font-size:var(--text-sm); text-transform:uppercase; letter-spacing:0.05em; color:var(--color-warning); margin:0; display:flex; align-items:center; gap:var(--space-xs);">
@@ -585,7 +602,9 @@ export function renderIVA(): HTMLElement {
                       ${formatCurrency(finalCompResult)}
                     </td>
                   </tr>
-                  ${(q.surchargeExtemporaneous || 0) > 0 ? `
+                  ${
+                    (q.surchargeExtemporaneous || 0) > 0
+                      ? `
                     <tr>
                       <td>(+) Recàrrec per Presentació Extemporània (Art. 27 LGT: ${q.extemporaneousRate || 1}% - 25% bonificació)</td>
                       <td><span class="badge badge--sm">Art. 27 LGT</span></td>
@@ -593,7 +612,9 @@ export function renderIVA(): HTMLElement {
                         +${formatCurrency(q.surchargeExtemporaneous || 0)}
                       </td>
                     </tr>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                   <tr style="background:var(--color-warning-soft, rgba(234,179,8,0.15)); font-weight:800; font-size:var(--text-sm);">
                     <td>TOTAL EFECTIU A INGRESAR PER AQUEST TRIMESTRE ${selectedQuarter}</td>
                     <td><span class="badge badge--warning">TOTAL 303</span></td>
@@ -605,7 +626,9 @@ export function renderIVA(): HTMLElement {
               </table>
             </div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -618,33 +641,38 @@ export function renderIVA(): HTMLElement {
     const received = ivaData.receivedInvoices || [];
     const assets = ivaData.investmentAssets || [];
 
-    const filterQuarter = <T extends {
-      quarter: FiscalQuarter;
-      hasAttachment?: boolean;
-      clientName?: string;
-      supplierName?: string;
-      description?: string;
-      invoiceNumber?: string;
-      concept?: string;
-      clientNif?: string;
-      supplierNif?: string;
-    }>(invList: T[]): T[] => {
+    const filterQuarter = <
+      T extends {
+        quarter: FiscalQuarter;
+        hasAttachment?: boolean;
+        clientName?: string;
+        supplierName?: string;
+        description?: string;
+        invoiceNumber?: string;
+        concept?: string;
+        clientNif?: string;
+        supplierNif?: string;
+      },
+    >(
+      invList: T[],
+    ): T[] => {
       let filtered = invList;
       if (invoiceQuarterFilter !== 'ALL') {
-        filtered = filtered.filter(i => i.quarter === invoiceQuarterFilter);
+        filtered = filtered.filter((i) => i.quarter === invoiceQuarterFilter);
       }
       if (invoicePdfFilter === 'WITH_PDF') {
-        filtered = filtered.filter(i => i.hasAttachment);
+        filtered = filtered.filter((i) => i.hasAttachment);
       } else if (invoicePdfFilter === 'WITHOUT_PDF') {
-        filtered = filtered.filter(i => !i.hasAttachment);
+        filtered = filtered.filter((i) => !i.hasAttachment);
       }
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
-        filtered = filtered.filter(i => 
-          (i.clientName || i.supplierName || i.description || '').toLowerCase().includes(q) ||
-          (i.invoiceNumber || '').toLowerCase().includes(q) ||
-          (i.concept || '').toLowerCase().includes(q) ||
-          (i.clientNif || i.supplierNif || '').toLowerCase().includes(q)
+        filtered = filtered.filter(
+          (i) =>
+            (i.clientName || i.supplierName || i.description || '').toLowerCase().includes(q) ||
+            (i.invoiceNumber || '').toLowerCase().includes(q) ||
+            (i.concept || '').toLowerCase().includes(q) ||
+            (i.clientNif || i.supplierNif || '').toLowerCase().includes(q),
         );
       }
       return filtered;
@@ -737,7 +765,9 @@ export function renderIVA(): HTMLElement {
             </tr>
           </thead>
           <tbody>
-            ${invoices.map(inv => `
+            ${invoices
+              .map(
+                (inv) => `
               <tr style="border-bottom:1px solid var(--border-subtle);">
                 <td style="padding:10px;"><span class="badge badge--sm badge--primary">${inv.quarter}</span></td>
                 <td style="padding:10px;"><strong>${inv.invoiceNumber}</strong></td>
@@ -759,21 +789,27 @@ export function renderIVA(): HTMLElement {
                 </td>
                 <td style="padding:10px; text-align:right; font-weight:bold;">${formatCurrency(inv.totalInvoice)}</td>
                 <td style="padding:10px; text-align:center;">
-                  ${inv.hasAttachment ? `
+                  ${
+                    inv.hasAttachment
+                      ? `
                     <button class="btn btn--sm btn-manage-pdf" data-id="${inv.id}" data-type="issued" style="font-size:0.7rem; padding:2px 8px; background:var(--color-success); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer;" title="${inv.attachmentStandardizedName || 'Documentat'}">
                       📄 Veure PDF
                     </button>
-                  ` : `
+                  `
+                      : `
                     <button class="btn btn--ghost btn--sm btn-manage-pdf" data-id="${inv.id}" data-type="issued" style="font-size:0.7rem; padding:2px 8px; color:var(--color-warning); border:1px dashed var(--color-warning); border-radius:var(--radius-sm); cursor:pointer;" title="Adjuntar PDF oficial">
                       ⚠️ + Adjuntar
                     </button>
-                  `}
+                  `
+                  }
                 </td>
                 <td style="padding:10px; text-align:center;">
                   <button class="btn btn--ghost btn--sm btn--icon btn-delete-issued" data-id="${inv.id}" title="Eliminar factura">🗑️</button>
                 </td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </tbody>
         </table>
       </div>
@@ -811,7 +847,9 @@ export function renderIVA(): HTMLElement {
             </tr>
           </thead>
           <tbody>
-            ${invoices.map(inv => `
+            ${invoices
+              .map(
+                (inv) => `
               <tr style="border-bottom:1px solid var(--border-subtle);">
                 <td style="padding:10px;"><span class="badge badge--sm badge--success">${inv.quarter}</span></td>
                 <td style="padding:10px;"><strong>${inv.invoiceNumber}</strong></td>
@@ -832,21 +870,27 @@ export function renderIVA(): HTMLElement {
                 <td style="padding:10px; text-align:right; font-weight:bold; color:var(--color-success);">${formatCurrency(inv.deductibleVatAmount)}</td>
                 <td style="padding:10px; text-align:right; font-weight:bold;">${formatCurrency(inv.totalInvoice)}</td>
                 <td style="padding:10px; text-align:center;">
-                  ${inv.hasAttachment ? `
+                  ${
+                    inv.hasAttachment
+                      ? `
                     <button class="btn btn--sm btn-manage-pdf" data-id="${inv.id}" data-type="received" style="font-size:0.7rem; padding:2px 8px; background:var(--color-success); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer;" title="${inv.attachmentStandardizedName || 'Documentat'}">
                       📄 Veure PDF
                     </button>
-                  ` : `
+                  `
+                      : `
                     <button class="btn btn--ghost btn--sm btn-manage-pdf" data-id="${inv.id}" data-type="received" style="font-size:0.7rem; padding:2px 8px; color:var(--color-warning); border:1px dashed var(--color-warning); border-radius:var(--radius-sm); cursor:pointer;" title="Adjuntar PDF oficial">
                       ⚠️ + Adjuntar
                     </button>
-                  `}
+                  `
+                  }
                 </td>
                 <td style="padding:10px; text-align:center;">
                   <button class="btn btn--ghost btn--sm btn--icon btn-delete-received" data-id="${inv.id}" title="Eliminar factura">🗑️</button>
                 </td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </tbody>
         </table>
       </div>
@@ -881,7 +925,9 @@ export function renderIVA(): HTMLElement {
             </tr>
           </thead>
           <tbody>
-            ${assets.map(a => `
+            ${assets
+              .map(
+                (a) => `
               <tr style="border-bottom:1px solid var(--border-subtle);">
                 <td style="padding:10px;"><strong>${a.description}</strong></td>
                 <td style="padding:10px;"><span class="badge badge--sm">${a.assetType}</span></td>
@@ -899,7 +945,9 @@ export function renderIVA(): HTMLElement {
                   <button class="btn btn--ghost btn--sm btn--icon btn-delete-asset" data-id="${a.id}" title="Eliminar actiu">🗑️</button>
                 </td>
               </tr>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </tbody>
         </table>
       </div>
@@ -1009,7 +1057,9 @@ export function renderIVA(): HTMLElement {
     const data = store.getData();
     const act = data.activities || { income: 0, expenses: 0, withholdings: 0 };
     const propCount = (data.properties || []).length;
-    const commercialProps = (data.properties || []).filter(p => p.usageType === 'commercial' || p.name?.toLowerCase().includes('local'));
+    const commercialProps = (data.properties || []).filter(
+      (p) => p.usageType === 'commercial' || p.name?.toLowerCase().includes('local'),
+    );
 
     return `
       <div style="margin-bottom:var(--space-xl);">
@@ -1079,7 +1129,7 @@ export function renderIVA(): HTMLElement {
               </div>
               <div style="display:flex; justify-content:space-between;">
                 <span style="color:var(--text-muted);">Inventari d'Actius vinculats:</span>
-                <strong>${ivaData.investmentAssets.filter(a => a.linkedPropertyId).length}</strong>
+                <strong>${ivaData.investmentAssets.filter((a) => a.linkedPropertyId).length}</strong>
               </div>
             </div>
           </div>
@@ -1125,7 +1175,11 @@ export function renderIVA(): HTMLElement {
   /* ─────────────────────────────────────────────────────────── */
   /* TAB 6: RESUM ANUAL MODEL 390 & MODEL 349                    */
   /* ─────────────────────────────────────────────────────────── */
-  function renderModel390Tab(model390: Model390AnnualSummary, model349: Model349Entry[], year: number): string {
+  function renderModel390Tab(
+    model390: Model390AnnualSummary,
+    model349: Model349Entry[],
+    year: number,
+  ): string {
     return `
       <!-- Targeta Model 390 -->
       <div class="card" style="margin-bottom:var(--space-xl);">
@@ -1163,7 +1217,9 @@ export function renderIVA(): HTMLElement {
         </div>
 
         <!-- Comparativa de Prorrata General vs Especial (Art. 103 LIVA) -->
-        ${model390.prorrataComparison ? `
+        ${
+          model390.prorrataComparison
+            ? `
           <div style="background:var(--bg-surface-elevated); border:1px solid ${model390.prorrataComparison.isSpecialProrrataMandatoryByLaw ? 'var(--color-error)' : 'var(--border-default)'}; border-radius:var(--radius-md); padding:var(--space-md); margin-bottom:var(--space-lg);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); margin-bottom:var(--space-sm);">
               <div style="font-weight:700; font-size:var(--text-sm); display:flex; align-items:center; gap:6px;">
@@ -1181,13 +1237,19 @@ export function renderIVA(): HTMLElement {
               <div>Règim Recomanat: <strong>${model390.prorrataComparison.recommendedRegime === 'special' ? 'Prorrata Especial' : 'Prorrata General'}</strong></div>
             </div>
 
-            ${model390.prorrataComparison.warningMessage ? `
+            ${
+              model390.prorrataComparison.warningMessage
+                ? `
               <div style="margin-top:var(--space-xs); padding:var(--space-xs) var(--space-sm); background:rgba(239, 68, 68, 0.1); border-left:3px solid var(--color-error); font-size:var(--text-xs); color:var(--color-error); border-radius:4px;">
                 ${model390.prorrataComparison.warningMessage}
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
 
       <!-- Targeta Model 349 -->
@@ -1200,9 +1262,12 @@ export function renderIVA(): HTMLElement {
           <p class="card__subtitle" style="margin:0;">Lliuraments i adquisicions de béns i serveis amb operadors de la Unió Europea</p>
         </div>
 
-        ${model349.length === 0 ? `
+        ${
+          model349.length === 0
+            ? `
           <p style="color:var(--text-muted); font-size:var(--text-sm); margin:0;">No s'han registrat operacions intracomunitàries durant l'exercici.</p>
-        ` : `
+        `
+            : `
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%; font-size:var(--text-xs);">
               <thead>
@@ -1215,19 +1280,24 @@ export function renderIVA(): HTMLElement {
                 </tr>
               </thead>
               <tbody>
-                ${model349.map(m => `
+                ${model349
+                  .map(
+                    (m) => `
                   <tr>
                     <td><strong>${m.countryCode}</strong></td>
                     <td>${m.operatorNif}</td>
                     <td>${m.operatorName}</td>
-                    <td><span class="badge badge--sm">${m.key === 'E' ? 'E (Lliurament Béns)' : (m.key === 'A' ? 'A (Adquisició Béns)' : m.key)}</span></td>
+                    <td><span class="badge badge--sm">${m.key === 'E' ? 'E (Lliurament Béns)' : m.key === 'A' ? 'A (Adquisició Béns)' : m.key}</span></td>
                     <td style="text-align:right; font-weight:bold;">${formatCurrency(m.taxableBase)}</td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>
-        `}
+        `
+        }
       </div>
     `;
   }
@@ -1235,7 +1305,11 @@ export function renderIVA(): HTMLElement {
   /* ─────────────────────────────────────────────────────────── */
   /* GESTIÓ D'EVENTS I MODALS INTERACTIUS                        */
   /* ─────────────────────────────────────────────────────────── */
-  function bindEvents(ivaData: IVAData, quarters: Record<FiscalQuarter, Model303QuarterResult>, year: number) {
+  function bindEvents(
+    ivaData: IVAData,
+    quarters: Record<FiscalQuarter, Model303QuarterResult>,
+    year: number,
+  ) {
     // 0. Selector d'Any Fiscal i Trimestre de Capçalera
     page.querySelector('#btn-open-iva-compliance')?.addEventListener('click', () => {
       openComplianceModal(() => {
@@ -1252,7 +1326,7 @@ export function renderIVA(): HTMLElement {
       });
     }
 
-    page.querySelectorAll('.btn-header-quarter').forEach(btn => {
+    page.querySelectorAll('.btn-header-quarter').forEach((btn) => {
       btn.addEventListener('click', () => {
         const q = ((btn as HTMLElement).dataset.quarter as FiscalQuarter | 'ALL') || 'ALL';
         selectedPeriodFilter = q;
@@ -1267,7 +1341,7 @@ export function renderIVA(): HTMLElement {
     });
 
     // 1. Canvi de pestanya principal
-    page.querySelectorAll('.tab-btn').forEach(btn => {
+    page.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeTab = ((btn as HTMLElement).dataset.tab as typeof activeTab) || 'overview';
         render();
@@ -1275,7 +1349,7 @@ export function renderIVA(): HTMLElement {
     });
 
     // 2. Canvi de trimestre en la vista 303
-    page.querySelectorAll('.btn-select-303-quarter, .btn-view-quarter').forEach(btn => {
+    page.querySelectorAll('.btn-select-303-quarter, .btn-view-quarter').forEach((btn) => {
       btn.addEventListener('click', () => {
         active303Quarter = (btn as HTMLElement).dataset.quarter as FiscalQuarter;
         activeTab = 'model303';
@@ -1293,7 +1367,12 @@ export function renderIVA(): HTMLElement {
         previousResultIngressat: curQ.previousResultIngressat || 0,
         extemporaneousMonths: curQ.extemporaneousMonths || 0,
       });
-      showToast(isCurrentlyComp ? `Declaració ordinària del ${active303Quarter} restaurada` : `Autoliquidació Complementària del ${active303Quarter} activada`, 'info');
+      showToast(
+        isCurrentlyComp
+          ? `Declaració ordinària del ${active303Quarter} restaurada`
+          : `Autoliquidació Complementària del ${active303Quarter} activada`,
+        'info',
+      );
       render();
     });
 
@@ -1304,18 +1383,22 @@ export function renderIVA(): HTMLElement {
 
     page.querySelector('#comp-303-prev-ingressat')?.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
-      store.updateQuarterComplementary(active303Quarter, { previousResultIngressat: parseFloat(target.value) || 0 });
+      store.updateQuarterComplementary(active303Quarter, {
+        previousResultIngressat: parseFloat(target.value) || 0,
+      });
       render();
     });
 
     page.querySelector('#comp-303-months-late')?.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
-      store.updateQuarterComplementary(active303Quarter, { extemporaneousMonths: parseInt(target.value, 10) || 0 });
+      store.updateQuarterComplementary(active303Quarter, {
+        extemporaneousMonths: parseInt(target.value, 10) || 0,
+      });
       render();
     });
 
     // 3. Canvi de subpestanya de factures
-    page.querySelectorAll('.btn-invoice-subtab').forEach(btn => {
+    page.querySelectorAll('.btn-invoice-subtab').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeInvoiceSubTab = ((btn as HTMLElement).dataset.subtab as typeof activeInvoiceSubTab) || 'issued';
         render();
@@ -1357,17 +1440,25 @@ export function renderIVA(): HTMLElement {
         showToast('Llibre de Factures Rebudes exportat correctament', 'success');
       } else {
         exportInvestmentAssetsCSV(ivaData.investmentAssets);
-        showToast('Llibre de Béns d\'Inversió exportat correctament', 'success');
+        showToast("Llibre de Béns d'Inversió exportat correctament", 'success');
       }
     });
 
     page.querySelector('#btn-export-inspection-bundle')?.addEventListener('click', async () => {
-      showToast('Preparant dossier d\'inspecció AEAT...', 'info');
+      showToast("Preparant dossier d'inspecció AEAT...", 'info');
       try {
-        const res = await generateAndDownloadInspectionPackage(ivaData, year, store.getActiveProfile().name, (msg) => {
-          showToast(msg, 'info');
-        });
-        showToast(`Dossier d'Inspecció AEAT descarregat (${res.totalFiles} fitxers, ${res.totalSizeMB} MB)`, 'success');
+        const res = await generateAndDownloadInspectionPackage(
+          ivaData,
+          year,
+          store.getActiveProfile().name,
+          (msg) => {
+            showToast(msg, 'info');
+          },
+        );
+        showToast(
+          `Dossier d'Inspecció AEAT descarregat (${res.totalFiles} fitxers, ${res.totalSizeMB} MB)`,
+          'success',
+        );
       } catch (err) {
         showToast('Error en generar el paquet: ' + String(err), 'error');
       }
@@ -1379,13 +1470,14 @@ export function renderIVA(): HTMLElement {
     });
 
     // 5.1 Obertura del Modal de Gestió de Document PDF Oficial
-    page.querySelectorAll('.btn-manage-pdf').forEach(btn => {
+    page.querySelectorAll('.btn-manage-pdf').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = (e.currentTarget as HTMLElement).dataset.id!;
         const docType = (e.currentTarget as HTMLElement).dataset.type as 'issued' | 'received';
-        const inv = docType === 'issued'
-          ? ivaData.issuedInvoices.find(i => i.id === id)
-          : ivaData.receivedInvoices.find(i => i.id === id);
+        const inv =
+          docType === 'issued'
+            ? ivaData.issuedInvoices.find((i) => i.id === id)
+            : ivaData.receivedInvoices.find((i) => i.id === id);
         if (inv) {
           openInvoiceDocumentModal(inv, docType, year, () => render());
         }
@@ -1395,13 +1487,17 @@ export function renderIVA(): HTMLElement {
     // 6. Botons d'obertura de modal per afegir factura
     page.querySelector('#btn-add-invoice-header')?.addEventListener('click', () => openAddInvoiceModal());
     page.querySelector('#btn-open-add-invoice-modal')?.addEventListener('click', () => openAddInvoiceModal());
-    page.querySelector('#btn-empty-add-issued')?.addEventListener('click', () => openAddInvoiceModal('issued'));
-    page.querySelector('#btn-empty-add-received')?.addEventListener('click', () => openAddInvoiceModal('received'));
+    page
+      .querySelector('#btn-empty-add-issued')
+      ?.addEventListener('click', () => openAddInvoiceModal('issued'));
+    page
+      .querySelector('#btn-empty-add-received')
+      ?.addEventListener('click', () => openAddInvoiceModal('received'));
     page.querySelector('#btn-empty-add-asset')?.addEventListener('click', () => openAddAssetModal());
     page.querySelector('#btn-add-asset-from-prorrata')?.addEventListener('click', () => openAddAssetModal());
 
     // 7. Eliminació de factures / actius
-    page.querySelectorAll('.btn-delete-issued').forEach(btn => {
+    page.querySelectorAll('.btn-delete-issued').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = (e.currentTarget as HTMLElement).dataset.id!;
         if (confirm('Segur que vols eliminar aquesta factura emesa?')) {
@@ -1412,7 +1508,7 @@ export function renderIVA(): HTMLElement {
       });
     });
 
-    page.querySelectorAll('.btn-delete-received').forEach(btn => {
+    page.querySelectorAll('.btn-delete-received').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = (e.currentTarget as HTMLElement).dataset.id!;
         if (confirm('Segur que vols eliminar aquesta factura rebuda?')) {
@@ -1423,12 +1519,12 @@ export function renderIVA(): HTMLElement {
       });
     });
 
-    page.querySelectorAll('.btn-delete-asset').forEach(btn => {
+    page.querySelectorAll('.btn-delete-asset').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = (e.currentTarget as HTMLElement).dataset.id!;
-        if (confirm('Segur que vols eliminar aquest bé d\'inversió?')) {
+        if (confirm("Segur que vols eliminar aquest bé d'inversió?")) {
           store.deleteInvestmentAsset(id);
-          showToast('Bé d\'inversió eliminat', 'info');
+          showToast("Bé d'inversió eliminat", 'info');
           render();
         }
       });
@@ -1442,25 +1538,37 @@ export function renderIVA(): HTMLElement {
 
     page.querySelector('#btn-sync-act-to-iva')?.addEventListener('click', () => {
       const res = store.syncIVAFromActivities();
-      showToast(`Sincronitzat amb èxit: +${res.addedIssued} factures emeses i +${res.addedReceived} factures rebudes creades`, 'success');
+      showToast(
+        `Sincronitzat amb èxit: +${res.addedIssued} factures emeses i +${res.addedReceived} factures rebudes creades`,
+        'success',
+      );
       render();
     });
 
     page.querySelector('#btn-sync-iva-to-act')?.addEventListener('click', () => {
       store.syncActivitiesFromIVA();
-      showToast('Ingressos i despeses del mòdul d\'Activitats (IRPF) actualitzats des del Llibre d\'IVA', 'success');
+      showToast(
+        "Ingressos i despeses del mòdul d'Activitats (IRPF) actualitzats des del Llibre d'IVA",
+        'success',
+      );
       render();
     });
 
     page.querySelector('#btn-sync-props-to-iva')?.addEventListener('click', () => {
       const res = store.syncIVAFromProperties();
-      showToast(`Immobles sincronitzats: +${res.addedCommercialRentals} factures comercials, +${res.addedTouristRentals} turístiques, +${res.addedExemptRentals} habitatge`, 'success');
+      showToast(
+        `Immobles sincronitzats: +${res.addedCommercialRentals} factures comercials, +${res.addedTouristRentals} turístiques, +${res.addedExemptRentals} habitatge`,
+        'success',
+      );
       render();
     });
 
     page.querySelector('#btn-sync-wealth-info')?.addEventListener('click', () => {
       const q4 = quarters['4T'];
-      showToast(`🏰 Patrimoni: ${ivaData.investmentAssets.length} béns d'inversió. Saldo IVA 4T: ${formatCurrency(q4.resultadoLiquidacion)} (${q4.resultadoLiquidacion > 0 ? 'Deute deduïble' : 'Crèdit computable'})`, 'info');
+      showToast(
+        `🏰 Patrimoni: ${ivaData.investmentAssets.length} béns d'inversió. Saldo IVA 4T: ${formatCurrency(q4.resultadoLiquidacion)} (${q4.resultadoLiquidacion > 0 ? 'Deute deduïble' : 'Crèdit computable'})`,
+        'info',
+      );
     });
 
     // 9. Controls de Prorrata
@@ -1471,7 +1579,7 @@ export function renderIVA(): HTMLElement {
           config: {
             ...ivaData.config,
             hasProrrata: chkProrrata.checked,
-          }
+          },
         });
         render();
       });
@@ -1486,8 +1594,8 @@ export function renderIVA(): HTMLElement {
             prorrata: {
               ...ivaData.config.prorrata,
               type: (selProrrataType.value as 'general' | 'special') || 'general',
-            }
-          }
+            },
+          },
         });
         render();
       });
@@ -1500,8 +1608,8 @@ export function renderIVA(): HTMLElement {
           prorrata: {
             ...ivaData.config.prorrata,
             isRegulatedAutomatically: true,
-          }
-        }
+          },
+        },
       });
       showToast('Percentatges de prorrata recalculats automàticament des de les factures', 'success');
       render();
@@ -1514,7 +1622,9 @@ export function renderIVA(): HTMLElement {
   /* ─────────────────────────────────────────────────────────── */
   /* MODAL D'ALTA / EDICIÓ DE FACTURA AMB VALIDACIÓ PREVIA       */
   /* ─────────────────────────────────────────────────────────── */
-  function openAddInvoiceModal(defaultType: 'issued' | 'received' = activeInvoiceSubTab === 'received' ? 'received' : 'issued') {
+  function openAddInvoiceModal(
+    defaultType: 'issued' | 'received' = activeInvoiceSubTab === 'received' ? 'received' : 'issued',
+  ) {
     const existingModal = document.getElementById('iva-invoice-modal');
     if (existingModal) existingModal.remove();
 
@@ -1522,7 +1632,8 @@ export function renderIVA(): HTMLElement {
     const modal = document.createElement('div');
     modal.id = 'iva-invoice-modal';
     modal.className = 'modal-backdrop';
-    modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md);';
+    modal.style.cssText =
+      'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md);';
 
     let currentType = defaultType;
 
@@ -1695,7 +1806,7 @@ export function renderIVA(): HTMLElement {
 
       const vatAmount = Math.round(b * (vRate / 100) * 100) / 100;
       const withhAmount = Math.round(b * (wRate / 100) * 100) / 100;
-      const total = currentType === 'issued' ? (b + vatAmount - withhAmount) : (b + vatAmount);
+      const total = currentType === 'issued' ? b + vatAmount - withhAmount : b + vatAmount;
 
       totalDisplay.textContent = formatCurrency(total);
       breakdownDisplay.textContent = `${formatCurrency(b)} + ${formatCurrency(vatAmount)} IVA ${withhAmount > 0 ? `- ${formatCurrency(withhAmount)} Ret.` : ''}`;
@@ -1753,9 +1864,10 @@ export function renderIVA(): HTMLElement {
         return;
       }
       const iva = store.getIVA();
-      const isDup = currentType === 'issued'
-        ? iva.issuedInvoices.some(i => i.invoiceNumber.trim().toLowerCase() === num.toLowerCase())
-        : false;
+      const isDup =
+        currentType === 'issued'
+          ? iva.issuedInvoices.some((i) => i.invoiceNumber.trim().toLowerCase() === num.toLowerCase())
+          : false;
 
       if (isDup) {
         numberWarning.textContent = `⚠️ Ja existeix una factura amb el número ${num}`;
@@ -1802,21 +1914,26 @@ export function renderIVA(): HTMLElement {
       const b = parseFloat(baseInput.value) || 0;
       const vRate = (parseFloat(vatRateSelect.value) || 0) as IVARate;
       const wRate = (parseFloat(withhSelect.value) || 0) as WithholdingRate;
-      const quarter = (modal.querySelector<HTMLSelectElement>('#inv-quarter')!.value) as FiscalQuarter;
+      const quarter = modal.querySelector<HTMLSelectElement>('#inv-quarter')!.value as FiscalQuarter;
       const date = modal.querySelector<HTMLInputElement>('#inv-date')!.value;
       const number = modal.querySelector<HTMLInputElement>('#inv-number')!.value.trim();
       const partyName = modal.querySelector<HTMLInputElement>('#inv-party-name')!.value.trim();
       const partyNif = modal.querySelector<HTMLInputElement>('#inv-party-nif')!.value.trim().toUpperCase();
       const concept = modal.querySelector<HTMLInputElement>('#inv-concept')!.value.trim();
       const category = modal.querySelector<HTMLSelectElement>('#inv-category')!.value;
-      const paymentMethod = modal.querySelector<HTMLSelectElement>('#inv-payment-method')!.value as IVAInvoiceIssued['paymentMethod'];
+      const paymentMethod = modal.querySelector<HTMLSelectElement>('#inv-payment-method')!
+        .value as IVAInvoiceIssued['paymentMethod'];
       const fileInput = modal.querySelector<HTMLInputElement>('#inv-file-upload');
       const file = fileInput?.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
 
       // 1. Validació de NIF/CIF
       const isIntra = category === 'intra_eu_delivery' || category === 'intra_eu_acquisition';
       if (!isIntra && !isValidSpanishTaxId(partyNif)) {
-        if (!confirm(`⚠️ ALERTA DE COMPLIMENT FISCAL:\n\nEl NIF/CIF "${partyNif}" no supera l'algorisme oficial de control de l'AEAT.\n\nVols guardar la factura igualment o prefereixes revisar-lo?`)) {
+        if (
+          !confirm(
+            `⚠️ ALERTA DE COMPLIMENT FISCAL:\n\nEl NIF/CIF "${partyNif}" no supera l'algorisme oficial de control de l'AEAT.\n\nVols guardar la factura igualment o prefereixes revisar-lo?`,
+          )
+        ) {
           return;
         }
       }
@@ -1824,16 +1941,20 @@ export function renderIVA(): HTMLElement {
       // 2. Validació de Límit d'Efectiu (> 1.000 €)
       const vatAmount = Math.round(b * (vRate / 100) * 100) / 100;
       const withhAmount = Math.round(b * (wRate / 100) * 100) / 100;
-      const total = currentType === 'issued' ? (b + vatAmount - withhAmount) : (b + vatAmount);
+      const total = currentType === 'issued' ? b + vatAmount - withhAmount : b + vatAmount;
 
       if (paymentMethod === 'cash' && total > 1000) {
-        alert(`⛔ OPERACIÓ EN EFECTIU NO PERMESA:\n\nL'import total (${formatCurrency(total)}) supera el límit legal de 1.000 € establert per la Llei 11/2021 de Prevenció del Frau Fiscal. Cal utilitzar transferència, targeta o xec bancari.`);
+        alert(
+          `⛔ OPERACIÓ EN EFECTIU NO PERMESA:\n\nL'import total (${formatCurrency(total)}) supera el límit legal de 1.000 € establert per la Llei 11/2021 de Prevenció del Frau Fiscal. Cal utilitzar transferència, targeta o xec bancari.`,
+        );
         return;
       }
 
       // 3. Alerta de manca de PDF en Despeses Deduïbles (Factures Rebudes)
       if (currentType === 'received' && !file && vatAmount > 0) {
-        const proceedWithoutDoc = confirm(`⚠️ ALERTA D'INSPECCIÓ TRIBUTÀRIA (Art. 97 LIVA & Art. 106 LGT):\n\nAquesta factura de despesa té ${formatCurrency(vatAmount)} d'IVA deduïble però NO té cap PDF original adjunt.\n\nEn cas de requeriment o inspecció de l'AEAT, la deducció serà rebutjada automàticament sense el document justificatiu original.\n\nVols continuar i guardar-la sense PDF (podràs adjuntar-lo més tard des del llibre)?`);
+        const proceedWithoutDoc = confirm(
+          `⚠️ ALERTA D'INSPECCIÓ TRIBUTÀRIA (Art. 97 LIVA & Art. 106 LGT):\n\nAquesta factura de despesa té ${formatCurrency(vatAmount)} d'IVA deduïble però NO té cap PDF original adjunt.\n\nEn cas de requeriment o inspecció de l'AEAT, la deducció serà rebutjada automàticament sense el document justificatiu original.\n\nVols continuar i guardar-la sense PDF (podràs adjuntar-lo més tard des del llibre)?`,
+        );
         if (!proceedWithoutDoc) {
           return;
         }
@@ -1944,7 +2065,8 @@ export function renderIVA(): HTMLElement {
     const modal = document.createElement('div');
     modal.id = 'iva-asset-modal';
     modal.className = 'modal-backdrop';
-    modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md);';
+    modal.style.cssText =
+      'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md);';
 
     modal.innerHTML = `
       <div class="modal-content card" style="max-width:540px; width:100%; max-height:90vh; overflow-y:auto; background:var(--modal-bg); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:var(--space-xl);">

@@ -6,18 +6,18 @@
 
 export interface ForeignAccountItem {
   id: string;
-  bankName: string;          // Ex: "Revolut Bank UAB", "Trade Republic Bank GmbH", "N26 Bank AG"
-  countryCode: string;       // Ex: "LT", "DE", "FR"
+  bankName: string; // Ex: "Revolut Bank UAB", "Trade Republic Bank GmbH", "N26 Bank AG"
+  countryCode: string; // Ex: "LT", "DE", "FR"
   ibanOrNumber: string;
-  balanceYearEnd: number;    // Saldo a 31 de desembre (€)
-  averageBalanceQ4: number;  // Saldo mitjà de l'últim trimestre (€)
+  balanceYearEnd: number; // Saldo a 31 de desembre (€)
+  averageBalanceQ4: number; // Saldo mitjà de l'últim trimestre (€)
 }
 
 export interface ForeignSecurityItem {
   id: string;
-  brokerName: string;        // Ex: "Interactive Brokers Ireland", "Degiro (FlatexDEGIRO Bank AG)", "eToro Europe"
+  brokerName: string; // Ex: "Interactive Brokers Ireland", "Degiro (FlatexDEGIRO Bank AG)", "eToro Europe"
   countryCode: string;
-  assetDescription: string;  // Ex: "Accions Apple Inc, ETF Vanguard S&P 500"
+  assetDescription: string; // Ex: "Accions Apple Inc, ETF Vanguard S&P 500"
   isin?: string;
   units: number;
   totalValueYearEnd: number; // Valor liquidatiu / cotització a 31 de desembre (€)
@@ -33,10 +33,10 @@ export interface ForeignRealEstateItem {
 
 export interface ForeignCryptoItem {
   id: string;
-  exchangeName: string;      // Ex: "Binance", "Kraken (Payward)", "Coinbase Europe", "Bybit"
-  cryptoSymbol: string;      // Ex: "BTC", "ETH", "SOL", "USDC"
+  exchangeName: string; // Ex: "Binance", "Kraken (Payward)", "Coinbase Europe", "Bybit"
+  cryptoSymbol: string; // Ex: "BTC", "ETH", "SOL", "USDC"
   units: number;
-  valueYearEndEUR: number;   // Valor de cotització a 31 de desembre (€)
+  valueYearEndEUR: number; // Valor de cotització a 31 de desembre (€)
 }
 
 export interface ForeignAssetsData {
@@ -96,20 +96,30 @@ export function auditForeignAssetsObligation(data: ForeignAssetsData): Model720A
   const summaryAlerts: string[] = [];
 
   if (block1MustDeclare) {
-    summaryAlerts.push(`⚠️ OBLIGACIÓ MODEL 720 (Bloc 1 - Comptes): Tens ${block1AccountsTotal.toFixed(2)} € en comptes bancaris estrangers (>50.000 €). Has de presentar el Model 720 abans del 31 de març.`);
+    summaryAlerts.push(
+      `⚠️ OBLIGACIÓ MODEL 720 (Bloc 1 - Comptes): Tens ${block1AccountsTotal.toFixed(2)} € en comptes bancaris estrangers (>50.000 €). Has de presentar el Model 720 abans del 31 de març.`,
+    );
   }
   if (block2MustDeclare) {
-    summaryAlerts.push(`⚠️ OBLIGACIÓ MODEL 720 (Bloc 2 - Valors/Brokers): Tens ${block2SecuritiesTotal.toFixed(2)} € en accions i fons en brokers estrangers (>50.000 €).`);
+    summaryAlerts.push(
+      `⚠️ OBLIGACIÓ MODEL 720 (Bloc 2 - Valors/Brokers): Tens ${block2SecuritiesTotal.toFixed(2)} € en accions i fons en brokers estrangers (>50.000 €).`,
+    );
   }
   if (block3MustDeclare) {
-    summaryAlerts.push(`⚠️ OBLIGACIÓ MODEL 720 (Bloc 3 - Immobles): Tens ${block3RealEstateTotal.toFixed(2)} € en immobles a l'estranger (>50.000 €).`);
+    summaryAlerts.push(
+      `⚠️ OBLIGACIÓ MODEL 720 (Bloc 3 - Immobles): Tens ${block3RealEstateTotal.toFixed(2)} € en immobles a l'estranger (>50.000 €).`,
+    );
   }
   if (model721MustDeclare) {
-    summaryAlerts.push(`⚠️ OBLIGACIÓ MODEL 721 (Criptoactius a l'estranger): Tens ${model721CryptoTotal.toFixed(2)} € en criptomonedes en plataformes no residents (>50.000 €). Has de presentar el Model 721.`);
+    summaryAlerts.push(
+      `⚠️ OBLIGACIÓ MODEL 721 (Criptoactius a l'estranger): Tens ${model721CryptoTotal.toFixed(2)} € en criptomonedes en plataformes no residents (>50.000 €). Has de presentar el Model 721.`,
+    );
   }
 
   if (!model720Obligation && !model721MustDeclare) {
-    summaryAlerts.push('✅ No estàs obligat a presentar ni el Model 720 ni el Model 721 (cap bloc supera els 50.000 € a 31 de desembre).');
+    summaryAlerts.push(
+      '✅ No estàs obligat a presentar ni el Model 720 ni el Model 721 (cap bloc supera els 50.000 € a 31 de desembre).',
+    );
   }
 
   return {

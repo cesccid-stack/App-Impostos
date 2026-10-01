@@ -35,7 +35,7 @@ export function renderCapital(): HTMLElement {
   mobCard.className = 'card';
   mobCard.appendChild(
     createFormSection(
-      'Capital mobiliari nacional (base de l\'estalvi)',
+      "Capital mobiliari nacional (base de l'estalvi)",
       createFormRow(
         createField({
           id: 'interests',
@@ -47,7 +47,7 @@ export function renderCapital(): HTMLElement {
         }),
         createField({
           id: 'dividends',
-          label: 'Dividends d\'empreses espanyoles',
+          label: "Dividends d'empreses espanyoles",
           value: c.dividends,
           suffix: '€',
           placeholder: '0,00',
@@ -57,7 +57,7 @@ export function renderCapital(): HTMLElement {
       createFormRow(
         createField({
           id: 'insurance-gains',
-          label: 'Rendiments d\'assegurances de vida/inversió',
+          label: "Rendiments d'assegurances de vida/inversió",
           value: c.insuranceGains,
           suffix: '€',
           placeholder: '0,00',
@@ -79,12 +79,12 @@ export function renderCapital(): HTMLElement {
           value: c.mobiliaryWithholdings,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Retencions d\'IRPF practicades pel banc o broker espanyol',
+          hint: "Retencions d'IRPF practicades pel banc o broker espanyol",
           onChange: updater('mobiliaryWithholdings'),
         }),
         createField({
           id: 'securities-management-expenses',
-          label: '📁 Gastos d\'administració i dipòsit de valors',
+          label: "📁 Gastos d'administració i dipòsit de valors",
           value: c.securitiesManagementExpenses || 0,
           suffix: '€',
           placeholder: '0,00',
@@ -121,12 +121,12 @@ export function renderCapital(): HTMLElement {
           value: c.foreignDividends || 0,
           suffix: '€',
           placeholder: '0,00',
-          hint: 'Ex: Dividends d\'Apple, Microsoft, ASML...',
+          hint: "Ex: Dividends d'Apple, Microsoft, ASML...",
           onChange: updater('foreignDividends'),
         }),
         createField({
           id: 'foreign-tax-withheld',
-          label: 'Impost satisfet a l\'estranger (Retenció en origen)',
+          label: "Impost satisfet a l'estranger (Retenció en origen)",
           value: c.foreignTaxWithheld || 0,
           suffix: '€',
           placeholder: '0,00',
@@ -141,23 +141,29 @@ export function renderCapital(): HTMLElement {
   // Capital immobiliari banner & form
   const immCard = document.createElement('div');
   immCard.className = 'card';
-  
+
   const propCount = properties.length;
   immCard.innerHTML = `
     <div class="alert alert--info" style="margin-bottom: var(--space-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-sm);">
       <div>
         <strong>🏠 Tens immobles en lloguer?</strong> 
-        ${propCount > 0 ? `Tens <strong>${propCount} immoble/s</strong> gestionat/s amb extracontable i amortització detallada.` : 'Gestiona cada propietat de forma individual amb càlcul automàtic del 3% de construcció i taula simplificada d\'actius (fins al 30%).'}
+        ${propCount > 0 ? `Tens <strong>${propCount} immoble/s</strong> gestionat/s amb extracontable i amortització detallada.` : "Gestiona cada propietat de forma individual amb càlcul automàtic del 3% de construcció i taula simplificada d'actius (fins al 30%)."}
       </div>
       <div style="display: flex; gap: var(--space-xs); flex-wrap: wrap;">
-        ${propCount > 0 ? `
+        ${
+          propCount > 0
+            ? `
           <button class="btn btn--secondary btn--sm" id="sync-properties-btn" style="white-space: nowrap;">⚡ Sincronitzar Valors</button>
-        ` : ''}
+        `
+            : ''
+        }
         <button class="btn btn--primary btn--sm" id="go-properties-btn" style="white-space: nowrap;">Anar a Immobles ➔</button>
       </div>
     </div>
 
-    ${propCount > 0 ? `
+    ${
+      propCount > 0
+        ? `
       <div style="background:var(--bg-surface-elevated); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-subtle); margin-bottom:var(--space-md); display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:var(--space-sm);">
         <div>
           <div style="font-size:0.7rem; color:var(--text-muted);">Ingressos Lloguer Cartera</div>
@@ -176,7 +182,9 @@ export function renderCapital(): HTMLElement {
           <div style="font-size:1rem; font-weight:700; color:var(--color-warning);">${formatCurrency(propResults.totalImputedIncome)}</div>
         </div>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
   `;
 
   immCard.querySelector('#go-properties-btn')?.addEventListener('click', () => {
@@ -197,7 +205,7 @@ export function renderCapital(): HTMLElement {
       rentalAmortization: propResults.totalAmortization,
       imputedIncome: propResults.totalImputedIncome,
     });
-    showToast('Valors consolidats d\'immobles sincronitzats correctament', 'success');
+    showToast("Valors consolidats d'immobles sincronitzats correctament", 'success');
     page.replaceWith(renderCapital());
   });
 
@@ -243,7 +251,7 @@ export function renderCapital(): HTMLElement {
         }),
         createField({
           id: 'rental-contract-date',
-          label: 'Data d\'inici del contracte de lloguer',
+          label: "Data d'inici del contracte de lloguer",
           type: 'date',
           value: c.rentalContractDate || '',
           hint: 'Posterior al 26/05/2023 → règim general (sense 60% transitori)',
@@ -264,7 +272,7 @@ export function renderCapital(): HTMLElement {
         }),
         createField({
           id: 'rental-waste-tax',
-          label: '🗑️ Taxa d\'Escombraries / Brosses & Altres Taxes',
+          label: "🗑️ Taxa d'Escombraries / Brosses & Altres Taxes",
           value: (c.rentalWasteTax || 0) + (c.rentalOtherTaxes || 0),
           suffix: '€',
           placeholder: '0,00',

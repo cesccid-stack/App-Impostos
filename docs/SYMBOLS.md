@@ -4,7 +4,7 @@
 > **Búscalo** (`search_codebase`) para ver en qué fichero(s) se exporta un símbolo.
 > Índice de módulos y mapa de secciones: **`docs/CODE_INDEX.md`**.
 
-Nombres de símbolo únicos: **514**
+Nombres de símbolo únicos: **522**
 
 - `ActivitiesData` → `src/types.ts`
 - `AEAT_SIMPLIFIED_TABLE` → `src/fiscal/amortization-tables.ts`
@@ -163,6 +163,10 @@ Nombres de símbolo únicos: **514**
 - `detectBrokerFormat` → `src/import/portfolio-automator.ts`
 - `DetectedBrokerType` → `src/import/portfolio-automator.ts`
 - `determineHoldingStyle` → `src/fiscal/investment-cockpit-engine.ts`
+- `DIET_EXEMPT_ABROAD_NO_PERNOCTATION` → `src/fiscal/constants.ts`
+- `DIET_EXEMPT_ABROAD_PERNOCTATION` → `src/fiscal/constants.ts`
+- `DIET_EXEMPT_NATIONAL_NO_PERNOCTATION` → `src/fiscal/constants.ts`
+- `DIET_EXEMPT_NATIONAL_PERNOCTATION` → `src/fiscal/constants.ts`
 - `DISABILITY_ASSISTANCE_EXTRA` → `src/fiscal/constants.ts`
 - `DISABILITY_MINIMUM_33` → `src/fiscal/constants.ts`
 - `DISABILITY_MINIMUM_65` → `src/fiscal/constants.ts`
@@ -250,6 +254,8 @@ Nombres de símbolo únicos: **514**
 - `getActiveModuleIdsForProfile` → `src/fiscal/modules-catalog.ts`
 - `getAEATAssetGroup` → `src/fiscal/amortization-tables.ts`
 - `getAutonomicBrackets` → `src/fiscal/autonomic-tax-scales.ts`
+- `getClassesPassivesQuotas` → `src/fiscal/social-security-engine.ts`
+- `getDefaultAvatarForType` → `src/store.ts`
 - `getDemoProfilesData` → `src/fiscal/user-presets.ts`
 - `getDocumentsForYear` → `src/utils/document-vault.ts`
 - `getExchangeRate` → `src/import/currency-service.ts`
@@ -258,6 +264,7 @@ Nombres de símbolo únicos: **514**
 - `getModuleByPath` → `src/fiscal/modules-catalog.ts`
 - `getRealEstatePortfolioPresets` → `src/fiscal/real-estate-automator.ts`
 - `getRentalReductionRate` → `src/fiscal/real-estate-engine.ts`
+- `getRETATableForYear` → `src/fiscal/social-security-engine.ts`
 - `getStatusMeta` → `src/fiscal/user-presets.ts`
 - `getStockPortfolioPresets` → `src/import/portfolio-automator.ts`
 - `getUserTypeConfig` → `src/fiscal/user-presets.ts`
@@ -310,6 +317,7 @@ Nombres de símbolo únicos: **514**
 - `MATERNITY_DEDUCTION_MAX` → `src/fiscal/constants.ts`
 - `MATERNITY_DEDUCTION_PER_MONTH` → `src/fiscal/constants.ts`
 - `MATERNITY_NURSERY_MAX` → `src/fiscal/constants.ts`
+- `MILEAGE_EXEMPT_RATE_PER_KM` → `src/fiscal/constants.ts`
 - `ModalOptions` → `src/components/modal.ts`
 - `Model111Quarterly` → `src/types-quarterly.ts`
 - `Model115And180Engine` → `src/fiscal/model115-180-engine.ts`

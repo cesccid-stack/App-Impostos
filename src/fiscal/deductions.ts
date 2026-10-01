@@ -49,10 +49,7 @@ export function computeDeductions(data: DeclaracionData, liquidableBase = 0): De
  */
 function computeHousingDeduction(data: DeclaracionData): number {
   if (!data.deductions.housingDeduction) return 0;
-  const base = Math.min(
-    data.deductions.housingAmountsPaid || 0,
-    HOUSING_DEDUCTION_MAX_BASE,
-  );
+  const base = Math.min(data.deductions.housingAmountsPaid || 0, HOUSING_DEDUCTION_MAX_BASE);
   return base * HOUSING_DEDUCTION_RATE;
 }
 
@@ -66,9 +63,9 @@ function computeHousingDeduction(data: DeclaracionData): number {
 function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): number {
   const donations = data.deductions.donations || [];
 
-  let mecenatgeDeduction = 0;   // Apartat a) — sense límit de base
-  let publicUtilityBase = 0;    // Apartat b)
-  let politicalPartyBase = 0;   // Apartat c)
+  let mecenatgeDeduction = 0; // Apartat a) — sense límit de base
+  let publicUtilityBase = 0; // Apartat b)
+  let politicalPartyBase = 0; // Apartat c)
 
   for (const donation of donations) {
     const amount = donation.amount || 0;
@@ -86,12 +83,9 @@ function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): n
       const hasPriorYearEvidence =
         donation.priorYearAmount !== undefined && donation.priorYear2Amount !== undefined;
       const isRecurring = hasPriorYearEvidence
-        ? (donation.priorYearAmount as number) >= amount &&
-          (donation.priorYear2Amount as number) >= amount
+        ? (donation.priorYearAmount as number) >= amount && (donation.priorYear2Amount as number) >= amount
         : donation.recurring;
-      const restRate = isRecurring
-        ? DONATION_REST_RECURRING_RATE
-        : DONATION_REST_RATE;
+      const restRate = isRecurring ? DONATION_REST_RECURRING_RATE : DONATION_REST_RATE;
 
       mecenatgeDeduction += firstTier * DONATION_FIRST_TIER_RATE + rest * restRate;
     } else if (category === 'political_party') {
@@ -129,9 +123,9 @@ function computeDonationsDeduction(data: DeclaracionData, liquidableBase = 0): n
  */
 function computeMaternityDeduction(data: DeclaracionData): number {
   if (!data.deductions.maternityDeduction) return 0;
-  
+
   // Garantisme: computar el límit per cada descendent menor de 3 anys
-  const eligibleChildren = (data.personal?.descendants || []).filter(d => (d.age || 0) < 3).length;
+  const eligibleChildren = (data.personal?.descendants || []).filter((d) => (d.age || 0) < 3).length;
   const numChildren = Math.max(1, eligibleChildren);
   const maxBaseAllowed = MATERNITY_DEDUCTION_MAX * numChildren;
   const maxNurseryAllowed = MATERNITY_NURSERY_MAX * numChildren;
@@ -145,10 +139,8 @@ function computeMaternityDeduction(data: DeclaracionData): number {
   // Art. 81.3 LIRPF: la deducció (base + increment de guarderia) no pot excedir les
   // cotitzacions i quotes totals a la Seguretat Social i mutualitats devengades en el període.
   const socialSecurityContributions =
-    (data.workIncome?.employers || []).reduce(
-      (sum, emp) => sum + (emp.socialSecurity || 0),
-      0,
-    ) + (data.activities?.socialSecuritySelfEmployed || 0);
+    (data.workIncome?.employers || []).reduce((sum, emp) => sum + (emp.socialSecurity || 0), 0) +
+    (data.activities?.socialSecuritySelfEmployed || 0);
 
   return Math.min(rawDeduction, Math.max(0, socialSecurityContributions));
 }
@@ -164,13 +156,13 @@ function computeEnergyEfficiencyDeduction(data: DeclaracionData): number {
   switch (type) {
     case 'heating_cooling_20':
       // 20% fins a 5.000€ (màx deducció 1.000€)
-      return Math.min(amount, 5000) * 0.20;
+      return Math.min(amount, 5000) * 0.2;
     case 'primary_energy_40':
       // 40% fins a 7.500€ (màx deducció 3.000€)
-      return Math.min(amount, 7500) * 0.40;
+      return Math.min(amount, 7500) * 0.4;
     case 'building_rehab_60':
       // 60% fins a 5.000€/any (màx deducció 3.000€/any)
-      return Math.min(amount, 5000) * 0.60;
+      return Math.min(amount, 5000) * 0.6;
     default:
       return 0;
   }

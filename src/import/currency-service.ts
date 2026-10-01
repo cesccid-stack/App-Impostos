@@ -68,7 +68,7 @@ export async function getExchangeRate(currency: string, date: string): Promise<n
       saveCache();
       return rate;
     }
-    
+
     console.warn(`Rate not found for ${upperCurrency} on ${date}`);
     return 1;
   } catch (error) {

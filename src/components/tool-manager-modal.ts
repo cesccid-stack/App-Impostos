@@ -53,14 +53,15 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
     const activeCount = currentEnabled.size;
 
     // Filter modules
-    const filteredModules = ALL_APP_MODULES.filter(m => {
+    const filteredModules = ALL_APP_MODULES.filter((m) => {
       const matchCat = selectedCategory === 'all' || m.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
-      const matchQuery = !q ||
+      const matchQuery =
+        !q ||
         m.name.toLowerCase().includes(q) ||
         m.shortName.toLowerCase().includes(q) ||
         m.description.toLowerCase().includes(q) ||
-        m.tags.some(t => t.toLowerCase().includes(q));
+        m.tags.some((t) => t.toLowerCase().includes(q));
       return matchCat && matchQuery;
     });
 
@@ -106,11 +107,13 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
         <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
           Plantilles Ràpides:
         </span>
-        ${MODULE_PRESETS.map(p => `
+        ${MODULE_PRESETS.map(
+          (p) => `
           <button class="btn btn--secondary btn--sm btn-apply-preset" data-preset="${p.id}" style="font-size: 0.75rem; padding: 4px 10px;" title="${p.description}">
             ${p.name}
           </button>
-        `).join('')}
+        `,
+        ).join('')}
       </div>
 
       <!-- Filters & Search -->
@@ -140,7 +143,7 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
           <button class="filter-pill ${selectedCategory === 'Ingressos & Rendiments' ? 'active' : ''}" data-cat="Ingressos & Rendiments">💼 Ingressos</button>
           <button class="filter-pill ${selectedCategory === 'Impostos & Models AEAT' ? 'active' : ''}" data-cat="Impostos & Models AEAT">🧾 Models AEAT</button>
           <button class="filter-pill ${selectedCategory === 'Inversió & Patrimoni' ? 'active' : ''}" data-cat="Inversió & Patrimoni">📈 Inversió</button>
-          <button class="filter-pill ${selectedCategory === 'Eines d\'Optimització' ? 'active' : ''}" data-cat="Eines d\'Optimització">🎯 Optimització</button>
+          <button class="filter-pill ${selectedCategory === "Eines d'Optimització" ? 'active' : ''}" data-cat="Eines d\'Optimització">🎯 Optimització</button>
           <button class="filter-pill ${selectedCategory === 'Fiscal & Normativa' ? 'active' : ''}" data-cat="Fiscal & Normativa">📜 Normativa</button>
         </div>
       </div>
@@ -154,16 +157,20 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
         flex-direction: column;
         gap: 16px;
       ">
-        ${filteredModules.length === 0 ? `
+        ${
+          filteredModules.length === 0
+            ? `
           <div style="text-align: center; padding: 40px; color: var(--text-muted);">
             <div style="font-size: 2rem; margin-bottom: 8px;">🔍</div>
             <p>No s'ha trobat cap eina que coincideixi amb la cerca.</p>
           </div>
-        ` : `
+        `
+            : `
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px;">
-            ${filteredModules.map(m => {
-              const isEnabled = currentEnabled.has(m.id);
-              return `
+            ${filteredModules
+              .map((m) => {
+                const isEnabled = currentEnabled.has(m.id);
+                return `
                 <div class="card" style="
                   padding: 12px 14px;
                   background: ${isEnabled ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)'};
@@ -218,18 +225,25 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
                       <span class="badge" style="font-size: 0.65rem; background: var(--bg-surface); color: var(--text-muted); padding: 1px 6px;">
                         ${m.category}
                       </span>
-                      ${m.tags.slice(0, 3).map(t => `
+                      ${m.tags
+                        .slice(0, 3)
+                        .map(
+                          (t) => `
                         <span style="font-size: 0.65rem; color: var(--text-secondary); background: rgba(255,255,255,0.04); padding: 1px 5px; border-radius: 3px;">
                           #${t}
                         </span>
-                      `).join('')}
+                      `,
+                        )
+                        .join('')}
                     </div>
                   </div>
                 </div>
               `;
-            }).join('')}
+              })
+              .join('')}
           </div>
-        `}
+        `
+        }
       </div>
 
       <!-- Footer with Save & Reset -->
@@ -278,14 +292,14 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
       }
     });
 
-    modalBox.querySelectorAll('.filter-pill').forEach(btn => {
+    modalBox.querySelectorAll('.filter-pill').forEach((btn) => {
       btn.addEventListener('click', () => {
         selectedCategory = (btn as HTMLElement).dataset.cat || 'all';
         renderContent();
       });
     });
 
-    modalBox.querySelectorAll('.tool-toggle-checkbox').forEach(cb => {
+    modalBox.querySelectorAll('.tool-toggle-checkbox').forEach((cb) => {
       cb.addEventListener('change', (e) => {
         const id = (e.target as HTMLElement).dataset.id;
         if (id) {
@@ -304,10 +318,10 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
       });
     });
 
-    modalBox.querySelectorAll('.btn-apply-preset').forEach(btn => {
+    modalBox.querySelectorAll('.btn-apply-preset').forEach((btn) => {
       btn.addEventListener('click', () => {
         const pId = (btn as HTMLElement).dataset.preset;
-        const preset = MODULE_PRESETS.find(p => p.id === pId);
+        const preset = MODULE_PRESETS.find((p) => p.id === pId);
         if (preset) {
           currentEnabled = new Set(preset.moduleIds);
           showToast(`S'ha aplicat la plantilla: ${preset.name}`, 'info');
@@ -317,13 +331,13 @@ export function openToolManagerModal(onSaveCallback?: () => void): void {
     });
 
     modalBox.querySelector('#btn-select-all-tools')?.addEventListener('click', () => {
-      currentEnabled = new Set(ALL_APP_MODULES.map(m => m.id));
+      currentEnabled = new Set(ALL_APP_MODULES.map((m) => m.id));
       showToast('Totes les eines activades', 'info');
       renderContent();
     });
 
     modalBox.querySelector('#btn-reset-basic-tools')?.addEventListener('click', () => {
-      const basic = MODULE_PRESETS.find(p => p.id === 'basic_income');
+      const basic = MODULE_PRESETS.find((p) => p.id === 'basic_income');
       if (basic) {
         currentEnabled = new Set(basic.moduleIds);
         showToast('Configuració de renda bàsica aplicada', 'info');

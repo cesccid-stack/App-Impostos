@@ -19,7 +19,7 @@ export function generateCSV(data: DeclaracionData, result: FiscalResult): string
   // Bases
   lines.push(['=== BASES IMPOSABLES ===', '']);
   lines.push(['Base imposable general', fmt(result.generalBase)]);
-  lines.push(['Base imposable de l\'estalvi', fmt(result.savingsBase)]);
+  lines.push(["Base imposable de l'estalvi", fmt(result.savingsBase)]);
   lines.push([]);
 
   // Reductions
@@ -32,7 +32,7 @@ export function generateCSV(data: DeclaracionData, result: FiscalResult): string
   // Liquidable bases
   lines.push(['=== BASES LIQUIDABLES ===', '']);
   lines.push(['Base liquidable general', fmt(result.liquidableGeneralBase)]);
-  lines.push(['Base liquidable de l\'estalvi', fmt(result.liquidableSavingsBase)]);
+  lines.push(["Base liquidable de l'estalvi", fmt(result.liquidableSavingsBase)]);
   lines.push([]);
 
   // Minimums

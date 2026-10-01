@@ -27,7 +27,7 @@ export function validateCadastralReferenceFormat(ref: string): boolean {
   if (!ref) return false;
   const clean = ref.trim().toUpperCase().replace(/\s+/g, '');
   if (clean.length !== 20) return false;
-  
+
   // Format estàndard: 7 caràcters alfanumèrics + 7 alfanumèrics + 4 alfanumèrics (fulla/càrrec) + 2 lletres de control
   const regex = /^[0-9A-Z]{20}$/;
   return regex.test(clean);
@@ -38,7 +38,7 @@ export function validateCadastralReferenceFormat(ref: string): boolean {
  */
 export async function lookupCadastreReference(reference: string): Promise<CadastreLookupResult> {
   const cleanRef = reference.trim().toUpperCase().replace(/\s+/g, '');
-  
+
   if (!validateCadastralReferenceFormat(cleanRef)) {
     return {
       isValid: false,
@@ -50,7 +50,7 @@ export async function lookupCadastreReference(reference: string): Promise<Cadast
   try {
     // URL del servei web lliure del Cadastre (OVCC)
     const url = `https://ovc.catastro.meh.es/ovcservweb/ovcswlocalizacionrc/ovccoordenadas.asmx/Consulta_RCCOOR?RC=${cleanRef}&SRS=EPSG:4326`;
-    
+
     // Fem la petició amb timeout curt
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -79,7 +79,7 @@ export async function lookupCadastreReference(reference: string): Promise<Cadast
         address: address || `Immoble a ${municipality || 'municipi'}, ${province || 'província'}`,
         municipality,
         province,
-        constructionRatioEstimated: 0.70, // 70% per defecte construcció
+        constructionRatioEstimated: 0.7, // 70% per defecte construcció
       };
     }
   } catch {
@@ -91,6 +91,6 @@ export async function lookupCadastreReference(reference: string): Promise<Cadast
     isValid: true,
     cadastralReference: cleanRef,
     address: `Referència Cadastral verificada (${cleanRef.substring(0, 7)} ${cleanRef.substring(7, 14)})`,
-    constructionRatioEstimated: 0.70,
+    constructionRatioEstimated: 0.7,
   };
 }

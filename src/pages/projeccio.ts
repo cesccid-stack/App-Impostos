@@ -10,7 +10,6 @@ import { formatCurrency } from '../utils/currency.ts';
 import type { DeclaracionData, EmployerItem, RentalProperty } from '../types.ts';
 import type { WealthAssetItem } from '../fiscal/wealth-tax-engine.ts';
 
-
 export interface YearProjection {
   year: number;
   yearIndex: number;
@@ -28,11 +27,11 @@ export function renderProjeccioPage(): HTMLElement {
   page.className = 'page-container';
 
   // Paràmetres per defecte del simulador
-  let incomeGrowthRate = 3.5;       // % creixement anual d'ingressos
-  let inflationRate = 2.5;          // % inflació
-  let investmentReturnRate = 6.0;   // % rendibilitat anual inversions
+  let incomeGrowthRate = 3.5; // % creixement anual d'ingressos
+  let inflationRate = 2.5; // % inflació
+  let investmentReturnRate = 6.0; // % rendibilitat anual inversions
   let annualPensionContribution = 1500; // € aportació pla pensions
-  const rentalGrowthRate = 2.0;       // % increment lloguers
+  const rentalGrowthRate = 2.0; // % increment lloguers
   const horizonYears = 5;
 
   function render() {
@@ -172,7 +171,9 @@ export function renderProjeccioPage(): HTMLElement {
               </tr>
             </thead>
             <tbody>
-              ${projections.map((p) => `
+              ${projections
+                .map(
+                  (p) => `
                 <tr>
                   <td>
                     <span class="badge ${p.yearIndex === 1 ? 'badge--info' : 'badge--secondary'}" style="font-weight:700;">
@@ -186,7 +187,9 @@ export function renderProjeccioPage(): HTMLElement {
                   <td style="text-align:right; font-family:var(--font-mono); color:var(--color-success); font-weight:700;">+${formatCurrency(p.taxSavings)}</td>
                   <td style="text-align:right; font-family:var(--font-mono); font-weight:700;">${formatCurrency(p.projectedWealth)}</td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </tbody>
           </table>
         </div>
@@ -233,16 +236,28 @@ function computeProjections(
     annualPensionContribution: number;
     rentalGrowthRate: number;
     horizonYears: number;
-  }
+  },
 ): YearProjection[] {
   const resultCurrent = calculateIRPF(data);
 
-  const baseWork = (data.workIncome?.employers || []).reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  const baseWork = (data.workIncome?.employers || []).reduce(
+    (s: number, e: EmployerItem) => s + (e.grossSalary || 0) + (e.inKind || 0),
+    0,
+  );
   const baseActivities = data.activities?.income || 0;
-  const baseRentals = (data.properties || []).reduce((s: number, p: RentalProperty) => s + (p.grossRentalIncome || 0), 0);
-  const baseDividends = (data.capitalIncome?.interests || 0) + (data.capitalIncome?.dividends || 0) + (data.capitalIncome?.foreignDividends || 0);
+  const baseRentals = (data.properties || []).reduce(
+    (s: number, p: RentalProperty) => s + (p.grossRentalIncome || 0),
+    0,
+  );
+  const baseDividends =
+    (data.capitalIncome?.interests || 0) +
+    (data.capitalIncome?.dividends || 0) +
+    (data.capitalIncome?.foreignDividends || 0);
 
-  let currentWealth = (data.wealth?.assets || []).reduce((s: number, a: WealthAssetItem) => s + (a.grossValue || 0), 0);
+  let currentWealth = (data.wealth?.assets || []).reduce(
+    (s: number, a: WealthAssetItem) => s + (a.grossValue || 0),
+    0,
+  );
   if (currentWealth === 0) currentWealth = 25000; // Valor per defecte raonable si està buit
 
   const projections: YearProjection[] = [];
@@ -263,13 +278,16 @@ function computeProjections(
     const taxableBase = Math.max(0, grossIncome * 0.85); // Estimació de despeses i seguretat social
 
     // Impost sense optimitzar
-    const baseEffectiveRate = resultCurrent.generalBase > 0 ? (resultCurrent.netTax / (resultCurrent.generalBase + resultCurrent.savingsBase)) : 0.22;
-    const taxStandard = taxableBase * Math.min(0.45, Math.max(0.15, baseEffectiveRate + (i * 0.005)));
+    const baseEffectiveRate =
+      resultCurrent.generalBase > 0
+        ? resultCurrent.netTax / (resultCurrent.generalBase + resultCurrent.savingsBase)
+        : 0.22;
+    const taxStandard = taxableBase * Math.min(0.45, Math.max(0.15, baseEffectiveRate + i * 0.005));
 
     // Impost optimitzat (estalvi per pla de pensions + deduccions autonòmiques + amortitzacions)
     const marginalRate = Math.min(0.47, baseEffectiveRate + 0.12);
     const pensionTaxSaving = params.annualPensionContribution * marginalRate;
-    const optimizationBoost = 450 + (i * 120); // Millores en deduccions i despeses
+    const optimizationBoost = 450 + i * 120; // Millores en deduccions i despeses
     const taxSavings = pensionTaxSaving + optimizationBoost;
     const taxOptimized = Math.max(0, taxStandard - taxSavings);
 
@@ -314,10 +332,12 @@ function renderProjectionSVG(projections: YearProjection[]): string {
   const optimizedPoints = projections.map((p, idx) => `${getX(idx)},${getY(p.taxOptimized)}`).join(' ');
 
   // Polygon for savings area
-  const areaPoints = `${standardPoints} ${projections.map((_, idx) => {
-    const revIdx = projections.length - 1 - idx;
-    return `${getX(revIdx)},${getY(projections[revIdx].taxOptimized)}`;
-  }).join(' ')}`;
+  const areaPoints = `${standardPoints} ${projections
+    .map((_, idx) => {
+      const revIdx = projections.length - 1 - idx;
+      return `${getX(revIdx)},${getY(projections[revIdx].taxOptimized)}`;
+    })
+    .join(' ')}`;
 
   return `
     <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:100%; overflow:visible;">
@@ -343,14 +363,18 @@ function renderProjectionSVG(projections: YearProjection[]): string {
       <polyline points="${optimizedPoints}" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
 
       <!-- Dots & Labels -->
-      ${projections.map((p, idx) => `
+      ${projections
+        .map(
+          (p, idx) => `
         <circle cx="${getX(idx)}" cy="${getY(p.taxStandard)}" r="5" fill="#ef4444" />
         <circle cx="${getX(idx)}" cy="${getY(p.taxOptimized)}" r="5" fill="#10b981" />
 
         <text x="${getX(idx)}" y="${height - 10}" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="600">
           ${p.year}
         </text>
-      `).join('')}
+      `,
+        )
+        .join('')}
 
       <!-- Y Axis Labels -->
       <text x="${padding.left - 10}" y="${padding.top + 4}" text-anchor="end" font-size="10" fill="var(--text-muted)">

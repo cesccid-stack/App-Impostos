@@ -6,20 +6,21 @@
 export interface CryptoTransaction {
   id: string;
   date: string; // ISO 8601
-  type: 'buy' | 'sell' | 'exchange' | 'staking_reward' | 'airdrop' | 'hard_fork' | 'transfer_in' | 'transfer_out';
-  
-  assetIn: string;     // ex: "BTC"
+  type:
+    'buy' | 'sell' | 'exchange' | 'staking_reward' | 'airdrop' | 'hard_fork' | 'transfer_in' | 'transfer_out';
+
+  assetIn: string; // ex: "BTC"
   amountIn: number;
-  
-  assetOut?: string;   // ex: "EUR" (for sell) or "ETH" (for exchange)
+
+  assetOut?: string; // ex: "EUR" (for sell) or "ETH" (for exchange)
   amountOut?: number;
-  
-  feeAsset?: string;   // ex: "EUR"
+
+  feeAsset?: string; // ex: "EUR"
   feeAmount?: number;
-  
+
   // Fiat value at the time of the transaction (required for taxes)
   fiatValueInEUR: number;
-  
+
   walletOrExchange: string; // ex: "Binance", "Ledger"
 }
 

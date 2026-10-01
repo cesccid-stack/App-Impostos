@@ -5,12 +5,12 @@
  * Optimitza el coeficient màxim lineal per aconseguir la deduïbilitat en el menor temps possible.
  */
 
-export type AEATAssetGroupId = 
-  | 'group_6_tools_30'       // 30% - Útils i eines (8 anys màx -> 3.33 anys mín)
-  | 'group_5_computer_26'    // 26% - Equips informàtics, sistemes, programari, domòtica (10 anys màx -> 3.85 anys mín)
-  | 'group_4_transport_16'   // 16% - Elements de transport (patinets, bicicletes) (14 anys màx -> 6.25 anys mín)
-  | 'group_3_machinery_12'   // 12% - Maquinària, climatització, aerotèrmia, bombes de calor (18 anys màx -> 8.33 anys mín)
-  | 'group_2_furniture_10'   // 10% - Instal·lacions, mobiliari, enseres i electrodomèstics (20 anys màx -> 10 anys mín)
+export type AEATAssetGroupId =
+  | 'group_6_tools_30' // 30% - Útils i eines (8 anys màx -> 3.33 anys mín)
+  | 'group_5_computer_26' // 26% - Equips informàtics, sistemes, programari, domòtica (10 anys màx -> 3.85 anys mín)
+  | 'group_4_transport_16' // 16% - Elements de transport (patinets, bicicletes) (14 anys màx -> 6.25 anys mín)
+  | 'group_3_machinery_12' // 12% - Maquinària, climatització, aerotèrmia, bombes de calor (18 anys màx -> 8.33 anys mín)
+  | 'group_2_furniture_10' // 10% - Instal·lacions, mobiliari, enseres i electrodomèstics (20 anys màx -> 10 anys mín)
   | 'group_1_improvements_3'; // 3% - Edificis, construccions i obres de millora (68 anys màx -> 33.33 anys mín)
 
 export interface AEATAssetGroupDefinition {
@@ -19,8 +19,8 @@ export interface AEATAssetGroupDefinition {
   name: string;
   shortName: string;
   maxLinearRate: number; // Percentatge anual màxim (%)
-  maxYears: number;      // Període màxim en anys
-  minYears: number;      // Període mínim d'amortització en anys (a taxa màxima)
+  maxYears: number; // Període màxim en anys
+  minYears: number; // Període mínim d'amortització en anys (a taxa màxima)
   description: string;
   examples: string[];
   keywords: string[];
@@ -39,12 +39,47 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
     maxLinearRate: 30,
     maxYears: 8,
     minYears: 3.33,
-    description: 'Petits béns d\'ús quotidià, estris de cuina, parament de la llar, caixes d\'eines, jocs de claus, coberteria i vaixella.',
-    examples: ['Coberteria i vaixella', 'Joc de tovalloles i llençols', 'Caixa d\'eines', 'Estris de cuina / paelles', 'Jocs de claus de seguretat'],
+    description:
+      "Petits béns d'ús quotidià, estris de cuina, parament de la llar, caixes d'eines, jocs de claus, coberteria i vaixella.",
+    examples: [
+      'Coberteria i vaixella',
+      'Joc de tovalloles i llençols',
+      "Caixa d'eines",
+      'Estris de cuina / paelles',
+      'Jocs de claus de seguretat',
+    ],
     keywords: [
-      'eina', 'eines', 'util', 'útil', 'utils', 'útils', 'vaixella', 'coberteria', 'parament', 'tovallola', 'tovalloles', 
-      'llençol', 'llençols', 'cobertor', 'paella', 'olla', 'estris', 'estris de cuina', 'joc de claus', 'martell', 'tornavís',
-      'menatge', 'parament llar', 'cubiertos', 'vajilla', 'toallas', 'sabanas', 'herramientas', 'menaje', 'ollas', 'sartenes'
+      'eina',
+      'eines',
+      'util',
+      'útil',
+      'utils',
+      'útils',
+      'vaixella',
+      'coberteria',
+      'parament',
+      'tovallola',
+      'tovalloles',
+      'llençol',
+      'llençols',
+      'cobertor',
+      'paella',
+      'olla',
+      'estris',
+      'estris de cuina',
+      'joc de claus',
+      'martell',
+      'tornavís',
+      'menatge',
+      'parament llar',
+      'cubiertos',
+      'vajilla',
+      'toallas',
+      'sabanas',
+      'herramientas',
+      'menaje',
+      'ollas',
+      'sartenes',
     ],
   },
   {
@@ -55,13 +90,50 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
     maxLinearRate: 26,
     maxYears: 10,
     minYears: 3.85,
-    description: 'Smart TVs, sistemes de domòtica, panys electrònics, encaminadors/routers Wifi, servidors, ordinadors i programari.',
-    examples: ['Smart TV menjador', 'Pany intel·ligent Wifi', 'Router Wifi 6 / Repetidors', 'Termòstat intel·ligent / Domòtica', 'Assistents de veu / Sensors'],
+    description:
+      'Smart TVs, sistemes de domòtica, panys electrònics, encaminadors/routers Wifi, servidors, ordinadors i programari.',
+    examples: [
+      'Smart TV menjador',
+      'Pany intel·ligent Wifi',
+      'Router Wifi 6 / Repetidors',
+      'Termòstat intel·ligent / Domòtica',
+      'Assistents de veu / Sensors',
+    ],
     keywords: [
-      'tv', 'smart tv', 'televisor', 'pantalla', 'monitor', 'ordinador', 'computer', 'pc', 'portatil', 'portàtil', 'router', 
-      'wifi', 'repetidor', 'domotica', 'domòtica', 'pany electronic', 'pany electrònic', 'pany intel·ligent', 'smart lock',
-      'termostat intel·ligent', 'termostato', 'sensor', 'alarma', 'camera', 'càmera', 'software', 'programari', 'alexa',
-      'google home', 'apple tv', 'chromecast', 'modem', 'switch', 'red'
+      'tv',
+      'smart tv',
+      'televisor',
+      'pantalla',
+      'monitor',
+      'ordinador',
+      'computer',
+      'pc',
+      'portatil',
+      'portàtil',
+      'router',
+      'wifi',
+      'repetidor',
+      'domotica',
+      'domòtica',
+      'pany electronic',
+      'pany electrònic',
+      'pany intel·ligent',
+      'smart lock',
+      'termostat intel·ligent',
+      'termostato',
+      'sensor',
+      'alarma',
+      'camera',
+      'càmera',
+      'software',
+      'programari',
+      'alexa',
+      'google home',
+      'apple tv',
+      'chromecast',
+      'modem',
+      'switch',
+      'red',
     ],
   },
   {
@@ -72,11 +144,21 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
     maxLinearRate: 16,
     maxYears: 14,
     minYears: 6.25,
-    description: 'Mitjans de transport cedits conjuntament amb l\'immoble (ex: patinets elèctrics o bicicletes per a llogaters).',
+    description:
+      "Mitjans de transport cedits conjuntament amb l'immoble (ex: patinets elèctrics o bicicletes per a llogaters).",
     examples: ['Patinet elèctric Xiaomi', 'Bicicleta urbana lloguer', 'Vehicle auxiliar servei'],
     keywords: [
-      'patinet', 'patinet electric', 'patinete', 'patinete electrico', 'bicicleta', 'bici', 'scooter', 'vehicle', 'vehiculo',
-      'ciclomotor', 'remolc'
+      'patinet',
+      'patinet electric',
+      'patinete',
+      'patinete electrico',
+      'bicicleta',
+      'bici',
+      'scooter',
+      'vehicle',
+      'vehiculo',
+      'ciclomotor',
+      'remolc',
     ],
   },
   {
@@ -87,12 +169,39 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
     maxLinearRate: 12,
     maxYears: 18,
     minYears: 8.33,
-    description: 'Equips de climatització split, bombes de calor, sistemes d\'aerotèrmia, calderes, descalcificadors i maquinària.',
-    examples: ['Aire condicionat split inverter', 'Bomba de calor / Aerotèrmia', 'Caldera de condensació gas', 'Descalcificador d\'aigua', 'Grup de pressió'],
+    description:
+      "Equips de climatització split, bombes de calor, sistemes d'aerotèrmia, calderes, descalcificadors i maquinària.",
+    examples: [
+      'Aire condicionat split inverter',
+      'Bomba de calor / Aerotèrmia',
+      'Caldera de condensació gas',
+      "Descalcificador d'aigua",
+      'Grup de pressió',
+    ],
     keywords: [
-      'aire condicionat', 'aire acondicionado', 'clima', 'climatitzacio', 'climatización', 'split', 'bomba de calor', 'aerotermia',
-      'aerotèrmia', 'caldera', 'caldera gas', 'termo', 'escalfador', 'calentador', 'descalcificador', 'termo electric',
-      'maquinaria', 'maquinària', 'motor', 'compressor', 'purificador', 'deshumidificador', 'bomba aigua'
+      'aire condicionat',
+      'aire acondicionado',
+      'clima',
+      'climatitzacio',
+      'climatización',
+      'split',
+      'bomba de calor',
+      'aerotermia',
+      'aerotèrmia',
+      'caldera',
+      'caldera gas',
+      'termo',
+      'escalfador',
+      'calentador',
+      'descalcificador',
+      'termo electric',
+      'maquinaria',
+      'maquinària',
+      'motor',
+      'compressor',
+      'purificador',
+      'deshumidificador',
+      'bomba aigua',
     ],
   },
   {
@@ -103,30 +212,107 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
     maxLinearRate: 10,
     maxYears: 20,
     minYears: 10,
-    description: 'Electrodomèstics de cuina, mobles de dormitori/menjador, llits, matalassos, sofàs, il·luminació i instal·lacions no estructurals.',
-    examples: ['Nevera / Frigorífic combi', 'Rentadora 8kg', 'Sofà 3 places', 'Llit i matalàs viscoelàstic', 'Taula menjador i cadires', 'Rentavaixelles', 'Forn i vitroceràmica'],
+    description:
+      'Electrodomèstics de cuina, mobles de dormitori/menjador, llits, matalassos, sofàs, il·luminació i instal·lacions no estructurals.',
+    examples: [
+      'Nevera / Frigorífic combi',
+      'Rentadora 8kg',
+      'Sofà 3 places',
+      'Llit i matalàs viscoelàstic',
+      'Taula menjador i cadires',
+      'Rentavaixelles',
+      'Forn i vitroceràmica',
+    ],
     keywords: [
-      'nevera', 'frigorific', 'frigorífico', 'rentadora', 'lavadora', 'rentavaixelles', 'lavavajillas', 'assecadora', 'secadora',
-      'forn', 'horno', 'microones', 'microondas', 'vitroceramica', 'vitrocerámica', 'induccio', 'inducció', 'campana', 
-      'extractor', 'sofa', 'sofà', 'llit', 'cama', 'matalas', 'matalàs', 'colchon', 'armari', 'armario', 'taula', 'mesa',
-      'cadira', 'cadires', 'sillas', 'estanteria', 'prestatgeria', 'comoda', 'tauleta', 'lampada', 'làmpada', 'cortines',
-      'il·luminacio', 'iluminacion', 'moble', 'mobles', 'muebles'
+      'nevera',
+      'frigorific',
+      'frigorífico',
+      'rentadora',
+      'lavadora',
+      'rentavaixelles',
+      'lavavajillas',
+      'assecadora',
+      'secadora',
+      'forn',
+      'horno',
+      'microones',
+      'microondas',
+      'vitroceramica',
+      'vitrocerámica',
+      'induccio',
+      'inducció',
+      'campana',
+      'extractor',
+      'sofa',
+      'sofà',
+      'llit',
+      'cama',
+      'matalas',
+      'matalàs',
+      'colchon',
+      'armari',
+      'armario',
+      'taula',
+      'mesa',
+      'cadira',
+      'cadires',
+      'sillas',
+      'estanteria',
+      'prestatgeria',
+      'comoda',
+      'tauleta',
+      'lampada',
+      'làmpada',
+      'cortines',
+      'il·luminacio',
+      'iluminacion',
+      'moble',
+      'mobles',
+      'muebles',
     ],
   },
   {
     id: 'group_1_improvements_3',
     groupNumber: 1,
-    name: 'Edificis i obres de millora / reformes de l\'immoble',
+    name: "Edificis i obres de millora / reformes de l'immoble",
     shortName: 'Obres de millora / Construcció (3%)',
     maxLinearRate: 3,
     maxYears: 68,
     minYears: 33.33,
-    description: 'Obres que augmenten la capacitat, habitabilitat o vida útil de l\'immoble (reforma bany/cuina, tancaments, aïllament).',
-    examples: ['Reforma integral de cuina', 'Renovació bany complet', 'Canvi finestres alumini / doble vidre', 'Aïllament tèrmic façana', 'Instal·lació elèctrica integral'],
+    description:
+      "Obres que augmenten la capacitat, habitabilitat o vida útil de l'immoble (reforma bany/cuina, tancaments, aïllament).",
+    examples: [
+      'Reforma integral de cuina',
+      'Renovació bany complet',
+      'Canvi finestres alumini / doble vidre',
+      'Aïllament tèrmic façana',
+      'Instal·lació elèctrica integral',
+    ],
     keywords: [
-      'reforma', 'obra', 'millora', 'rehabilitacio', 'rehabilitació', 'tancaments', 'finestres', 'ventanas', 'fusteria',
-      'aïllament', 'aïllament termic', 'façana', 'paviment', 'parquet', 'enrajolat', 'rajoles', 'canonades', 'fontaneria',
-      'instal·lacio electrica', 'instalacion electrica', 'obra cuina', 'obra bany', 'pladur', 'pintura integral'
+      'reforma',
+      'obra',
+      'millora',
+      'rehabilitacio',
+      'rehabilitació',
+      'tancaments',
+      'finestres',
+      'ventanas',
+      'fusteria',
+      'aïllament',
+      'aïllament termic',
+      'façana',
+      'paviment',
+      'parquet',
+      'enrajolat',
+      'rajoles',
+      'canonades',
+      'fontaneria',
+      'instal·lacio electrica',
+      'instalacion electrica',
+      'obra cuina',
+      'obra bany',
+      'pladur',
+      'pintura integral',
     ],
   },
 ];
@@ -135,7 +321,7 @@ export const AEAT_SIMPLIFIED_TABLE: readonly AEATAssetGroupDefinition[] = [
  * Retorna la definició d'un grup d'actius per ID.
  */
 export function getAEATAssetGroup(groupId: AEATAssetGroupId): AEATAssetGroupDefinition {
-  const found = AEAT_SIMPLIFIED_TABLE.find(g => g.id === groupId);
+  const found = AEAT_SIMPLIFIED_TABLE.find((g) => g.id === groupId);
   return found || AEAT_SIMPLIFIED_TABLE[4]; // Default: Grup 2 Mobiliari (10%)
 }
 
@@ -145,11 +331,17 @@ export function getAEATAssetGroup(groupId: AEATAssetGroupId): AEATAssetGroupDefi
  */
 export function suggestAEATCategory(description: string): AEATAssetGroupId {
   if (!description) return 'group_2_furniture_10';
-  const text = description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const text = description
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
   for (const group of AEAT_SIMPLIFIED_TABLE) {
     for (const kw of group.keywords) {
-      const normalizedKw = kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normalizedKw = kw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
       const regex = new RegExp(`\\b${normalizedKw}\\b`, 'i');
       if (regex.test(text) || text.includes(normalizedKw)) {
         return group.id;
@@ -174,7 +366,7 @@ export function calculateItemAnnualAmortization(
   fiscalYear: number = 2024,
   acquisitionDate?: string,
   disposalDate?: string,
-  status?: 'active' | 'disposed'
+  status?: 'active' | 'disposed',
 ): {
   annualAmount: number;
   accumulatedPrior: number;
@@ -250,7 +442,7 @@ export function calculateItemAnnualAmortization(
   } else if (acqDate && acqYear < fiscalYear) {
     for (let y = acqYear; y < fiscalYear; y++) {
       let yearQuota = fullYearQuota;
-      
+
       // Pro-rata l'any d'adquisició
       if (y === acqYear) {
         const startOfYear = new Date(y, 0, 1);
@@ -302,7 +494,7 @@ export function calculateItemAnnualAmortization(
 
   // Si s'ha donat de baixa en el propi exercici actual (pro-rata de baixa)
   if (dispDate && dispYear === fiscalYear) {
-    const startOfYear = (acqDate && acqYear === fiscalYear) ? acqDate : new Date(fiscalYear, 0, 1);
+    const startOfYear = acqDate && acqYear === fiscalYear ? acqDate : new Date(fiscalYear, 0, 1);
     const endOfYear = new Date(fiscalYear, 11, 31);
     const totalDays = (endOfYear.getTime() - new Date(fiscalYear, 0, 1).getTime()) / (1000 * 3600 * 24) + 1;
     const activeDays = Math.max(1, (dispDate.getTime() - startOfYear.getTime()) / (1000 * 3600 * 24) + 1);

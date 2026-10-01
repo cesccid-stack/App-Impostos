@@ -50,9 +50,33 @@ export interface ValidationReport {
  * Llista oficial de codis de país de la Unió Europea per al cens VIES (Model 349).
  */
 const EU_COUNTRY_CODES = new Set([
-  'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES', 'FI', 
-  'FR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 
-  'PT', 'RO', 'SE', 'SI', 'SK'
+  'AT',
+  'BE',
+  'BG',
+  'CY',
+  'CZ',
+  'DE',
+  'DK',
+  'EE',
+  'EL',
+  'ES',
+  'FI',
+  'FR',
+  'HR',
+  'HU',
+  'IE',
+  'IT',
+  'LT',
+  'LU',
+  'LV',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SE',
+  'SI',
+  'SK',
 ]);
 
 /**
@@ -159,14 +183,21 @@ export function runAutomatedComplianceChecks(data: DeclaracionData): ValidationR
 function runAutomatedComplianceChecksInternal(data: DeclaracionData): ValidationReport {
   const issues: ValidationIssue[] = [];
   const year = data.year || 2024;
-  
+
   const iva = data.iva || {
     config: {
       regime: 'general',
       settlementFrequency: 'quarterly',
       isREDEME: false,
       hasProrrata: false,
-      prorrata: { type: 'general', provisionalPercentage: 100, definitivePercentage: 100, isRegulatedAutomatically: true, totalOperationsWithDeduction: 0, totalOperationsVolume: 0 },
+      prorrata: {
+        type: 'general',
+        provisionalPercentage: 100,
+        definitivePercentage: 100,
+        isRegulatedAutomatically: true,
+        totalOperationsWithDeduction: 0,
+        totalOperationsVolume: 0,
+      },
       initialPendingCarryover: 0,
     },
     issuedInvoices: [],
@@ -175,13 +206,45 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
     quarters: {} as Record<FiscalQuarter, Model303QuarterResult>,
   };
 
-  const act = data.activities || { income: 0, expenses: 0, withholdings: 0, socialSecuritySelfEmployed: 0, estimationType: 'direct_simplified' };
+  const act = data.activities || {
+    income: 0,
+    expenses: 0,
+    withholdings: 0,
+    socialSecuritySelfEmployed: 0,
+    estimationType: 'direct_simplified',
+  };
   const properties = data.properties || [];
-  const work = data.workIncome || { employers: [], unionFees: 0, otherDeductible: 0, pensionContributions: 0 };
-  const cap = data.capitalIncome || { interests: 0, dividends: 0, foreignDividends: 0, foreignTaxWithheld: 0, insuranceGains: 0, otherMobiliary: 0, mobiliaryWithholdings: 0, rentalIncome: 0, rentalExpenses: 0, imputedIncome: 0, realEstateWithholdings: 0 };
+  const work = data.workIncome || {
+    employers: [],
+    unionFees: 0,
+    otherDeductible: 0,
+    pensionContributions: 0,
+  };
+  const cap = data.capitalIncome || {
+    interests: 0,
+    dividends: 0,
+    foreignDividends: 0,
+    foreignTaxWithheld: 0,
+    insuranceGains: 0,
+    otherMobiliary: 0,
+    mobiliaryWithholdings: 0,
+    rentalIncome: 0,
+    rentalExpenses: 0,
+    imputedIncome: 0,
+    realEstateWithholdings: 0,
+  };
   const deductions = data.deductions;
   const gains = data.gains || { items: [], totalWithholdings: 0 };
-  const personal = data.personal || { name: '', nif: '', age: 35, disability: 0, descendants: [], ascendants: [], community: 'CAT', taxDeclarationType: 'individual' };
+  const personal = data.personal || {
+    name: '',
+    nif: '',
+    age: 35,
+    disability: 0,
+    descendants: [],
+    ascendants: [],
+    community: 'CAT',
+    taxDeclarationType: 'individual',
+  };
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 1: COMPROVACIONS DETALLADES D'IRPF — RENDIMENTS DEL TREBALL (ARTS. 17-20 LIRPF)
@@ -196,7 +259,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Aportació a Plans de Pensions individuals (${formatCurrency(pensionContrib)}) superior al límit legal de 1.500 €`,
       message: `El límit fiscal màxim de reducció a la base imposable per aportacions a plans de pensions individuals és de 1.500 € anuals. L'excés de ${formatCurrency(pensionContrib - 1500)} es pot traslladar als 5 exercicis següents.`,
-      legalReference: 'Art. 51.1 Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 51.1 Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -210,7 +273,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Aportació empresarial a plans d'ocupació (${formatCurrency(companyPension)}) superior al sostre de 8.500 €`,
       message: `L'increment del límit per aportacions empresarials a plans de pensions d'ocupació té un sostre de 8.500 € anuals.`,
-      legalReference: 'Art. 51.1.2n Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 51.1.2n Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -218,14 +281,14 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // 1.3 Retenció del Treball Anormalment Baixa (< 2%)
   const employers = work.employers || [];
   for (const emp of employers) {
-    if ((emp.grossSalary || 0) > 15000 && ((emp.withholdings || 0) / emp.grossSalary) < 0.02) {
+    if ((emp.grossSalary || 0) > 15000 && (emp.withholdings || 0) / emp.grossSalary < 0.02) {
       issues.push({
         id: `work-low-retention-${emp.id}`,
         module: 'general',
         severity: 'warning',
         title: `Tipus de retenció molt baix a l'empresa ${emp.name || 'Ocupador'} (< 2%)`,
         message: `El percentatge de retenció és inferior al 2% sobre un salari brut de ${formatCurrency(emp.grossSalary)}. Això provocarà una quota diferencial a pagar elevada a la declaració.`,
-        legalReference: 'Art. 80 a 88 del Reglament de l\'IRPF (RD 439/2007)',
+        legalReference: "Art. 80 a 88 del Reglament de l'IRPF (RD 439/2007)",
         autoFixable: false,
       });
     }
@@ -243,7 +306,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'info',
         title: `Obligació de presentar Declaració de Renda per 2 o més pagadors`,
         message: `Has percebut ${formatCurrency(secondaryTotal)} del segon i posteriors pagadors (superant el límit de 1.500 €). El llindar exempt baixa de 22.000 € a 15.000 € anuals.`,
-        legalReference: 'Art. 96.2 Llei de l\'IRPF (Llei 35/2006)',
+        legalReference: "Art. 96.2 Llei de l'IRPF (Llei 35/2006)",
         autoFixable: false,
       });
     }
@@ -257,7 +320,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `Exempció 7.p per feina a l'estranger (${formatCurrency(work.foreignWorkExemption7p || 0)}) superior al màxim de 60.100 €`,
       message: `El límit màxim exempt per rendiments de treballs efectivament realitzats a l'estranger és de 60.100 € anuals. L'excés ha de tributar com a rendiment del treball ordinari.`,
-      legalReference: 'Art. 7.p de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 7.p de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Ajustar exempció al màxim de 60.100 €',
       autoFixKey: 'fix_cap_7p_exemption',
@@ -272,7 +335,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `Despesa deduïble incrementada per treballador actiu amb discapacitat no aplicada`,
       message: `Com a treballador actiu amb un grau de discapacitat del ${personal.disability}%, tens dret a deduir 3.500 € addicionals (o 7.750 € si necessites ajuda de tercers) en concepte de despeses de treball.`,
-      legalReference: 'Art. 19.2.f de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 19.2.f de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Aplicar despesa deduïble de 3.500 € a rendiments del treball',
       autoFixKey: 'fix_apply_disabled_worker_deduction',
@@ -287,7 +350,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `Quotes a col·legis professionals (${formatCurrency(work.unionFees)}) per sobre del límit de 500 €`,
       message: `Les quotes satisfetes a col·legis professionals són deduïbles fins a un màxim legal de 500 € anuals quan la col·legiació sigui obligatòria per exercir la feina.`,
-      legalReference: 'Art. 19.2.d Llei de l\'IRPF i Art. 10 del RIRPF',
+      legalReference: "Art. 19.2.d Llei de l'IRPF i Art. 10 del RIRPF",
       autoFixable: false,
     });
   }
@@ -300,7 +363,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Rendiment irregular (${formatCurrency(work.irregularIncomeAmount || 0)}) supera el sostre legal de 300.000 €`,
       message: `La base sobre la qual s'aplica la reducció del 30% per rendiments generats en més de 2 anys està limitada a un màxim legal de 300.000 € anuals.`,
-      legalReference: 'Art. 18.2 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 18.2 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -313,13 +376,15 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `Indemnització per acomiadament (${formatCurrency(work.severancePay || 0)}) superior al límit exempt de 180.000 €`,
       message: `L'exempció legal per acomiadament laboral està limitada a 180.000 €. L'excés de ${formatCurrency((work.severancePay || 0) - 180000)} ha de tributar obligatòriament a l'IRPF com a rendiment del treball.`,
-      legalReference: 'Art. 7.e de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 7.e de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 1.10 Exempció de Dietes i Desplaçaments (> 0,26 €/km / Ordre HFP/792/2023)
-  const excessiveMileage = (work.employers || []).filter(e => (e.mileageKm || 0) > 0 && (e.mileageIncome || 0) > ((e.mileageKm || 0) * 0.26 + 1.0));
+  const excessiveMileage = (work.employers || []).filter(
+    (e) => (e.mileageKm || 0) > 0 && (e.mileageIncome || 0) > (e.mileageKm || 0) * 0.26 + 1.0,
+  );
   if (excessiveMileage.length > 0) {
     issues.push({
       id: 'work-mileage-allowance-excess',
@@ -327,7 +392,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: 'Compensació de quilometratge superior al límit reglamentari exempt (0,26 €/km)',
       message: `L'import percebut en concepte de quilometratge supera el límit reglamentari de 0,26 €/km. L'excés no justificat amb despeses addicionals ha de tributar com a retribució ordinària.`,
-      legalReference: 'Art. 9.A.2 del Reglament de l\'IRPF (Ordre HFP/792/2023)',
+      legalReference: "Art. 9.A.2 del Reglament de l'IRPF (Ordre HFP/792/2023)",
       autoFixable: false,
     });
   }
@@ -344,7 +409,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `Dividends internacionals (${formatCurrency(cap.foreignDividends)}): deducció per doble imposició a la Casella 0588`,
       message: `Has suportat ${formatCurrency(cap.foreignTaxWithheld)} de retenció en origen (W-8BEN als EUA o similar). S'ha d'aplicar la deducció per doble imposició internacional per recuperar la retenció exterior.`,
-      legalReference: 'Art. 80 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 80 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -355,56 +420,71 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 3.1 Manca de NIF de Llogater en Habitatge Habitual (Preceptiu per a la Casella 0065)
   const habitualWithoutTenant = properties.filter(
-    p => p.usageType === 'habitual' && p.grossRentalIncome > 0 && (!p.tenantNIFs || p.tenantNIFs.length === 0 || p.tenantNIFs.some(n => !n.trim()))
+    (p) =>
+      p.usageType === 'habitual' &&
+      p.grossRentalIncome > 0 &&
+      (!p.tenantNIFs || p.tenantNIFs.length === 0 || p.tenantNIFs.some((n) => !n.trim())),
   );
   if (habitualWithoutTenant.length > 0) {
     issues.push({
       id: 'prop-habitual-missing-tenant-nif',
       module: 'properties',
       severity: 'critical',
-      title: 'Falta el NIF del llogater a l\'arrendament d\'habitatge habitual',
+      title: "Falta el NIF del llogater a l'arrendament d'habitatge habitual",
       message: `L'AEAT requereix obligatòriament el NIF/NIE del llogater a la Casella 0065 per poder aplicar la reducció per arrendament d'habitatge.`,
-      legalReference: 'Art. 23.2 Llei de l\'IRPF i Llei 12/2023 pel Dret a l\'Habitatge',
+      legalReference: "Art. 23.2 Llei de l'IRPF i Llei 12/2023 pel Dret a l'Habitatge",
       autoFixable: false,
     });
   }
 
   // 3.2 Incongruència del Valor Cadastral de la Construcció (Construcció > Total)
   for (const p of properties) {
-    if (p.constructionCadastralValue > 0 && p.totalCadastralValue > 0 && p.constructionCadastralValue > p.totalCadastralValue) {
+    if (
+      p.constructionCadastralValue > 0 &&
+      p.totalCadastralValue > 0 &&
+      p.constructionCadastralValue > p.totalCadastralValue
+    ) {
       issues.push({
         id: `prop-invalid-construction-val-${p.id}`,
         module: 'properties',
         severity: 'critical',
         title: `Valor cadastral de la construcció superior al total a ${p.name || 'Immoble'}`,
         message: `El valor de la construcció (${formatCurrency(p.constructionCadastralValue)}) no pot ser superior al valor cadastral total (${formatCurrency(p.totalCadastralValue)}). Cal corregir el valor del rebut de l'IBI.`,
-        legalReference: 'Art. 23.1.b Llei de l\'IRPF i Art. 14 del RIRPF',
+        legalReference: "Art. 23.1.b Llei de l'IRPF i Art. 14 del RIRPF",
         autoFixable: false,
       });
     }
 
     // 3.3 Manca de Cost d'Adquisició o Valor Cadastral per a l'Amortització del 3%
-    if (p.grossRentalIncome > 0 && (!p.acquisitionCost || p.acquisitionCost === 0) && (!p.totalCadastralValue || p.totalCadastralValue === 0)) {
+    if (
+      p.grossRentalIncome > 0 &&
+      (!p.acquisitionCost || p.acquisitionCost === 0) &&
+      (!p.totalCadastralValue || p.totalCadastralValue === 0)
+    ) {
       issues.push({
         id: `prop-missing-amort-base-${p.id}`,
         module: 'properties',
         severity: 'warning',
         title: `Falta el valor d'adquisició o cadastral a ${p.name || 'Immoble'}`,
         message: `Per deduir l'amortització del 3% de l'immoble arrendat (Caselles 0079 a 0083), és obligatori informar el cost d'adquisició o el valor cadastral.`,
-        legalReference: 'Art. 23.1.b Llei de l\'IRPF (Llei 35/2006)',
+        legalReference: "Art. 23.1.b Llei de l'IRPF (Llei 35/2006)",
         autoFixable: false,
       });
     }
 
     // 3.3b Oportunitat Garantista: Despeses d'Adquisició de l'Immoble (STS 1130/2021)
-    if (p.grossRentalIncome > 0 && (p.acquisitionCost || 0) > 0 && (!p.acquisitionExpenses || p.acquisitionExpenses === 0)) {
+    if (
+      p.grossRentalIncome > 0 &&
+      (p.acquisitionCost || 0) > 0 &&
+      (!p.acquisitionExpenses || p.acquisitionExpenses === 0)
+    ) {
       issues.push({
         id: `prop-missing-acq-expenses-${p.id}`,
         module: 'properties',
         severity: 'info',
         title: `Oportunitat d'escut fiscal per despeses d'adquisició a ${p.name || 'Immoble'}`,
         message: `Segons la Sentència del Tribunal Suprem STS 1130/2021, l'ITP, notaria, registre i gestoria formen part del cost d'adquisició amortitzable al 3%. Pots afegir aquestes despeses per optimitzar la declaració.`,
-        legalReference: 'STS 1130/2021 i Art. 23.1.b Llei de l\'IRPF',
+        legalReference: "STS 1130/2021 i Art. 23.1.b Llei de l'IRPF",
         autoFixable: false,
       });
     }
@@ -422,7 +502,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
           severity: 'info',
           title: `Excedent de despeses de reparació a ${p.name || 'Immoble'} (${formatCurrency(excess)})`,
           message: `Les despeses de finançament i conservació superen els ingressos íntegres. L'excedent no es perd, es compensarà durant els 4 exercicis següents.`,
-          legalReference: 'Art. 23.1.a Llei de l\'IRPF (Llei 35/2006)',
+          legalReference: "Art. 23.1.a Llei de l'IRPF (Llei 35/2006)",
           autoFixable: false,
         });
       }
@@ -430,7 +510,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 3.5 Imputació de Rendes Immobiliàries en Immobles Buits o d'Ús Propi (Casella 0089 / Art. 85 LIRPF)
-  const vacantProperties = properties.filter(p => p.grossRentalIncome === 0 && p.usageType !== 'habitual');
+  const vacantProperties = properties.filter((p) => p.grossRentalIncome === 0 && p.usageType !== 'habitual');
   if (vacantProperties.length > 0) {
     issues.push({
       id: 'prop-vacant-imputation-required',
@@ -438,13 +518,15 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `${vacantProperties.length} immoble/s buit/s o a disposició amb imputació de rendes (Casella 0089)`,
       message: `Els immobles urbans que no constitueixen habitatge habitual ni estan llogats generen una imputació de rendes de l'1,1% (cadastre revisat) o 2% del valor cadastral.`,
-      legalReference: 'Art. 85 Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 85 Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 3.6 Retencions d'Arrendaments Comercials (Models 115/180) vs Casella 0598
-  const commercialPropsWithhold = properties.filter(p => p.usageType === 'commercial' && (p.grossRentalIncome || 0) > 0);
+  const commercialPropsWithhold = properties.filter(
+    (p) => p.usageType === 'commercial' && (p.grossRentalIncome || 0) > 0,
+  );
   if (commercialPropsWithhold.length > 0) {
     const totalCommercialRent = commercialPropsWithhold.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
     const expected19Withholding = totalCommercialRent * 0.19;
@@ -457,7 +539,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'warning',
         title: 'Retencions de Lloguer Comercial (Model 180) no imputades a la Renda',
         message: `Tens ${commercialPropsWithhold.length} immoble/s comercial/s amb ingressos de ${formatCurrency(totalCommercialRent)}. Els llogaters estan obligats a ingressar ${formatCurrency(expected19Withholding)} al Model 115/180. Aquest import ha de constar a la Casella 0598 per a minorar el teu IRPF.`,
-        legalReference: 'Art. 75.2.a i Art. 100 del Reglament de l\'IRPF (RD 439/2007)',
+        legalReference: "Art. 75.2.a i Art. 100 del Reglament de l'IRPF (RD 439/2007)",
         autoFixable: true,
         autoFixLabel: `Imputar ${formatCurrency(expected19Withholding)} a la Casella 0598`,
         autoFixKey: 'fix_sync_commercial_withholdings_180',
@@ -466,14 +548,21 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 3.7 Validació de Format de Referència Cadastral (20 caràcters / Llei del Cadastre)
-  const invalidCadastreProps = properties.filter(p => p.cadastralReference && !isValidCadastralReference(p.cadastralReference));
+  const invalidCadastreProps = properties.filter(
+    (p) => p.cadastralReference && !isValidCadastralReference(p.cadastralReference),
+  );
   if (invalidCadastreProps.length > 0) {
     issues.push({
       id: 'prop-invalid-cadastral-reference',
       module: 'properties',
       severity: 'warning',
       title: `${invalidCadastreProps.length} immoble/s amb referència cadastral de format no reglamentari`,
-      message: `Les referències cadastrals com ${invalidCadastreProps.slice(0, 2).map(p => p.cadastralReference).join(', ')} no tenen l'estructura oficial de 20 caràcters alfanumèrics requerida per la seu electrònica de l'AEAT.`,
+      message: `Les referències cadastrals com ${invalidCadastreProps
+        .slice(0, 2)
+        .map((p) => p.cadastralReference)
+        .join(
+          ', ',
+        )} no tenen l'estructura oficial de 20 caràcters alfanumèrics requerida per la seu electrònica de l'AEAT.`,
       legalReference: 'Reial Decret Legislatiu 1/2004 (Text Refós de la Llei del Cadastre Immobiliari)',
       autoFixable: false,
     });
@@ -485,7 +574,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 4.1 Desquadre d'Ingressos Facturats vs Ingressos IRPF
   const actIssuedBase = (iva.issuedInvoices || [])
-    .filter(i => i.category === 'activity_service' || i.category === 'activity_goods')
+    .filter((i) => i.category === 'activity_service' || i.category === 'activity_goods')
     .reduce((s, i) => s + (i.taxableBase || 0), 0);
 
   if (act.income > 0 && actIssuedBase > 0 && Math.abs(act.income - actIssuedBase) > 1.0) {
@@ -493,9 +582,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       id: 'cross-income-mismatch',
       module: 'activities',
       severity: 'warning',
-      title: 'Incongruència d\'Ingressos entre IRPF i Llibre d\'IVA',
+      title: "Incongruència d'Ingressos entre IRPF i Llibre d'IVA",
       message: `Els ingressos declarats a l'IRPF (${formatCurrency(act.income)}) no coincideixen amb la base facturada al llibre d'IVA (${formatCurrency(actIssuedBase)}). Discrepància: ${formatCurrency(Math.abs(act.income - actIssuedBase))}.`,
-      legalReference: 'Criteris de Creuament d\'Inspecció AEAT (IRPF vs Model 303/390)',
+      legalReference: "Criteris de Creuament d'Inspecció AEAT (IRPF vs Model 303/390)",
       autoFixable: true,
       autoFixLabel: 'Sincronitzar Ingressos IRPF ↔ IVA',
       autoFixKey: 'fix_sync_activities_iva',
@@ -508,11 +597,11 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       id: 'cross-expenses-missing-invoices',
       module: 'activities',
       severity: 'warning',
-      title: 'Despeses d\'IRPF declarades sense factures al Llibre d\'IVA',
+      title: "Despeses d'IRPF declarades sense factures al Llibre d'IVA",
       message: `Has declarat ${formatCurrency(act.expenses)} en despeses d'autònom però el Llibre de Factures Rebudes d'IVA està buit. No estàs deduint l'IVA suportat corresponent.`,
       legalReference: 'Ordre HAC/773/2019 de Llibres Registre Oficials',
       autoFixable: true,
-      autoFixLabel: 'Generar factures de despesa al Llibre d\'IVA',
+      autoFixLabel: "Generar factures de despesa al Llibre d'IVA",
       autoFixKey: 'fix_sync_activities_iva',
     });
   }
@@ -523,9 +612,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       id: 'act-missing-reta',
       module: 'activities',
       severity: 'warning',
-      title: 'Quota de Seguretat Social d\'Autònoms (RETA) no informada',
+      title: "Quota de Seguretat Social d'Autònoms (RETA) no informada",
       message: `Has declarat ${formatCurrency(act.income)} d'ingressos d'autònom però 0 € de quotes a la Seguretat Social. Aquesta despesa és 100% deduïble en l'IRPF.`,
-      legalReference: 'Art. 30.2.1a Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 30.2.1a Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Aplicar quota estàndard RETA (3.600 € / any)',
       autoFixKey: 'fix_set_reta_standard',
@@ -543,16 +632,17 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'info',
         title: 'Límit legal de Despeses de Difícil Justificació aplicat (2.000 €)',
         message: `El 5% del rendiment net (${formatCurrency(calculated5pct)}) supera el sostre legal de 2.000 € anuals. S'ha aplicat el límit màxim permès.`,
-        legalReference: 'Art. 30.2 del Reglament de l\'IRPF (RD 439/2007)',
+        legalReference: "Art. 30.2 del Reglament de l'IRPF (RD 439/2007)",
         autoFixable: false,
       });
     }
   }
 
   // 4.5 Despeses de Manutenció i Restauració d'Autònoms (> 26,67 € / dia)
-  const excessiveMeals = (iva.receivedInvoices || []).filter(i => {
+  const excessiveMeals = (iva.receivedInvoices || []).filter((i) => {
     const c = (i.concept || '').toLowerCase();
-    const isMeal = c.includes('restaurant') || c.includes('dinar') || c.includes('menjar') || c.includes('manutencio');
+    const isMeal =
+      c.includes('restaurant') || c.includes('dinar') || c.includes('menjar') || c.includes('manutencio');
     return isMeal && (i.totalInvoice || 0) > 26.67;
   });
   if (excessiveMeals.length > 0) {
@@ -562,7 +652,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `${excessiveMeals.length} despesa/es de restauració superiors al límit diari legal (26,67 €)`,
       message: `La llei limita la deducció de despeses de manutenció a 26,67 €/dia a territori espanyol pagades per via electrònica. L'excés no és deduïble sense justificant de pernocta o desplaçament.`,
-      legalReference: 'Art. 30.5.c Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 30.5.c Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -570,14 +660,14 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // 4.6 Obligació de Pagaments Fraccionats (Model 130 vs Regla del 70% de Retenció)
   if (act.income > 0) {
     const withhRatio = (act.withholdings || 0) / act.income;
-    if (withhRatio >= 0.70) {
+    if (withhRatio >= 0.7) {
       issues.push({
         id: 'act-model-130-exempt',
         module: 'activities',
         severity: 'info',
         title: `Exempció de presentació del Model 130 (${(withhRatio * 100).toFixed(0)}% retenció)`,
         message: `Més del 70% dels ingressos han estat sotmesos a retenció d'IRPF. Estàs legalment exempt de presentar els pagaments fraccionats trimestrals del Model 130.`,
-        legalReference: 'Art. 109 del Reglament de l\'IRPF (RD 439/2007)',
+        legalReference: "Art. 109 del Reglament de l'IRPF (RD 439/2007)",
         autoFixable: false,
       });
     } else if (act.withholdings === 0 && act.income > 5000) {
@@ -587,16 +677,24 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'warning',
         title: `Obligació de presentar el Model 130 trimestral (sense retencions a compte)`,
         message: `Com que menys del 70% dels teus ingressos tenen retenció d'IRPF, estàs obligat a ingressar trimestralment el 20% del rendiment net mitjançant el Model 130.`,
-        legalReference: 'Art. 109 i 110 del Reglament de l\'IRPF (RD 439/2007)',
+        legalReference: "Art. 109 i 110 del Reglament de l'IRPF (RD 439/2007)",
         autoFixable: false,
       });
     }
   }
 
   // 4.7 Desacoblament de Vehicles: IVA (50%) vs IRPF (0%) (Art. 95 LIVA vs Art. 22 RIRPF)
-  const vehicleInvoices = (iva.receivedInvoices || []).filter(i => {
+  const vehicleInvoices = (iva.receivedInvoices || []).filter((i) => {
     const c = (i.concept || '').toLowerCase();
-    return c.includes('combustible') || c.includes('benzina') || c.includes('gasoil') || c.includes('peatge') || c.includes('reparacio vehicle') || c.includes('renting vehicle') || c.includes('assegurança vehicle');
+    return (
+      c.includes('combustible') ||
+      c.includes('benzina') ||
+      c.includes('gasoil') ||
+      c.includes('peatge') ||
+      c.includes('reparacio vehicle') ||
+      c.includes('renting vehicle') ||
+      c.includes('assegurança vehicle')
+    );
   });
 
   if (vehicleInvoices.length > 0 && !isExclusiveVehicleActivity(act.iae)) {
@@ -607,7 +705,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: 'Desacoblament de despeses de vehicle aplicat (IVA 50% vs IRPF 0%)',
       message: `S'han detectat ${vehicleInvoices.length} despesa/es de vehicle (${formatCurrency(totalVehicleExpense)}). Per l'epígraf IAE declarat, l'IVA suportat es dedueix al 50% (Art. 95 LIVA) però la despesa a l'IRPF és del 0% per no ser un vehicle d'ús 100% exclusiu (Art. 22 RIRPF), evitant sancions de l'Art. 191 LGT.`,
-      legalReference: 'Art. 95.Tres Llei de l\'IVA vs Art. 22 Reglament de l\'IRPF',
+      legalReference: "Art. 95.Tres Llei de l'IVA vs Art. 22 Reglament de l'IRPF",
       autoFixable: false,
     });
   }
@@ -618,7 +716,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 5.1 Venda d'Habitatge Habitual per Majors de 65 Anys (100% Exempta)
   if (personal.age >= 65) {
-    const homeGain = (gains.items || []).find(g => g.type === 'real_estate' && g.description?.toLowerCase().includes('habitual'));
+    const homeGain = (gains.items || []).find(
+      (g) => g.type === 'real_estate' && g.description?.toLowerCase().includes('habitual'),
+    );
     if (homeGain) {
       issues.push({
         id: 'gains-senior-65-exempt-home',
@@ -626,14 +726,16 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'info',
         title: `Exempció total per transmissió d'habitatge habitual en majors de 65 anys`,
         message: `Com que el contribuent té $\ge 65$ anys, el guany patrimonial derivat de la venda del seu habitatge habitual està 100% exempt d'IRPF per llei.`,
-        legalReference: 'Art. 33.4.b de la Llei de l\'IRPF (Llei 35/2006)',
+        legalReference: "Art. 33.4.b de la Llei de l'IRPF (Llei 35/2006)",
         autoFixable: false,
       });
     }
   }
 
   // 5.2 Regla Antiaplicació de Pèrdues Patrimonials en Valors Homogenis (Regla dels 2 mesos / Art. 33.5.f LIRPF)
-  const suspendedLosses = (gains.items || []).filter(g => g.isNonComputableLoss && (g.nonComputableLossAmount || 0) > 0);
+  const suspendedLosses = (gains.items || []).filter(
+    (g) => g.isNonComputableLoss && (g.nonComputableLossAmount || 0) > 0,
+  );
   if (suspendedLosses.length > 0) {
     const totalSuspended = suspendedLosses.reduce((s, g) => s + (g.nonComputableLossAmount || 0), 0);
     issues.push({
@@ -642,7 +744,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `Pèrdues suspeses per recompra de valors homogenis (${formatCurrency(totalSuspended)})`,
       message: `En aplicació de la regla dels 2 mesos (Art. 33.5.f LIRPF), les pèrdues de valors recomprats queden suspeses i no es poden compensar fins a la transmissió definitiva.`,
-      legalReference: 'Art. 33.5.f de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 33.5.f de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -654,9 +756,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
     [
       ...(lossCarryovers.pendingGeneralLosses || []),
       ...(lossCarryovers.pendingMobiliaryLosses || []),
-      ...(lossCarryovers.pendingCapitalLosses || [])
-    ].forEach(item => {
-      if (item.year && (year - item.year) > 4 && item.amount > 0) {
+      ...(lossCarryovers.pendingCapitalLosses || []),
+    ].forEach((item) => {
+      if (item.year && year - item.year > 4 && item.amount > 0) {
         expiredLosses.push(item.year);
       }
     });
@@ -668,7 +770,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'critical',
         title: 'Pèrdues patrimonials pendents prescrites (> 4 exercicis anteriors)',
         message: `S'han detectat pèrdues registrades d'exercicis anteriors al ${year - 4} (anys ${Array.from(new Set(expiredLosses)).join(', ')}). L'Art. 49 LIRPF limita estrictament la compensació als 4 exercicis immediatament posteriors. Les pèrdues anteriors estan caducades i prescrites.`,
-        legalReference: 'Art. 49 Llei de l\'IRPF i Art. 66 de la Llei General Tributària (LGT)',
+        legalReference: "Art. 49 Llei de l'IRPF i Art. 66 de la Llei General Tributària (LGT)",
         autoFixable: false,
       });
     }
@@ -677,9 +779,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
     [
       ...(lossCarryovers.pendingGeneralLosses || []),
       ...(lossCarryovers.pendingMobiliaryLosses || []),
-      ...(lossCarryovers.pendingCapitalLosses || [])
-    ].forEach(item => {
-      if (item.year && (year - item.year) === 4 && item.amount > 0) {
+      ...(lossCarryovers.pendingCapitalLosses || []),
+    ].forEach((item) => {
+      if (item.year && year - item.year === 4 && item.amount > 0) {
         expiringThisYearLosses.push(item.year);
       }
     });
@@ -691,7 +793,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'warning',
         title: `Caducitat imminent de pèrdues fiscals de l'exercici ${year - 4} (Darrer any de compensació)`,
         message: `Tens saldos negatius pendents de l'exercici ${year - 4}. Aquest és el quart i darrer exercici fiscal per poder-los compensar abans que prescriguin definitivament segons l'Art. 49 LIRPF.`,
-        legalReference: 'Art. 49 Llei de l\'IRPF (Termini màxim de 4 exercicis de compensació)',
+        legalReference: "Art. 49 Llei de l'IRPF (Termini màxim de 4 exercicis de compensació)",
         autoFixable: false,
       });
     }
@@ -710,13 +812,13 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `Mínim per discapacitat del contribuent (${formatCurrency(minAmount)}) aplicat correctament`,
       message: `Per tenir un grau de discapacitat reconegut del ${personal.disability}%, el teu mínim personal s'incrementa en ${formatCurrency(minAmount)} anuals.`,
-      legalReference: 'Art. 60 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 60 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 6.2 Verificació de Descendents i Ascendents amb Discapacitat
-  const disabledDescendants = (personal.descendants || []).filter(d => d.disability >= 33);
+  const disabledDescendants = (personal.descendants || []).filter((d) => d.disability >= 33);
   if (disabledDescendants.length > 0) {
     issues.push({
       id: 'personal-descendant-disability-applied',
@@ -724,13 +826,15 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'info',
       title: `${disabledDescendants.length} descendent(s) amb dret al mínim per discapacitat familiar`,
       message: `S'aplica el mínim addicional per discapacitat de descendents (3.000 € per $\ge 33\%$ o 9.000 € per $\ge 65\%$).`,
-      legalReference: 'Art. 60.2 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 60.2 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 6.3 Incompatibilitat d'Edat en Descendents (> 25 anys sense discapacitat >= 33%)
-  const ineligibleDescendants = (personal.descendants || []).filter(d => d.age > 25 && (d.disability || 0) < 33);
+  const ineligibleDescendants = (personal.descendants || []).filter(
+    (d) => d.age > 25 && (d.disability || 0) < 33,
+  );
   if (ineligibleDescendants.length > 0) {
     issues.push({
       id: 'personal-descendant-age-ineligible',
@@ -738,13 +842,15 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${ineligibleDescendants.length} descendent(s) major(s) de 25 anys sense dret al mínim familiar`,
       message: `Segons l'Art. 58 LIRPF, els fills majors de 25 anys no donen dret al mínim per descendents llevat que tinguin un grau de discapacitat reconegut >= 33%.`,
-      legalReference: 'Art. 58 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 58 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 6.4 Incompatibilitat d'Edat en Ascendents (< 65 anys sense discapacitat >= 33%)
-  const ineligibleAscendants = (personal.ascendants || []).filter(a => a.age < 65 && (a.disability || 0) < 33);
+  const ineligibleAscendants = (personal.ascendants || []).filter(
+    (a) => a.age < 65 && (a.disability || 0) < 33,
+  );
   if (ineligibleAscendants.length > 0) {
     issues.push({
       id: 'personal-ascendant-age-ineligible',
@@ -752,13 +858,13 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${ineligibleAscendants.length} ascendent(s) menor(s) de 65 anys sense dret al mínim familiar`,
       message: `Segons l'Art. 59 LIRPF, els pares o avis han de tenir 65 anys o més o un grau de discapacitat >= 33% per donar dret al mínim per ascendents.`,
-      legalReference: 'Art. 59 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 59 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
 
   // 6.5 Convivència de l'Ascendent amb el Contribuent (Art. 59 LIRPF)
-  const nonCohabitingAscendants = (personal.ascendants || []).filter(a => a.liveTogether === false);
+  const nonCohabitingAscendants = (personal.ascendants || []).filter((a) => a.liveTogether === false);
   if (nonCohabitingAscendants.length > 0) {
     issues.push({
       id: 'personal-ascendant-not-cohabiting',
@@ -766,7 +872,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${nonCohabitingAscendants.length} ascendent(s) sense convivència reglamentària amb el contribuent`,
       message: `L'Art. 59 LIRPF exigeix que els ascendents convisquin amb el contribuent almenys la meitat de l'exercici (o depenguin d'ell en centres residencials) per poder aplicar el mínim per ascendents.`,
-      legalReference: 'Art. 59 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 59 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: false,
     });
   }
@@ -783,20 +889,24 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Base de deducció per habitatge habitual superior al límit legal (${formatCurrency(deductions.housingAmountsPaid)})`,
       message: `La base màxima de deducció per habitatge habitual (règim transitori pre-2013) és de 9.040 € anuals per declaració. L'excés de ${formatCurrency(deductions.housingAmountsPaid - 9040)} no genera dret a deducció.`,
-      legalReference: 'Art. 68.1 i Disposició Transitòria 18a de la Llei de l\'IRPF',
+      legalReference: "Art. 68.1 i Disposició Transitòria 18a de la Llei de l'IRPF",
       autoFixable: true,
-      autoFixLabel: 'Ajustar la base d\'habitatge al màxim de 9.040 €',
+      autoFixLabel: "Ajustar la base d'habitatge al màxim de 9.040 €",
       autoFixKey: 'fix_cap_housing_deduction',
     });
   }
 
   // 7.2 Deducció de Lloguer a Catalunya per a Majors de 32 anys sense Circumstància Especial
-  if (deductions.catalanRentalDeduction && personal.age > 32 && deductions.catalanRentalSituation === 'none') {
+  if (
+    deductions.catalanRentalDeduction &&
+    personal.age > 32 &&
+    deductions.catalanRentalSituation === 'none'
+  ) {
     issues.push({
       id: 'ded-catalan-rental-age-ineligible',
       module: 'general',
       severity: 'critical',
-      title: 'Incompatibilitat d\'edat en la deducció de lloguer a Catalunya (> 32 anys)',
+      title: "Incompatibilitat d'edat en la deducció de lloguer a Catalunya (> 32 anys)",
       message: `Per aplicar la deducció del 10% per lloguer a Catalunya, cal tenir 32 anys o menys a data 31/12, llevat que es trobi en situació d'atur >= 183 dies, discapacitat >= 65% o família nombrosa.`,
       legalReference: 'Art. 1 de la Llei 31/2002 de la Comunitat Autònoma de Catalunya',
       autoFixable: true,
@@ -807,7 +917,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 7.2.b Deducció de Lloguer a Catalunya: Límit de Renda (20.000 € individual / 30.000 € conjunta / Llei 31/2002)
   if (deductions.catalanRentalDeduction && data.workIncome) {
-    const totalGrossIncome = (data.workIncome.employers || []).reduce((s, e) => s + e.grossSalary, 0) + (data.activities?.income || 0);
+    const totalGrossIncome =
+      (data.workIncome.employers || []).reduce((s, e) => s + e.grossSalary, 0) +
+      (data.activities?.income || 0);
     const isJoint = personal.taxDeclarationType === 'joint';
     const incomeCap = isJoint ? 30000 : 20000;
     if (totalGrossIncome > incomeCap) {
@@ -826,14 +938,14 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 7.3 Deducció per Maternitat (1.200 € / Art. 81 LIRPF)
-  if (deductions.maternityDeduction && (personal.descendants || []).every(d => d.age >= 3)) {
+  if (deductions.maternityDeduction && (personal.descendants || []).every((d) => d.age >= 3)) {
     issues.push({
       id: 'ded-maternity-age-exceeded',
       module: 'general',
       severity: 'critical',
       title: 'Deducció per maternitat no aplicable: no hi ha fills menors de 3 anys',
       message: `La deducció per maternitat de 1.200 € anuals només s'aplica a mares amb fills menors de 3 anys amb dret al mínim per descendents.`,
-      legalReference: 'Art. 81 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 81 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Desactivar deducció per maternitat',
       autoFixKey: 'fix_disable_maternity_deduction',
@@ -850,7 +962,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Aportació a pla de pensions individual (${formatCurrency(pensionInd)}) supera el límit d'1.500 €`,
       message: `El límit màxim d'aportació individual amb dret a reducció a la base imposable és d'1.500 € anuals.`,
-      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 52 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Ajustar pla individual a 1.500 €',
       autoFixKey: 'fix_cap_pension_individual',
@@ -863,9 +975,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Aportació empresarial a pla d'ocupació (${formatCurrency(pensionEmp)}) supera el límit de 8.500 €`,
       message: `El límit legal d'aportació empresarial és de 8.500 € anuals.`,
-      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 52 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
-      autoFixLabel: 'Ajustar pla d\'empresa a 8.500 €',
+      autoFixLabel: "Ajustar pla d'empresa a 8.500 €",
       autoFixKey: 'fix_cap_pension_company',
     });
   }
@@ -876,7 +988,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `Aportació conjunta a plans de pensions (${formatCurrency(pensionInd + pensionEmp)}) supera el límit global de 10.000 €`,
       message: `El sostre màxim absolut de reducció conjunta per plans individuals i d'empresa és de 10.000 € anuals.`,
-      legalReference: 'Art. 52 de la Llei de l\'IRPF (Llei 35/2006)',
+      legalReference: "Art. 52 de la Llei de l'IRPF (Llei 35/2006)",
       autoFixable: true,
       autoFixLabel: 'Ajustar el total de plans a 10.000 €',
       autoFixKey: 'fix_cap_pension_total',
@@ -884,7 +996,11 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 7.5 Deducció per Eficiència Energètica (RD-Llei 19/2021)
-  if (deductions.energyEfficiencyType && deductions.energyEfficiencyType !== 'none' && (deductions.energyEfficiencyAmount || 0) > 7500) {
+  if (
+    deductions.energyEfficiencyType &&
+    deductions.energyEfficiencyType !== 'none' &&
+    (deductions.energyEfficiencyAmount || 0) > 7500
+  ) {
     issues.push({
       id: 'ded-energy-efficiency-excess-cap',
       module: 'general',
@@ -893,7 +1009,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       message: `La base màxima de deducció és de 5.000 € (modalitat 1 i 3) o 7.500 € (modalitat 2 amb reducció del 30% d'energia no renovable).`,
       legalReference: 'Disposició Addicional 50a LIRPF (RD-Llei 19/2021)',
       autoFixable: true,
-      autoFixLabel: 'Ajustar la base d\'eficiència energètica a 7.500 €',
+      autoFixLabel: "Ajustar la base d'eficiència energètica a 7.500 €",
       autoFixKey: 'fix_cap_energy_deduction',
     });
   }
@@ -902,18 +1018,23 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // Només afecta les deduccions dels apartats b) (fundacions i associacions d'utilitat pública no
   // acollides) i c) (partits polítics). El mecenatge de la Llei 49/2002 (apartat a) no té límit de base.
   const cappedDonationsBase = (deductions.donations || [])
-    .filter((d: DonationItem) => (d.category ?? (d.priority ? 'ley_49_2002' : 'public_utility')) !== 'ley_49_2002')
+    .filter(
+      (d: DonationItem) => (d.category ?? (d.priority ? 'ley_49_2002' : 'public_utility')) !== 'ley_49_2002',
+    )
     .reduce((s: number, d: DonationItem) => s + (d.amount || 0), 0);
   if (cappedDonationsBase > 0 && data.workIncome) {
-    const approxBase = (data.workIncome.employers || []).reduce((s: number, e: EmployerItem) => s + (e.grossSalary || 0), 0);
-    if (approxBase > 0 && cappedDonationsBase > (approxBase * 0.10)) {
+    const approxBase = (data.workIncome.employers || []).reduce(
+      (s: number, e: EmployerItem) => s + (e.grossSalary || 0),
+      0,
+    );
+    if (approxBase > 0 && cappedDonationsBase > approxBase * 0.1) {
       issues.push({
         id: 'ded-donations-10pct-base-cap',
         module: 'general',
         severity: 'info',
         title: 'Deducció per donatius subjecta al límit del 10% de la base liquidable',
         message: `La base de les deduccions per donatius a fundacions i associacions de utilitat pública no acollides al règim de la Llei 49/2002 (i a partits polítics) no pot superar el 10% de la base liquidable del contribuent. L'excés no genera dret a deducció en aquest exercici.`,
-        legalReference: 'Art. 68.3, pàrraf final, de la Llei de l\'IRPF',
+        legalReference: "Art. 68.3, pàrraf final, de la Llei de l'IRPF",
         autoFixable: false,
       });
     }
@@ -946,7 +1067,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 8.2 Validació de NIF/CIF buits en factures emeses i rebudes
-  const issuedWithoutNif = (iva.issuedInvoices || []).filter(i => !i.clientNif || i.clientNif.trim() === '');
+  const issuedWithoutNif = (iva.issuedInvoices || []).filter(
+    (i) => !i.clientNif || i.clientNif.trim() === '',
+  );
   if (issuedWithoutNif.length > 0) {
     issues.push({
       id: 'iva-missing-client-nif',
@@ -959,7 +1082,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
     });
   }
 
-  const receivedWithoutNif = (iva.receivedInvoices || []).filter(i => !i.supplierNif || i.supplierNif.trim() === '');
+  const receivedWithoutNif = (iva.receivedInvoices || []).filter(
+    (i) => !i.supplierNif || i.supplierNif.trim() === '',
+  );
   if (receivedWithoutNif.length > 0) {
     issues.push({
       id: 'iva-missing-supplier-nif',
@@ -967,19 +1092,19 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${receivedWithoutNif.length} factura/es rebuda/es sense NIF/CIF de proveïdor`,
       message: `No es pot deduir l'IVA suportat de factures que no continguin el NIF complet del proveïdor.`,
-      legalReference: 'Art. 97.Un Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 97.Un Llei de l'IVA (Llei 37/1992)",
       autoFixable: false,
     });
   }
 
   // 8.3 Validació d'Algorisme i Format de NIF / NIE / CIF
   const invalidFormatNifs: string[] = [];
-  (iva.issuedInvoices || []).forEach(i => {
+  (iva.issuedInvoices || []).forEach((i) => {
     if (i.clientNif && i.category !== 'intra_eu_delivery' && !isValidSpanishTaxId(i.clientNif)) {
       invalidFormatNifs.push(i.clientNif);
     }
   });
-  (iva.receivedInvoices || []).forEach(i => {
+  (iva.receivedInvoices || []).forEach((i) => {
     if (i.supplierNif && i.category !== 'intra_eu_acquisition' && !isValidSpanishTaxId(i.supplierNif)) {
       invalidFormatNifs.push(i.supplierNif);
     }
@@ -991,14 +1116,16 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `${invalidFormatNifs.length} NIF/CIF amb format o dígit de control invàlid`,
       message: `Identificadors fiscals com ${invalidFormatNifs.slice(0, 3).join(', ')} no superen l'algorisme oficial de control de l'AEAT i causaran rebuig en la presentació telemàtica.`,
-      legalReference: 'Art. 18 del RGAT i Ordre EHA/451/2008 de l\'AEAT',
+      legalReference: "Art. 18 del RGAT i Ordre EHA/451/2008 de l'AEAT",
       autoFixable: false,
     });
   }
 
   // 8.4 Correlació Cronològica de Factures Emeses
   const issuedList = [...(iva.issuedInvoices || [])];
-  const sortedByNumber = [...issuedList].sort((a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true }));
+  const sortedByNumber = [...issuedList].sort((a, b) =>
+    a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true }),
+  );
   let chronoIssueFound = false;
   let chronoDetails = '';
   for (let i = 1; i < sortedByNumber.length; i++) {
@@ -1023,7 +1150,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 8.5 Validació de Prefix VIES en Operacions Intracomunitàries
-  const intraEuWithoutVies = [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].filter(i => {
+  const intraEuWithoutVies = [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].filter((i) => {
     const isIntra = i.category === 'intra_eu_delivery' || i.category === 'intra_eu_acquisition';
     if (!isIntra) return false;
     const nif = ('clientNif' in i ? i.clientNif : i.supplierNif) || '';
@@ -1037,13 +1164,13 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `${intraEuWithoutVies.length} operació/ns intracomunitària/es sense prefix NIF-IVA de la UE`,
       message: `Les operacions intracomunitàries al Model 349 requereixen que el NIF comenci pel codi de 2 lletres de l'estat membre (ex: FR, DE, IT, PT, NL).`,
-      legalReference: 'Art. 25 i Art. 79 Llei de l\'IVA (Cens VIES / Model 349)',
+      legalReference: "Art. 25 i Art. 79 Llei de l'IVA (Cens VIES / Model 349)",
       autoFixable: false,
     });
   }
 
   // 8.6 Factures Rectificatives sense Sèrie Específica
-  const rectWithoutSeries = (iva.issuedInvoices || []).filter(i => {
+  const rectWithoutSeries = (iva.issuedInvoices || []).filter((i) => {
     const isNeg = (i.taxableBase || 0) < 0;
     const isRect = i.isRectification || isNeg;
     if (!isRect) return false;
@@ -1064,10 +1191,19 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 8.7 Factures de Despesa Excloses de Deducció (Art. 96 LIVA)
-  const nonDeductibleConcepts = ['joies', 'joieria', 'tabac', 'loteria', 'multa', 'sancio', 'regal particular', 'espectacle privat'];
-  const nonDeductibleInvoices = (iva.receivedInvoices || []).filter(i => {
+  const nonDeductibleConcepts = [
+    'joies',
+    'joieria',
+    'tabac',
+    'loteria',
+    'multa',
+    'sancio',
+    'regal particular',
+    'espectacle privat',
+  ];
+  const nonDeductibleInvoices = (iva.receivedInvoices || []).filter((i) => {
     const c = (i.concept || '').toLowerCase();
-    return (i.deductibleVatAmount || 0) > 0 && nonDeductibleConcepts.some(nd => c.includes(nd));
+    return (i.deductibleVatAmount || 0) > 0 && nonDeductibleConcepts.some((nd) => c.includes(nd));
   });
   if (nonDeductibleInvoices.length > 0) {
     issues.push({
@@ -1076,18 +1212,18 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${nonDeductibleInvoices.length} factura/es de despesa amb IVA no deduïble per llei (Art. 96 LIVA)`,
       message: `S'ha detectat deducció d'IVA en conceptes exclosos de deducció (joies, tabac, espectacles recreatius, multes). L'AEAT imposa sancions del 50% al 150% per deduccions indegudes.`,
-      legalReference: 'Art. 96 de la Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 96 de la Llei de l'IVA (Llei 37/1992)",
       autoFixable: true,
-      autoFixLabel: 'Ajustar a 0% la deducció d\'aquestes factures',
+      autoFixLabel: "Ajustar a 0% la deducció d'aquestes factures",
       autoFixKey: 'fix_exclude_non_deductible_iva',
     });
   }
 
   // 8.8 Caducitat del Termini de Deducció d'IVA de Factures Rebudes (4 Anys / Art. 99.Tres LIVA)
-  const expiredInvoices = (iva.receivedInvoices || []).filter(i => {
+  const expiredInvoices = (iva.receivedInvoices || []).filter((i) => {
     if (!i.date) return false;
     const invYear = parseInt(i.date.substring(0, 4), 10);
-    return (year - invYear) > 4 && (i.deductibleVatAmount || 0) > 0;
+    return year - invYear > 4 && (i.deductibleVatAmount || 0) > 0;
   });
   if (expiredInvoices.length > 0) {
     issues.push({
@@ -1096,43 +1232,53 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: `${expiredInvoices.length} factura/es de despesa amb dret a deducció d'IVA prescrit (> 4 anys)`,
       message: `El dret a deduir les quotes suportades d'IVA caduca als 4 anys de la data de la factura. No es pot deduir l'IVA de factures d'exercicis prescrits.`,
-      legalReference: 'Art. 99.Tres Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 99.Tres Llei de l'IVA (Llei 37/1992)",
       autoFixable: false,
     });
   }
 
   // 8.9 Factures d'Arrendament d'Habitatge amb IVA erroni (> 0%)
   const exemptRentalsWithVat = (iva.issuedInvoices || []).filter(
-    i => (i.category === 'property_exempt_rental' || i.concept?.toLowerCase().includes('habitatge') || i.concept?.toLowerCase().includes('vivienda')) && (i.vatRate > 0 || i.vatAmount > 0)
+    (i) =>
+      (i.category === 'property_exempt_rental' ||
+        i.concept?.toLowerCase().includes('habitatge') ||
+        i.concept?.toLowerCase().includes('vivienda')) &&
+      (i.vatRate > 0 || i.vatAmount > 0),
   );
   if (exemptRentalsWithVat.length > 0) {
     issues.push({
       id: 'iva-exempt-rental-with-vat',
       module: 'iva',
       severity: 'critical',
-      title: 'IVA aplicat erròniament a l\'arrendament d\'habitatge habitual',
+      title: "IVA aplicat erròniament a l'arrendament d'habitatge habitual",
       message: `L'arrendament d'edificis destinats a habitatge està exempt d'IVA per llei. No s'ha de repercutir cap tipus d'IVA (ha de ser 0% exempt).`,
-      legalReference: 'Art. 20.Uno.23è Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 20.Uno.23è Llei de l'IVA (Llei 37/1992)",
       autoFixable: true,
-      autoFixLabel: 'Eliminar IVA de factures d\'habitatge (Exempt Art. 20)',
+      autoFixLabel: "Eliminar IVA de factures d'habitatge (Exempt Art. 20)",
       autoFixKey: 'fix_remove_vat_exempt_rental',
     });
   }
 
   // 8.10 Validació de la Regla de Prorrata per Arrendaments d'Habitatge
-  const hasExemptRentals = (iva.issuedInvoices || []).some(i => i.category === 'property_exempt_rental' || i.notes?.includes('exempt_art20')) ||
-    properties.some(p => p.usageType === 'habitual' || p.usageType === 'temporary');
-  
-  const hasDeductibleVat = (iva.receivedInvoices || []).some(i => (i.vatAmount || 0) > 0);
+  const hasExemptRentals =
+    (iva.issuedInvoices || []).some(
+      (i) => i.category === 'property_exempt_rental' || i.notes?.includes('exempt_art20'),
+    ) || properties.some((p) => p.usageType === 'habitual' || p.usageType === 'temporary');
 
-  if (hasExemptRentals && hasDeductibleVat && (!iva.config.hasProrrata || iva.config.prorrata.definitivePercentage === 100)) {
+  const hasDeductibleVat = (iva.receivedInvoices || []).some((i) => (i.vatAmount || 0) > 0);
+
+  if (
+    hasExemptRentals &&
+    hasDeductibleVat &&
+    (!iva.config.hasProrrata || iva.config.prorrata.definitivePercentage === 100)
+  ) {
     issues.push({
       id: 'iva-prorrata-mandatory',
       module: 'iva',
       severity: 'critical',
       title: 'Règim de Prorrata obligatori no activat',
       message: `Tens arrendaments d'habitatge (operacions exemptes sense dret a deducció segons l'Art. 20.Uno.23è LIVA) simultàniament amb despeses amb IVA suportat. La llei obliga a aplicar la Regla de Prorrata.`,
-      legalReference: 'Art. 102 a 104 Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 102 a 104 Llei de l'IVA (Llei 37/1992)",
       autoFixable: true,
       autoFixLabel: 'Activar i auto-calcular Prorrata General',
       autoFixKey: 'fix_activate_prorrata',
@@ -1141,7 +1287,10 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 8.11 Validació de Retencions en Arrendaments de Locals Comercials (19%)
   const commercialWithout19 = (iva.issuedInvoices || []).filter(
-    i => (i.category === 'property_commercial_rental' || i.concept?.toLowerCase().includes('local')) && i.withholdingRate !== 19 && i.taxableBase > 0
+    (i) =>
+      (i.category === 'property_commercial_rental' || i.concept?.toLowerCase().includes('local')) &&
+      i.withholdingRate !== 19 &&
+      i.taxableBase > 0,
   );
   if (commercialWithout19.length > 0) {
     issues.push({
@@ -1150,7 +1299,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: 'Retenció IRPF incorrecta en arrendament de local comercial',
       message: `S'han detectat factures de lloguer de local sense la retenció preceptiva del 19% aplicable a immobles urbans de negoci.`,
-      legalReference: 'Art. 75.2.a i Art. 80.1 del Reglament de l\'IRPF (RD 439/2007)',
+      legalReference: "Art. 75.2.a i Art. 80.1 del Reglament de l'IRPF (RD 439/2007)",
       autoFixable: true,
       autoFixLabel: 'Ajustar retenció al 19% en factures de locals',
       autoFixKey: 'fix_commercial_retention_19',
@@ -1159,16 +1308,21 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 8.12 Deducció d'IVA de Vehicles de Turisme superior al 50%
   const vehicleInvoices100 = (iva.receivedInvoices || []).filter(
-    i => (i.category === 'vehicle_expense' || i.concept?.toLowerCase().includes('cotxe') || i.concept?.toLowerCase().includes('vehicle') || i.concept?.toLowerCase().includes('gasolina')) && (i.deductiblePercentage || 100) > 50
+    (i) =>
+      (i.category === 'vehicle_expense' ||
+        i.concept?.toLowerCase().includes('cotxe') ||
+        i.concept?.toLowerCase().includes('vehicle') ||
+        i.concept?.toLowerCase().includes('gasolina')) &&
+      (i.deductiblePercentage || 100) > 50,
   );
   if (vehicleInvoices100.length > 0) {
     issues.push({
       id: 'iva-vehicle-deduction-excess',
       module: 'iva',
       severity: 'warning',
-      title: 'Deducció d\'IVA en vehicles de turisme superior al 50%',
+      title: "Deducció d'IVA en vehicles de turisme superior al 50%",
       message: `L'Art. 95 LIVA presumeix una afectació màxima del 50% en vehicles de turisme no industrials. Deducir el 100% és motiu habitual de paralització i sanció per l'AEAT.`,
-      legalReference: 'Art. 95.Tres.2a Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 95.Tres.2a Llei de l'IVA (Llei 37/1992)",
       autoFixable: true,
       autoFixLabel: 'Ajustar deducció de vehicles al 50% legal',
       autoFixKey: 'fix_adjust_vehicle_deduction_50',
@@ -1177,7 +1331,10 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 8.13 Validació de Béns d'Inversió (> 3.005,06 €)
   const bigExpensesNotTracked = (iva.receivedInvoices || []).filter(
-    i => (i.taxableBase || 0) >= 3005.06 && !i.isInvestmentAsset && (iva.investmentAssets || []).every(a => a.description !== i.concept)
+    (i) =>
+      (i.taxableBase || 0) >= 3005.06 &&
+      !i.isInvestmentAsset &&
+      (iva.investmentAssets || []).every((a) => a.description !== i.concept),
   );
   if (bigExpensesNotTracked.length > 0) {
     issues.push({
@@ -1186,9 +1343,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `${bigExpensesNotTracked.length} compra/es d'actius > 3.005,06 € sense registrar com a Bé d'Inversió`,
       message: `Els béns d'inversió superiors a 3.005,06 € han de constar obligatòriament al Llibre Registre de Béns d'Inversió per al seguiment de 5 o 10 anys.`,
-      legalReference: 'Art. 107 a 110 Llei de l\'IVA (Llei 37/1992)',
+      legalReference: "Art. 107 a 110 Llei de l'IVA (Llei 37/1992)",
       autoFixable: true,
-      autoFixLabel: 'Registrar automàticament com a Béns d\'Inversió',
+      autoFixLabel: "Registrar automàticament com a Béns d'Inversió",
       autoFixKey: 'fix_register_investment_assets',
     });
   }
@@ -1202,7 +1359,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'critical',
       title: 'Desquadre entre el Model 303 trimestral i el Model 390 anual',
       message: `La suma de les autoliquidacions trimestrals difereix del resum anual en ${formatCurrency(model390.quartersReconciliation.discrepancyAmount)}. L'AEAT emet sanció per inconsistència de caselles.`,
-      legalReference: 'Ordre HFP/1395/2021 de l\'AEAT',
+      legalReference: "Ordre HFP/1395/2021 de l'AEAT",
       autoFixable: true,
       autoFixLabel: 'Recalcular i quadrar 303 amb 390',
       autoFixKey: 'fix_recalculate_iva_all',
@@ -1210,7 +1367,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   }
 
   // 8.15 Control Documental: Factures Rebudes sense PDF Original Adjunt
-  const receivedWithoutPdf = (iva.receivedInvoices || []).filter(i => (i.deductibleVatAmount || 0) > 0 && !i.hasAttachment);
+  const receivedWithoutPdf = (iva.receivedInvoices || []).filter(
+    (i) => (i.deductibleVatAmount || 0) > 0 && !i.hasAttachment,
+  );
   if (receivedWithoutPdf.length > 0) {
     issues.push({
       id: 'iva-missing-pdf-attachments',
@@ -1225,7 +1384,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 8.16 Límit de Pagaments en Efectiu (> 1.000 €)
   const cashOver1000 = [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].filter(
-    i => i.paymentMethod === 'cash' && (i.totalInvoice || 0) > 1000
+    (i) => i.paymentMethod === 'cash' && (i.totalInvoice || 0) > 1000,
   );
   if (cashOver1000.length > 0) {
     issues.push({
@@ -1241,12 +1400,12 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
 
   // 8.17 Llindar d'Operacions amb Terceres Persones (> 3.005,06 € - Model 347)
   const nifTotals = new Map<string, { name: string; total: number }>();
-  [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].forEach(i => {
+  [...(iva.issuedInvoices || []), ...(iva.receivedInvoices || [])].forEach((i) => {
     const nif = ('clientNif' in i ? i.clientNif : i.supplierNif) || '';
     const name = ('clientName' in i ? i.clientName : i.supplierName) || '';
     if (nif) {
       const current = nifTotals.get(nif) || { name, total: 0 };
-      current.total += (i.totalInvoice || 0);
+      current.total += i.totalInvoice || 0;
       nifTotals.set(nif, current);
     }
   });
@@ -1258,28 +1417,38 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       module: 'iva',
       severity: 'info',
       title: `${over347List.length} client(s)/proveïdor(s) superen els 3.005,06 € anuals (Model 347)`,
-      message: `Tercers com ${over347List.slice(0, 2).map(([_, d]) => d.name).join(', ')} superen el llindar anual de 3.005,06 € i s'hauran d'incloure a la declaració informativa del Model 347 (febrer).`,
-      legalReference: 'Reial Decret 1065/2007 (Model 347 de l\'AEAT)',
+      message: `Tercers com ${over347List
+        .slice(0, 2)
+        .map(([_, d]) => d.name)
+        .join(
+          ', ',
+        )} superen el llindar anual de 3.005,06 € i s'hauran d'incloure a la declaració informativa del Model 347 (febrer).`,
+      legalReference: "Reial Decret 1065/2007 (Model 347 de l'AEAT)",
       autoFixable: false,
     });
   }
 
   // 8.18 Locals comercials arrendats sense facturació d'IVA
   const commercialProperties = properties.filter(
-    p => p.usageType === 'commercial' || p.name?.toLowerCase().includes('local') || p.name?.toLowerCase().includes('oficina')
+    (p) =>
+      p.usageType === 'commercial' ||
+      p.name?.toLowerCase().includes('local') ||
+      p.name?.toLowerCase().includes('oficina'),
   );
-  const commercialInvoices = (iva.issuedInvoices || []).filter(i => i.category === 'property_commercial_rental');
+  const commercialInvoices = (iva.issuedInvoices || []).filter(
+    (i) => i.category === 'property_commercial_rental',
+  );
 
   if (commercialProperties.length > 0 && commercialInvoices.length === 0) {
     issues.push({
       id: 'cross-commercial-rentals-unbilled',
       module: 'properties',
       severity: 'critical',
-      title: 'Locals comercials arrendats sense facturació d\'IVA',
+      title: "Locals comercials arrendats sense facturació d'IVA",
       message: `Tens ${commercialProperties.length} immoble/s d'ús comercial però no hi ha factures de lloguer amb IVA al 21% emeses. L'arrendament de locals està subjecte a IVA obligatòriament.`,
-      legalReference: 'Art. 4.Un i Art. 20.Uno.23è.a\' Llei de l\'IVA',
+      legalReference: "Art. 4.Un i Art. 20.Uno.23è.a' Llei de l'IVA",
       autoFixable: true,
-      autoFixLabel: 'Auto-generar factures d\'arrendament de locals',
+      autoFixLabel: "Auto-generar factures d'arrendament de locals",
       autoFixKey: 'fix_sync_properties_iva',
     });
   }
@@ -1289,15 +1458,24 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 9.1 Obligació de Declaració de Béns a l'Estranger (Model 720 - Llindar 50.000 €)
-  const foreignAccounts = (data.foreignAssets?.accounts || []).reduce((s, a) => s + (a.balanceYearEnd || 0), 0);
-  const foreignSecurities = (data.foreignAssets?.securities || []).reduce((s, a) => s + (a.totalValueYearEnd || 0), 0);
-  const foreignRealEstate = (data.foreignAssets?.realEstate || []).reduce((s, a) => s + (a.acquisitionCostEUR || 0), 0);
+  const foreignAccounts = (data.foreignAssets?.accounts || []).reduce(
+    (s, a) => s + (a.balanceYearEnd || 0),
+    0,
+  );
+  const foreignSecurities = (data.foreignAssets?.securities || []).reduce(
+    (s, a) => s + (a.totalValueYearEnd || 0),
+    0,
+  );
+  const foreignRealEstate = (data.foreignAssets?.realEstate || []).reduce(
+    (s, a) => s + (a.acquisitionCostEUR || 0),
+    0,
+  );
   if (foreignAccounts > 50000 || foreignSecurities > 50000 || foreignRealEstate > 50000) {
     issues.push({
       id: 'foreign-model-720-mandatory',
       module: 'general',
       severity: 'info',
-      title: 'Obligació de presentació del Model 720 (Béns i Drets a l\'Estranger > 50.000 €)',
+      title: "Obligació de presentació del Model 720 (Béns i Drets a l'Estranger > 50.000 €)",
       message: `Com que el valor conjunt d'algun dels blocs (comptes, valors o immobles) supera els 50.000 €, estàs obligat a presentar el Model 720 informatiu abans del 31 de març.`,
       legalReference: 'Disposició Addicional 18a LGT i Art. 42 bis del RGAT',
       autoFixable: false,
@@ -1325,7 +1503,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   for (const disc of reconReport.discrepancies) {
     issues.push({
       id: `reconcile-${disc.id}`,
-      module: disc.category === 'iva' ? 'iva' : (disc.category === 'irpf_130' ? 'activities' : 'general'),
+      module: disc.category === 'iva' ? 'iva' : disc.category === 'irpf_130' ? 'activities' : 'general',
       severity: disc.severity,
       title: disc.title,
       message: `${disc.description} Risc: ${disc.inspectionRiskExplanation}`,
@@ -1340,14 +1518,18 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // GRUP 11: ARRENDAMENTS TURÍSTICS I TEMPORALS (CRITERIS DGT V1187-24 & MODEL 179)
   // ═══════════════════════════════════════════════════════════════════════════
   for (const p of properties) {
-    if ((p.usageType === 'tourist' || p.usageType === 'temporary') && p.reductionType && p.reductionType !== 'none') {
+    if (
+      (p.usageType === 'tourist' || p.usageType === 'temporary') &&
+      p.reductionType &&
+      p.reductionType !== 'none'
+    ) {
       issues.push({
         id: `prop-tourist-invalid-reduction-${p.id}`,
         module: 'properties',
         severity: 'critical',
         title: `Reducció d'habitatge habitual aplicada indegudament a immoble ${p.usageType === 'tourist' ? 'turístic' : 'temporal'}`,
         message: `Els arrendaments turístics o d'ús temporal no constitueixen habitatge permanent del llogater i estan expressament exclosos de les reduccions del 50%-90% de la Llei 12/2023.`,
-        legalReference: 'Art. 23.2 Llei de l\'IRPF i Consulta Vinculant DGT V1187-24',
+        legalReference: "Art. 23.2 Llei de l'IRPF i Consulta Vinculant DGT V1187-24",
         autoFixable: true,
         autoFixLabel: 'Eliminar reducció de lloguer temporal/turístic',
         autoFixKey: `fix_remove_tourist_reduction_${p.id}`,
@@ -1358,12 +1540,19 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // ═══════════════════════════════════════════════════════════════════════════
   // GRUP 12: TELETREBALL I SUBMINISTRAMENTS D'HABITATGE D'AUTÒNOMS (ART. 30.2.5a.b LIRPF)
   // ═══════════════════════════════════════════════════════════════════════════
-  const utilityInvoices = (iva.receivedInvoices || []).filter(i => {
+  const utilityInvoices = (iva.receivedInvoices || []).filter((i) => {
     const c = (i.concept || '').toLowerCase();
-    return c.includes('electricitat') || c.includes('llum') || c.includes('aigua') || c.includes('gas') || c.includes('fibra') || c.includes('internet');
+    return (
+      c.includes('electricitat') ||
+      c.includes('llum') ||
+      c.includes('aigua') ||
+      c.includes('gas') ||
+      c.includes('fibra') ||
+      c.includes('internet')
+    );
   });
   if (utilityInvoices.length > 0 && act.income > 0) {
-    const fullDeductedUtilities = utilityInvoices.filter(i => (i.deductiblePercentage || 100) > 30);
+    const fullDeductedUtilities = utilityInvoices.filter((i) => (i.deductiblePercentage || 100) > 30);
     if (fullDeductedUtilities.length > 0) {
       issues.push({
         id: 'act-home-office-utilities-overdeducted',
@@ -1371,9 +1560,9 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
         severity: 'warning',
         title: `${fullDeductedUtilities.length} factura/es de subministraments de llar deduïdes per sobre del límit legal del 30%`,
         message: `Segons l'Art. 30.2.5a.b LIRPF, les despeses de subministraments (llum, aigua, gas, internet) de l'habitatge habitual afectat a l'activitat només són deduïbles al 30% de la proporció entre els metres quadrats afectes i la superfície total. Deduir el 100% genera sanció tributària.`,
-        legalReference: 'Art. 30.2.5a.b Llei de l\'IRPF (Llei 6/2017 de Reformes Urgents del Treball Autònom)',
+        legalReference: "Art. 30.2.5a.b Llei de l'IRPF (Llei 6/2017 de Reformes Urgents del Treball Autònom)",
         autoFixable: true,
-        autoFixLabel: 'Ajustar subministraments a la regla del 30% d\'afectació',
+        autoFixLabel: "Ajustar subministraments a la regla del 30% d'afectació",
         autoFixKey: 'fix_adjust_home_utilities_30',
       });
     }
@@ -1389,7 +1578,7 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
       severity: 'warning',
       title: `Despeses de guarderia (${formatCurrency(deductions.maternityNurseryExpenses)}) superen el sostre màxim de 1.000 €`,
       message: `L'increment de la deducció per maternitat per despeses de custòdia en guarderies o centres d'educació infantil autoritzats té un límit màxim de 1.000 € anuals per fill.`,
-      legalReference: 'Art. 81.2 Llei de l\'IRPF i Sentència del Tribunal Suprem 8/1/2024',
+      legalReference: "Art. 81.2 Llei de l'IRPF i Sentència del Tribunal Suprem 8/1/2024",
       autoFixable: true,
       autoFixLabel: 'Ajustar despeses de guarderia a 1.000 €',
       autoFixKey: 'fix_cap_nursery_expenses',
@@ -1400,15 +1589,17 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // GRUP 14: IMPOST SOBRE EL PATRIMONI (MODEL 714) & LÍMIT CONJUNT 60% (ART. 31 LIP)
   // ═══════════════════════════════════════════════════════════════════════════
   if (data.wealth && data.wealth.assets && data.wealth.assets.length > 0) {
-    const hasPrimaryResidenceOver300k = (data.wealth.assets || []).some(a => a.isPrimaryResidence && (a.grossValue || 0) > 300000);
+    const hasPrimaryResidenceOver300k = (data.wealth.assets || []).some(
+      (a) => a.isPrimaryResidence && (a.grossValue || 0) > 300000,
+    );
     if (hasPrimaryResidenceOver300k) {
       issues.push({
         id: 'wealth-primary-residence-exemption-cap',
         module: 'wealth',
         severity: 'info',
-        title: 'Exempció d\'habitatge habitual a Patrimoni limitada a 300.000 €',
+        title: "Exempció d'habitatge habitual a Patrimoni limitada a 300.000 €",
         message: `L'Art. 4.Nou LIP estableix una exempció màxima de 300.000 € per al valor de l'habitatge habitual. L'excés computa com a patrimoni net subjecte a gravamen.`,
-        legalReference: 'Art. 4.Nou Llei 19/1991 de l\'Impost sobre el Patrimoni',
+        legalReference: "Art. 4.Nou Llei 19/1991 de l'Impost sobre el Patrimoni",
         autoFixable: false,
       });
     }
@@ -1417,17 +1608,17 @@ function runAutomatedComplianceChecksInternal(data: DeclaracionData): Validation
   // ═══════════════════════════════════════════════════════════════════════════
   // CÀLCUL DE LA PUNTUACIÓ DE CONFORMITAT FISCAL (0-100%)
   // ═══════════════════════════════════════════════════════════════════════════
-  const criticalCount = issues.filter(i => i.severity === 'critical').length;
-  const warningCount = issues.filter(i => i.severity === 'warning').length;
-  const infoCount = issues.filter(i => i.severity === 'info').length;
+  const criticalCount = issues.filter((i) => i.severity === 'critical').length;
+  const warningCount = issues.filter((i) => i.severity === 'warning').length;
+  const infoCount = issues.filter((i) => i.severity === 'info').length;
 
   let score = 100;
-  score -= (criticalCount * 20);
-  score -= (warningCount * 8);
-  score -= (infoCount * 2);
+  score -= criticalCount * 20;
+  score -= warningCount * 8;
+  score -= infoCount * 2;
   const complianceScore = Math.max(0, Math.min(100, score));
 
-  const status = criticalCount > 0 ? 'errors' : (warningCount > 0 ? 'warnings' : 'perfect');
+  const status = criticalCount > 0 ? 'errors' : warningCount > 0 ? 'warnings' : 'perfect';
 
   return {
     timestamp: new Date().toISOString(),
@@ -1455,16 +1646,23 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
           prorrata: {
             ...iva.config.prorrata,
             isRegulatedAutomatically: true,
-          }
-        }
+          },
+        },
       });
-      return { success: true, message: 'Règim de Prorrata activat i recalculat automàticament segons facturació.' };
+      return {
+        success: true,
+        message: 'Règim de Prorrata activat i recalculat automàticament segons facturació.',
+      };
     }
 
     case 'fix_remove_vat_exempt_rental': {
       const iva = store.getIVA();
       for (const inv of iva.issuedInvoices) {
-        if (inv.category === 'property_exempt_rental' || inv.concept?.toLowerCase().includes('habitatge') || inv.concept?.toLowerCase().includes('vivienda')) {
+        if (
+          inv.category === 'property_exempt_rental' ||
+          inv.concept?.toLowerCase().includes('habitatge') ||
+          inv.concept?.toLowerCase().includes('vivienda')
+        ) {
           inv.vatRate = 0;
           inv.vatAmount = 0;
           inv.totalInvoice = inv.taxableBase - (inv.withholdingAmount || 0);
@@ -1473,7 +1671,10 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
         }
       }
       store.updateIVA({ issuedInvoices: iva.issuedInvoices });
-      return { success: true, message: 'IVA eliminat de les factures d\'habitatge (ara marcades com a exemptes Art. 20 LIVA).' };
+      return {
+        success: true,
+        message: "IVA eliminat de les factures d'habitatge (ara marcades com a exemptes Art. 20 LIVA).",
+      };
     }
 
     case 'fix_commercial_retention_19': {
@@ -1486,34 +1687,54 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
         }
       }
       store.updateIVA({ issuedInvoices: iva.issuedInvoices });
-      return { success: true, message: 'Retencions del 19% aplicades a totes les factures d\'arrendament de locals.' };
+      return {
+        success: true,
+        message: "Retencions del 19% aplicades a totes les factures d'arrendament de locals.",
+      };
     }
 
     case 'fix_adjust_vehicle_deduction_50': {
       const iva = store.getIVA();
       for (const inv of iva.receivedInvoices) {
-        if (inv.category === 'vehicle_expense' || inv.concept?.toLowerCase().includes('cotxe') || inv.concept?.toLowerCase().includes('vehicle') || inv.concept?.toLowerCase().includes('gasolina')) {
+        if (
+          inv.category === 'vehicle_expense' ||
+          inv.concept?.toLowerCase().includes('cotxe') ||
+          inv.concept?.toLowerCase().includes('vehicle') ||
+          inv.concept?.toLowerCase().includes('gasolina')
+        ) {
           inv.deductiblePercentage = 50;
         }
       }
       store.updateIVA({ receivedInvoices: iva.receivedInvoices });
-      return { success: true, message: 'Deducció d\'IVA en vehicles ajustada al 50% legal (Art. 95 LIVA).' };
+      return { success: true, message: "Deducció d'IVA en vehicles ajustada al 50% legal (Art. 95 LIVA)." };
     }
 
     case 'fix_exclude_non_deductible_iva': {
       const iva = store.getIVA();
-      const nonDeductible = ['joies', 'joieria', 'tabac', 'loteria', 'multa', 'sancio', 'regal particular', 'espectacle privat'];
+      const nonDeductible = [
+        'joies',
+        'joieria',
+        'tabac',
+        'loteria',
+        'multa',
+        'sancio',
+        'regal particular',
+        'espectacle privat',
+      ];
       let count = 0;
       for (const inv of iva.receivedInvoices) {
         const c = (inv.concept || '').toLowerCase();
-        if (nonDeductible.some(nd => c.includes(nd))) {
+        if (nonDeductible.some((nd) => c.includes(nd))) {
           inv.deductiblePercentage = 0;
           inv.deductibleVatAmount = 0;
           count++;
         }
       }
       store.updateIVA({ receivedInvoices: iva.receivedInvoices });
-      return { success: true, message: `${count} factures ajustades a 0% de deducció segons l'Art. 96 LIVA.` };
+      return {
+        success: true,
+        message: `${count} factures ajustades a 0% de deducció segons l'Art. 96 LIVA.`,
+      };
     }
 
     case 'fix_register_investment_assets': {
@@ -1524,7 +1745,7 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
           inv.isInvestmentAsset = true;
           iva.investmentAssets.push({
             id: `asset_autofix_${Date.now()}_${added}`,
-            description: inv.concept || 'Bé d\'Inversió',
+            description: inv.concept || "Bé d'Inversió",
             assetType: 'machinery',
             acquisitionDate: inv.date || `${store.getYear()}-01-15`,
             startDate: inv.date || `${store.getYear()}-01-15`,
@@ -1541,32 +1762,47 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
         }
       }
       store.updateIVA({ receivedInvoices: iva.receivedInvoices, investmentAssets: iva.investmentAssets });
-      return { success: true, message: `${added} actius registrats automàticament al Llibre de Béns d'Inversió.` };
+      return {
+        success: true,
+        message: `${added} actius registrats automàticament al Llibre de Béns d'Inversió.`,
+      };
     }
 
     case 'fix_set_reta_standard': {
       store.update('activities', { socialSecuritySelfEmployed: 3600 });
-      return { success: true, message: 'Quota de Seguretat Social d\'Autònoms (3.600 € anuals) assignada a Activitats Econòmiques.' };
+      return {
+        success: true,
+        message: "Quota de Seguretat Social d'Autònoms (3.600 € anuals) assignada a Activitats Econòmiques.",
+      };
     }
 
     case 'fix_recalculate_iva_all': {
       store.recalculateIVA();
-      return { success: true, message: 'Totes les liquidacions del Model 303 i el Model 390 han estat recalculades i quadrades.' };
+      return {
+        success: true,
+        message: 'Totes les liquidacions del Model 303 i el Model 390 han estat recalculades i quadrades.',
+      };
     }
 
     case 'fix_sync_activities_iva': {
       const res = store.syncIVAFromActivities();
-      return { success: true, message: `Sincronització completada: ${res.addedIssued} factures emeses i ${res.addedReceived} rebudes creades.` };
+      return {
+        success: true,
+        message: `Sincronització completada: ${res.addedIssued} factures emeses i ${res.addedReceived} rebudes creades.`,
+      };
     }
 
     case 'fix_sync_properties_iva': {
       const res = store.syncIVAFromProperties();
-      return { success: true, message: `Immobles sincronitzats: +${res.addedCommercialRentals} factures de locals (21% + 19% retenció) generades.` };
+      return {
+        success: true,
+        message: `Immobles sincronitzats: +${res.addedCommercialRentals} factures de locals (21% + 19% retenció) generades.`,
+      };
     }
 
     case 'fix_sync_commercial_withholdings_180': {
       const curData = store.getData();
-      const commercialProps = (curData.properties || []).filter(p => p.usageType === 'commercial');
+      const commercialProps = (curData.properties || []).filter((p) => p.usageType === 'commercial');
       const totalCommercialRent = commercialProps.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
       const expected19 = totalCommercialRent * 0.19;
 
@@ -1574,7 +1810,10 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
         ...curData.capitalIncome,
         realEstateWithholdings: expected19,
       });
-      return { success: true, message: `S'han imputat ${formatCurrency(expected19)} de retencions a la Casella 0598 procedents del Model 180.` };
+      return {
+        success: true,
+        message: `S'han imputat ${formatCurrency(expected19)} de retencions a la Casella 0598 procedents del Model 180.`,
+      };
     }
 
     case 'fix_cap_7p_exemption': {
@@ -1586,42 +1825,67 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
     case 'fix_apply_disabled_worker_deduction': {
       const workData = store.getData().workIncome;
       store.update('workIncome', { ...workData, otherDeductible: 3500 });
-      return { success: true, message: 'Despesa deduïble incrementada de 3.500 € per discapacitat aplicada a Rendiments del Treball.' };
+      return {
+        success: true,
+        message:
+          'Despesa deduïble incrementada de 3.500 € per discapacitat aplicada a Rendiments del Treball.',
+      };
     }
 
     case 'fix_cap_housing_deduction': {
       store.update('deductions', { housingAmountsPaid: 9040 });
-      return { success: true, message: 'Base de deducció per habitatge habitual ajustada al màxim legal de 9.040 €.' };
+      return {
+        success: true,
+        message: 'Base de deducció per habitatge habitual ajustada al màxim legal de 9.040 €.',
+      };
     }
 
     case 'fix_disable_catalan_rental_deduction': {
       store.update('deductions', { catalanRentalDeduction: false });
-      return { success: true, message: 'Deducció de lloguer autonòmica desactivada per incompatibilitat d\'edat.' };
+      return {
+        success: true,
+        message: "Deducció de lloguer autonòmica desactivada per incompatibilitat d'edat.",
+      };
     }
 
     case 'fix_disable_maternity_deduction': {
       store.update('deductions', { maternityDeduction: false });
-      return { success: true, message: 'Deducció per maternitat desactivada en no haver-hi descendents menors de 3 anys.' };
+      return {
+        success: true,
+        message: 'Deducció per maternitat desactivada en no haver-hi descendents menors de 3 anys.',
+      };
     }
 
     case 'fix_cap_pension_individual': {
       store.update('deductions', { pensionPlanContributions: 1500 });
-      return { success: true, message: 'Aportació individual a pla de pensions ajustada al límit d\'1.500 €.' };
+      return {
+        success: true,
+        message: "Aportació individual a pla de pensions ajustada al límit d'1.500 €.",
+      };
     }
 
     case 'fix_cap_pension_company': {
       store.update('deductions', { companyPensionContributions: 8500 });
-      return { success: true, message: 'Aportació empresarial a pla d\'ocupació ajustada al límit de 8.500 €.' };
+      return {
+        success: true,
+        message: "Aportació empresarial a pla d'ocupació ajustada al límit de 8.500 €.",
+      };
     }
 
     case 'fix_cap_pension_total': {
       store.update('deductions', { pensionPlanContributions: 1500, companyPensionContributions: 8500 });
-      return { success: true, message: 'Plans de pensions ajustats al límit conjunt de 10.000 € (1.500 € ind + 8.500 € empresa).' };
+      return {
+        success: true,
+        message: 'Plans de pensions ajustats al límit conjunt de 10.000 € (1.500 € ind + 8.500 € empresa).',
+      };
     }
 
     case 'fix_cap_energy_deduction': {
       store.update('deductions', { energyEfficiencyAmount: 7500 });
-      return { success: true, message: 'Base de deducció per eficiència energètica ajustada al màxim legal de 7.500 €.' };
+      return {
+        success: true,
+        message: 'Base de deducció per eficiència energètica ajustada al màxim legal de 7.500 €.',
+      };
     }
 
     case 'fix_cap_nursery_expenses': {
@@ -1634,14 +1898,24 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
       let adjusted = 0;
       for (const inv of iva.receivedInvoices) {
         const c = (inv.concept || '').toLowerCase();
-        if (c.includes('electricitat') || c.includes('llum') || c.includes('aigua') || c.includes('gas') || c.includes('fibra') || c.includes('internet')) {
+        if (
+          c.includes('electricitat') ||
+          c.includes('llum') ||
+          c.includes('aigua') ||
+          c.includes('gas') ||
+          c.includes('fibra') ||
+          c.includes('internet')
+        ) {
           inv.deductiblePercentage = 30;
-          inv.deductibleVatAmount = Math.round((inv.vatAmount || 0) * 0.30 * 100) / 100;
+          inv.deductibleVatAmount = Math.round((inv.vatAmount || 0) * 0.3 * 100) / 100;
           adjusted++;
         }
       }
       store.updateIVA({ receivedInvoices: iva.receivedInvoices });
-      return { success: true, message: `${adjusted} factura/es de subministraments ajustades al 30% d'afectació legal (Art. 30.2.5a.b LIRPF).` };
+      return {
+        success: true,
+        message: `${adjusted} factura/es de subministraments ajustades al 30% d'afectació legal (Art. 30.2.5a.b LIRPF).`,
+      };
     }
 
     case 'fix_reconcile_all_models': {
@@ -1652,21 +1926,27 @@ export function executeAutoFix(fixKey: string): { success: boolean; message: str
       if (reconciled.gains) store.update('gains', reconciled.gains);
       if (reconciled.capitalIncome) store.update('capitalIncome', reconciled.capitalIncome);
       if (reconciled.iva) store.updateIVA(reconciled.iva);
-      return { success: true, message: 'Cuadre Automàtic Integral executat: 100% de models tributaris sincronitzats i quadrats.' };
+      return {
+        success: true,
+        message: 'Cuadre Automàtic Integral executat: 100% de models tributaris sincronitzats i quadrats.',
+      };
     }
 
     default: {
       if (fixKey.startsWith('fix_remove_tourist_reduction_')) {
         const propId = fixKey.replace('fix_remove_tourist_reduction_', '');
         const props = store.getData().properties || [];
-        const target = props.find(p => p.id === propId);
+        const target = props.find((p) => p.id === propId);
         if (target) {
           target.reductionType = 'none';
           store.setSection('properties', props);
-          return { success: true, message: `Reducció eliminada de l'immoble ${target.name || propId} per tractar-se d'ús turístic/temporal.` };
+          return {
+            success: true,
+            message: `Reducció eliminada de l'immoble ${target.name || propId} per tractar-se d'ús turístic/temporal.`,
+          };
         }
       }
-      return { success: false, message: 'Acció d\'auto-correcció no reconeguda.' };
+      return { success: false, message: "Acció d'auto-correcció no reconeguda." };
     }
   }
 }

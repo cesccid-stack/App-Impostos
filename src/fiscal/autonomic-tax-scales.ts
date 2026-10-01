@@ -1,7 +1,7 @@
 /**
  * @module fiscal/autonomic-tax-scales
  * Escales de Gravamen Autonòmiques de l'IRPF per a les 17 Comunitats Autònomes.
- * 
+ *
  * Normativa: Art. 74 i Art. 77 de la Llei 35/2006 de l'IRPF.
  * Cada Comunitat Autònoma té competència normativa per aprovar la seva pròpia
  * escala de gravamen sobre la base liquidable general.
@@ -41,10 +41,10 @@ export interface AutonomicCommunityInfo {
  * Escala Autonòmica de la Comunitat de Madrid (Trams deflactats).
  */
 export const MADRID_GENERAL_TAX_BRACKETS: readonly TaxBracket[] = [
-  { upTo: 13_351.20, rate: 0.085 },
+  { upTo: 13_351.2, rate: 0.085 },
   { upTo: 19_656.96, rate: 0.107 },
-  { upTo: 36_531.00, rate: 0.128 },
-  { upTo: 57_320.40, rate: 0.174 },
+  { upTo: 36_531.0, rate: 0.128 },
+  { upTo: 57_320.4, rate: 0.174 },
   { upTo: Infinity, rate: 0.205 },
 ];
 
@@ -90,10 +90,10 @@ export const GALICIA_GENERAL_TAX_BRACKETS: readonly TaxBracket[] = [
  */
 export const CATALUNYA_GENERAL_TAX_BRACKETS: readonly TaxBracket[] = [
   { upTo: 12_450, rate: 0.105 },
-  { upTo: 17_707.20, rate: 0.12 },
+  { upTo: 17_707.2, rate: 0.12 },
   { upTo: 21_000, rate: 0.14 },
-  { upTo: 33_007.20, rate: 0.15 },
-  { upTo: 53_407.20, rate: 0.188 },
+  { upTo: 33_007.2, rate: 0.15 },
+  { upTo: 53_407.2, rate: 0.188 },
   { upTo: 90_000, rate: 0.215 },
   { upTo: 120_000, rate: 0.235 },
   { upTo: 175_000, rate: 0.245 },
@@ -277,12 +277,12 @@ const CCAA_CODE_MAP: Record<string, SpanishAutonomousCommunity> = {
 export function getAutonomicBrackets(ccaa: string = 'catalunya'): readonly TaxBracket[] {
   if (!ccaa) return CATALUNYA_GENERAL_TAX_BRACKETS;
   const raw = ccaa.toLowerCase().trim();
-  
+
   // 1. Cercar directament al registre
   if (AUTONOMIC_COMMUNITIES_REGISTRY[raw as SpanishAutonomousCommunity]) {
     return AUTONOMIC_COMMUNITIES_REGISTRY[raw as SpanishAutonomousCommunity].brackets;
   }
-  
+
   // 2. Cercar a través del mapatge de codis de 3 lletres
   const mappedKey = CCAA_CODE_MAP[raw];
   if (mappedKey && AUTONOMIC_COMMUNITIES_REGISTRY[mappedKey]) {

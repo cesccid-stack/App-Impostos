@@ -33,8 +33,20 @@ export interface ExpensesBookEntry {
  * Exporta el Llibre Registre de Vendes i Ingressos en format CSV homologat AEAT.
  */
 export function exportSalesBookCSV(entries: SalesBookEntry[]): void {
-  const headers = ['Data', 'Num_Factura', 'Nom_Client', 'NIF_Client', 'Concepte', 'Base_Imposable_EUR', 'Tipus_IVA_PCT', 'Quota_IVA_EUR', 'Tipus_Retencio_PCT', 'Retencio_IRPF_EUR', 'Total_Factura_EUR'];
-  const rows = entries.map(e => [
+  const headers = [
+    'Data',
+    'Num_Factura',
+    'Nom_Client',
+    'NIF_Client',
+    'Concepte',
+    'Base_Imposable_EUR',
+    'Tipus_IVA_PCT',
+    'Quota_IVA_EUR',
+    'Tipus_Retencio_PCT',
+    'Retencio_IRPF_EUR',
+    'Total_Factura_EUR',
+  ];
+  const rows = entries.map((e) => [
     e.date,
     `"${e.invoiceNumber}"`,
     `"${e.clientName}"`,
@@ -48,15 +60,27 @@ export function exportSalesBookCSV(entries: SalesBookEntry[]): void {
     e.totalInvoice.toFixed(2),
   ]);
 
-  downloadCSV([headers.join(';'), ...rows.map(r => r.join(';'))].join('\n'), 'llibre_registre_vendes_ingressos_aeat.csv');
+  downloadCSV(
+    [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n'),
+    'llibre_registre_vendes_ingressos_aeat.csv',
+  );
 }
 
 /**
  * Exporta el Llibre Registre de Compres i Despeses en format CSV homologat AEAT.
  */
 export function exportExpensesBookCSV(entries: ExpensesBookEntry[]): void {
-  const headers = ['Data', 'Num_Factura', 'Nom_Proveidor', 'NIF_Proveidor', 'Concepte', 'Despesa_Deductible_IRPF_EUR', 'IVA_Deductible_EUR', 'Total_EUR'];
-  const rows = entries.map(e => [
+  const headers = [
+    'Data',
+    'Num_Factura',
+    'Nom_Proveidor',
+    'NIF_Proveidor',
+    'Concepte',
+    'Despesa_Deductible_IRPF_EUR',
+    'IVA_Deductible_EUR',
+    'Total_EUR',
+  ];
+  const rows = entries.map((e) => [
     e.date,
     `"${e.invoiceNumber}"`,
     `"${e.supplierName}"`,
@@ -67,7 +91,10 @@ export function exportExpensesBookCSV(entries: ExpensesBookEntry[]): void {
     e.totalExpense.toFixed(2),
   ]);
 
-  downloadCSV([headers.join(';'), ...rows.map(r => r.join(';'))].join('\n'), 'llibre_registre_compres_despeses_aeat.csv');
+  downloadCSV(
+    [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n'),
+    'llibre_registre_compres_despeses_aeat.csv',
+  );
 }
 
 function downloadCSV(csvContent: string, filename: string): void {

@@ -34,7 +34,13 @@ interface DashboardContext {
   totalGainsPositive: number;
   totalGainsLosses: number;
   ivaAnnualBalance: number;
-  wealthTaxResult: { totalGrossAssets: number; totalDebts: number; netWealth: number; finalTax: number; hasFilingObligation: boolean };
+  wealthTaxResult: {
+    totalGrossAssets: number;
+    totalDebts: number;
+    netWealth: number;
+    finalTax: number;
+    hasFilingObligation: boolean;
+  };
   totalGrossIncome: number;
   allProfiles: UserProfile[];
   enabledModuleIds: string[];
@@ -90,12 +96,18 @@ export function renderDashboard(): HTMLElement {
     if (data.iva) {
       const ivaQuarters = calculateAllQuarters(data.iva, currentYear);
       for (const qRes of Object.values(ivaQuarters.quarters)) {
-        ivaAnnualBalance += (qRes.resultadoLiquidacion || 0);
+        ivaAnnualBalance += qRes.resultadoLiquidacion || 0;
       }
     }
 
     // Càlculs de Patrimoni (Model 714)
-    let wealthTaxResult = { totalGrossAssets: 0, totalDebts: 0, netWealth: 0, finalTax: 0, hasFilingObligation: false };
+    let wealthTaxResult = {
+      totalGrossAssets: 0,
+      totalDebts: 0,
+      netWealth: 0,
+      finalTax: 0,
+      hasFilingObligation: false,
+    };
     if (data.wealth) {
       const wRes = calculateWealthTax(data.wealth, result.generalBase, result.savingsBase, result.netTax);
       wealthTaxResult = {
@@ -113,18 +125,25 @@ export function renderDashboard(): HTMLElement {
     const totalGrossIncome =
       (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0) +
       propSummary.totalGrossIncome +
-      (data.capitalIncome?.interests || 0) + (data.capitalIncome?.dividends || 0) + (data.capitalIncome?.foreignDividends || 0) +
+      (data.capitalIncome?.interests || 0) +
+      (data.capitalIncome?.dividends || 0) +
+      (data.capitalIncome?.foreignDividends || 0) +
       (data.activities?.income || 0) +
       totalGainsPositive;
 
-    const overallEffective = totalGrossIncome > 0 ? (result.netTax / totalGrossIncome) : 0;
+    const overallEffective = totalGrossIncome > 0 ? result.netTax / totalGrossIncome : 0;
 
     // Fiscal Health Score (0 a 100)
     let healthScore = 100;
     if (auditRisk.overallRiskScore > 30) healthScore -= 15;
     if (auditRisk.overallRiskScore > 60) healthScore -= 25;
     if (audit.adviceList.length > 3) healthScore -= 10;
-    if ((data.workIncome?.employers || []).length === 0 && (data.properties || []).length === 0 && (data.activities?.income || 0) === 0 && totalGrossIncome === 0) {
+    if (
+      (data.workIncome?.employers || []).length === 0 &&
+      (data.properties || []).length === 0 &&
+      (data.activities?.income || 0) === 0 &&
+      totalGrossIncome === 0
+    ) {
       healthScore = 50;
     }
     healthScore = Math.max(20, Math.min(100, healthScore));
@@ -168,7 +187,7 @@ export function renderDashboard(): HTMLElement {
           🌟 Visió Global & KPIs Claus
         </button>
         <button class="tab-btn ${activeTab === 'journey' ? 'active' : ''}" data-tab="journey" style="padding:8px 16px; border:none; background:transparent; color:${activeTab === 'journey' ? 'var(--color-primary)' : 'var(--text-secondary)'}; font-weight:${activeTab === 'journey' ? '700' : '500'}; font-size:0.85rem; cursor:pointer; border-bottom:2px solid ${activeTab === 'journey' ? 'var(--color-primary)' : 'transparent'}; white-space:nowrap;">
-          🧭 Cuadro de Mando Didàctic & Viatge Fiscal
+          🧭 Viatge Fiscal & Explicador Didàctic
         </button>
         <button class="tab-btn ${activeTab === 'charts' ? 'active' : ''}" data-tab="charts" style="padding:8px 16px; border:none; background:transparent; color:${activeTab === 'charts' ? 'var(--color-primary)' : 'var(--text-secondary)'}; font-weight:${activeTab === 'charts' ? '700' : '500'}; font-size:0.85rem; cursor:pointer; border-bottom:2px solid ${activeTab === 'charts' ? 'var(--color-primary)' : 'transparent'}; white-space:nowrap;">
           📊 Flux de Renda & Gràfics
@@ -279,7 +298,17 @@ export function renderDashboard(): HTMLElement {
   }
 
   function renderGlobalKpiGrid(ctx: DashboardContext) {
-    const { data, result, propSummary, totalGainsPositive, totalGainsLosses, ivaAnnualBalance, wealthTaxResult, auditRisk, enabledModuleIds } = ctx;
+    const {
+      data,
+      result,
+      propSummary,
+      totalGainsPositive,
+      totalGainsLosses,
+      ivaAnnualBalance,
+      wealthTaxResult,
+      auditRisk,
+      enabledModuleIds,
+    } = ctx;
 
     const showWork = enabledModuleIds.includes('work_income');
     const showProps = enabledModuleIds.includes('properties');
@@ -305,7 +334,7 @@ export function renderDashboard(): HTMLElement {
           </div>
         </div>
         <button class="btn btn--primary btn--sm" id="btn-open-journey-tab" style="font-weight:700;">
-          Obrir Cuadro de Mando Visual ➡️
+          Obrir Viatge Fiscal & Explicador ➡️
         </button>
       </div>
 
@@ -313,7 +342,9 @@ export function renderDashboard(): HTMLElement {
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:var(--space-md); margin-bottom:var(--space-xl);">
         
         <!-- 1. Treball -->
-        ${showWork ? `
+        ${
+          showWork
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -331,10 +362,14 @@ export function renderDashboard(): HTMLElement {
             <a href="#/treball" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Veure Nòmines & 7.p ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 2. Immobles -->
-        ${showProps ? `
+        ${
+          showProps
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -352,10 +387,14 @@ export function renderDashboard(): HTMLElement {
             <a href="#/immobles" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Extracontable & Factures ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 3. Capital Mobiliari -->
-        ${showCapital ? `
+        ${
+          showCapital
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -373,17 +412,21 @@ export function renderDashboard(): HTMLElement {
             <a href="#/capital" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Dividends & Doble Imposició ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 4. Guanys i Cartera (FIFO) -->
-        ${showGains ? `
+        ${
+          showGains
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
               <span style="font-size:var(--text-xs); font-weight:700; color:var(--text-muted); text-transform:uppercase;">📊 Borsa & Cripto (FIFO)</span>
               <span class="badge badge--primary">${(data.gains?.items || []).length} op.</span>
             </div>
-            <div style="font-size:1.5rem; font-weight:800; color:${(totalGainsPositive - totalGainsLosses) >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
+            <div style="font-size:1.5rem; font-weight:800; color:${totalGainsPositive - totalGainsLosses >= 0 ? 'var(--color-success)' : 'var(--color-error)'};">
               ${formatCurrency(totalGainsPositive - totalGainsLosses)}
             </div>
             <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">
@@ -394,10 +437,14 @@ export function renderDashboard(): HTMLElement {
             <a href="#/guanys" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Compensació 4 Anys & FIFO ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 5. Activitats & IVA 303 -->
-        ${showIVA ? `
+        ${
+          showIVA
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -415,10 +462,14 @@ export function renderDashboard(): HTMLElement {
             <a href="#/iva" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Model 303 / 390 & Factures ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 6. Deduccions & Estalvi -->
-        ${showDeductions ? `
+        ${
+          showDeductions
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -436,10 +487,14 @@ export function renderDashboard(): HTMLElement {
             <a href="#/deduccions" style="color:var(--color-success); font-weight:600; text-decoration:none;">Revisar Deduccions ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 7. Patrimoni & 720 -->
-        ${showWealth ? `
+        ${
+          showWealth
+            ? `
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
@@ -459,7 +514,9 @@ export function renderDashboard(): HTMLElement {
             <a href="#/patrimoni" style="color:var(--color-primary); font-weight:600; text-decoration:none;">Model 714 & 720 Estranger ➡️</a>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 8. Radar Risc AEAT -->
         <div class="card" style="padding:var(--space-md); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-surface-elevated);">
@@ -500,9 +557,16 @@ export function renderDashboard(): HTMLElement {
         </div>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:var(--space-sm);">
-          ${[ctx.currentYear, ctx.currentYear - 1, ctx.currentYear - 2, ctx.currentYear - 3, ctx.currentYear - 4].map(yr => {
-            const irpfPresc = checkTaxPrescription(yr, 'IRPF');
-            return `
+          ${[
+            ctx.currentYear,
+            ctx.currentYear - 1,
+            ctx.currentYear - 2,
+            ctx.currentYear - 3,
+            ctx.currentYear - 4,
+          ]
+            .map((yr) => {
+              const irpfPresc = checkTaxPrescription(yr, 'IRPF');
+              return `
               <div style="padding:10px 12px; background:var(--bg-surface); border-radius:var(--radius-md); border:1px solid ${irpfPresc.isPrescribed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'};">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                   <span style="font-weight:700; font-size:var(--text-sm);">Exercici ${yr}</span>
@@ -518,7 +582,8 @@ export function renderDashboard(): HTMLElement {
                 </div>
               </div>
             `;
-          }).join('')}
+            })
+            .join('')}
         </div>
       </div>
 
@@ -679,7 +744,7 @@ export function renderDashboard(): HTMLElement {
               </tr>
               <tr style="background:var(--bg-surface); font-size:1.2rem; font-weight:900;">
                 <td><strong>RESULTAT FINAL (Casella 0610)</strong></td>
-                <td>${result.result < 0 ? 'Quantitat que l\'AEAT t\'ha de retornar' : 'Quantitat pendent d\'ingressar'}</td>
+                <td>${result.result < 0 ? "Quantitat que l'AEAT t'ha de retornar" : "Quantitat pendent d'ingressar"}</td>
                 <td style="text-align:right;" class="${result.result < 0 ? 'text-success' : 'text-error'}">
                   ${result.result < 0 ? '↩ -' : '↗ +'}${formatCurrency(Math.abs(result.result))}
                 </td>
@@ -705,15 +770,29 @@ export function renderDashboard(): HTMLElement {
     // Apply simulation deltas
     if (simSalaryDelta !== 0) {
       if (!simData.workIncome.employers || simData.workIncome.employers.length === 0) {
-        simData.workIncome.employers = [{ id: 'sim_emp', name: 'Simulació Treball', grossSalary: simSalaryDelta, inKind: 0, withholdings: simSalaryDelta * 0.2, socialSecurity: simSalaryDelta * 0.0635, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 }];
+        simData.workIncome.employers = [
+          {
+            id: 'sim_emp',
+            name: 'Simulació Treball',
+            grossSalary: simSalaryDelta,
+            inKind: 0,
+            withholdings: simSalaryDelta * 0.2,
+            socialSecurity: simSalaryDelta * 0.0635,
+            dietsIncome: 0,
+            dietsDays: 0,
+            mileageIncome: 0,
+            mileageKm: 0,
+          },
+        ];
       } else {
         simData.workIncome.employers[0].grossSalary += simSalaryDelta;
-        simData.workIncome.employers[0].withholdings += (simSalaryDelta * 0.2);
+        simData.workIncome.employers[0].withholdings += simSalaryDelta * 0.2;
       }
     }
 
     if (simPensionDelta !== 0) {
-      simData.deductions.pensionPlanContributions = (simData.deductions.pensionPlanContributions || 0) + simPensionDelta;
+      simData.deductions.pensionPlanContributions =
+        (simData.deductions.pensionPlanContributions || 0) + simPensionDelta;
     }
 
     if (simGainsDelta !== 0) {
@@ -838,10 +917,10 @@ export function renderDashboard(): HTMLElement {
 
           <div>
             <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Variació Neta de Liquidació</div>
-            <div style="font-size:1.6rem; font-weight:900; color:${diffResult < 0 ? 'var(--color-success)' : (diffResult > 0 ? 'var(--color-error)' : 'var(--text-primary)')}; margin-top:2px;">
-              ${diffResult < 0 ? 'Estalvi: +' : (diffResult > 0 ? 'Cost: +' : 'Sense canvis ')}${formatCurrency(Math.abs(diffResult))}
+            <div style="font-size:1.6rem; font-weight:900; color:${diffResult < 0 ? 'var(--color-success)' : diffResult > 0 ? 'var(--color-error)' : 'var(--text-primary)'}; margin-top:2px;">
+              ${diffResult < 0 ? 'Estalvi: +' : diffResult > 0 ? 'Cost: +' : 'Sense canvis '}${formatCurrency(Math.abs(diffResult))}
             </div>
-            <div style="font-size:0.7rem; color:var(--text-secondary);">${diffResult < 0 ? '🎉 Més devolució o menys pagament' : (diffResult > 0 ? '⚠️ Increment de quota tributària' : 'Modifica els controls')}</div>
+            <div style="font-size:0.7rem; color:var(--text-secondary);">${diffResult < 0 ? '🎉 Més devolució o menys pagament' : diffResult > 0 ? '⚠️ Increment de quota tributària' : 'Modifica els controls'}</div>
           </div>
         </div>
       </div>
@@ -905,9 +984,9 @@ export function renderDashboard(): HTMLElement {
 
       const gross = (res.generalBase || 0) + (res.savingsBase || 0);
       consolidatedGross += gross;
-      consolidatedNetTax += (res.netTax || 0);
-      consolidatedWithholdings += (res.totalWithholdings || 0);
-      consolidatedResult += (res.result || 0);
+      consolidatedNetTax += res.netTax || 0;
+      consolidatedWithholdings += res.totalWithholdings || 0;
+      consolidatedResult += res.result || 0;
 
       return {
         profile: p,
@@ -968,10 +1047,11 @@ export function renderDashboard(): HTMLElement {
               </tr>
             </thead>
             <tbody>
-              ${profileSummaries.map((ps: ProfileSummaryItem) => {
-                const isRef = ps.result < 0;
-                const isAct = ps.profile.id === store.getActiveProfileId();
-                return `
+              ${profileSummaries
+                .map((ps: ProfileSummaryItem) => {
+                  const isRef = ps.result < 0;
+                  const isAct = ps.profile.id === store.getActiveProfileId();
+                  return `
                   <tr style="${isAct ? 'background:rgba(99,102,241,0.08); font-weight:600;' : ''}">
                     <td>
                       <div style="display:flex; align-items:center; gap:8px;">
@@ -992,15 +1072,20 @@ export function renderDashboard(): HTMLElement {
                       ${isRef ? '↩ -' : '↗ +'}${formatCurrency(Math.abs(ps.result))}
                     </td>
                     <td style="text-align:center;">
-                      ${isAct ? `<span style="font-size:0.75rem; color:var(--text-muted);">Seleccionat</span>` : `
+                      ${
+                        isAct
+                          ? `<span style="font-size:0.75rem; color:var(--text-muted);">Seleccionat</span>`
+                          : `
                         <button class="btn btn--secondary btn--sm btn-switch-profile-table" data-id="${ps.profile.id}" style="font-size:0.7rem; padding:2px 8px;">
                           Canviar ⇄
                         </button>
-                      `}
+                      `
+                      }
                     </td>
                   </tr>
                 `;
-              }).join('')}
+                })
+                .join('')}
             </tbody>
           </table>
         </div>
@@ -1027,7 +1112,7 @@ export function renderDashboard(): HTMLElement {
         </div>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:var(--space-md);">
-          ${ALL_APP_MODULES.map(m => {
+          ${ALL_APP_MODULES.map((m) => {
             const isAct = enabledModuleIds.includes(m.id);
             return `
               <div class="card" style="
@@ -1098,7 +1183,7 @@ export function renderDashboard(): HTMLElement {
     });
 
     // Tab navigation
-    page.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach(btn => {
+    page.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeTab = (btn.dataset.tab as typeof activeTab) || 'global';
         render();
@@ -1124,15 +1209,29 @@ export function renderDashboard(): HTMLElement {
       const data = store.getData();
       const result = calculateIRPF(data);
       const propSummary = calculateAllProperties(data.properties || [], store.getYear());
-      const totalGainsPositive = (data.gains?.items || []).filter(i => (i.transferValue - i.acquisitionValue - i.expenses) > 0).reduce((s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses), 0);
+      const totalGainsPositive = (data.gains?.items || [])
+        .filter((i) => i.transferValue - i.acquisitionValue - i.expenses > 0)
+        .reduce((s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses), 0);
 
       const incomeItems = [
-        { label: 'Treball', value: (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0) },
+        {
+          label: 'Treball',
+          value: (data.workIncome?.employers || []).reduce(
+            (s, e) => s + (e.grossSalary || 0) + (e.inKind || 0),
+            0,
+          ),
+        },
         { label: 'Lloguers', value: propSummary.totalGrossIncome },
-        { label: 'Capital Mobiliari', value: (data.capitalIncome?.interests || 0) + (data.capitalIncome?.dividends || 0) + (data.capitalIncome?.foreignDividends || 0) },
+        {
+          label: 'Capital Mobiliari',
+          value:
+            (data.capitalIncome?.interests || 0) +
+            (data.capitalIncome?.dividends || 0) +
+            (data.capitalIncome?.foreignDividends || 0),
+        },
         { label: 'Activitats', value: data.activities?.income || 0 },
         { label: 'Guanys Borsa', value: totalGainsPositive },
-      ].filter(i => i.value > 0);
+      ].filter((i) => i.value > 0);
 
       const totalInc = incomeItems.reduce((s, i) => s + i.value, 0);
       const incomeCard = page.querySelector('#dash-income-card');
@@ -1142,7 +1241,7 @@ export function renderDashboard(): HTMLElement {
             size: 200,
             centerLabel: 'Total Bruts',
             centerValue: totalInc > 0 ? formatCurrency(totalInc) : '0 €',
-          })
+          }),
         );
       }
 
@@ -1155,7 +1254,7 @@ export function renderDashboard(): HTMLElement {
             { label: 'Crèdit Mínim', value: result.minimumTaxCredit, color: '#10b981' },
             { label: 'Deduccions', value: result.totalDeductions, color: '#10b981' },
             { label: 'Retencions', value: result.totalWithholdings, color: '#f59e0b' },
-          ])
+          ]),
         );
       }
     }
@@ -1198,7 +1297,7 @@ export function renderDashboard(): HTMLElement {
 
     // Consolidation table switch profile
     if (activeTab === 'consolidation') {
-      page.querySelectorAll<HTMLButtonElement>('.btn-switch-profile-table').forEach(btn => {
+      page.querySelectorAll<HTMLButtonElement>('.btn-switch-profile-table').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
           if (id) {
@@ -1220,7 +1319,7 @@ export function renderDashboard(): HTMLElement {
         });
       });
 
-      page.querySelectorAll<HTMLButtonElement>('.btn-toggle-tool-inline').forEach(btn => {
+      page.querySelectorAll<HTMLButtonElement>('.btn-toggle-tool-inline').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
           if (id) {

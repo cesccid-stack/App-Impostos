@@ -19,9 +19,9 @@ export interface OpenPosition {
 }
 
 export interface TaxLossHarvestingPlan {
-  totalRealizedNetGains: number;      // Guanys realitzats de l'any (€)
-  currentTaxDueEUR: number;           // Impostos actuals a pagar per la base de l'estalvi (€)
-  targetLossToHarvestEUR: number;     // Pèrdua necessària a aflorar per arribar a 0€ de guanys (€)
+  totalRealizedNetGains: number; // Guanys realitzats de l'any (€)
+  currentTaxDueEUR: number; // Impostos actuals a pagar per la base de l'estalvi (€)
+  targetLossToHarvestEUR: number; // Pèrdua necessària a aflorar per arribar a 0€ de guanys (€)
   recommendedSales: {
     positionId: string;
     tickerOrName: string;
@@ -32,7 +32,7 @@ export interface TaxLossHarvestingPlan {
   }[];
   totalLossHarvestedEUR: number;
   projectedNetGainsAfterHarvest: number;
-  projectedTaxSavingsEUR: number;     // Estalvi directe d'impostos (€)
+  projectedTaxSavingsEUR: number; // Estalvi directe d'impostos (€)
   netRemainingTaxDueEUR: number;
 }
 
@@ -41,7 +41,7 @@ export interface TaxLossHarvestingPlan {
  */
 export function calculateTaxLossHarvesting(
   realizedItems: GainItem[] = [],
-  openPositions: OpenPosition[] = []
+  openPositions: OpenPosition[] = [],
 ): TaxLossHarvestingPlan {
   // 1. Calcular guanys nets ja realitzats durant l'exercici
   const totalRealizedNetGains = Math.max(
@@ -50,7 +50,7 @@ export function calculateTaxLossHarvesting(
       const pnl = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
       if (pnl < 0 && item.isNonComputableLoss) return sum; // Salta pèrdues no computables
       return sum + pnl;
-    }, 0)
+    }, 0),
   );
 
   // 2. Calcular l'impost de l'estalvi que es pagaria actualment
@@ -71,7 +71,7 @@ export function calculateTaxLossHarvesting(
 
   // 3. Filtrar posicions amb pèrdues latents (unrealizedPnL < 0)
   const lossPositions = openPositions
-    .filter(p => p.unrealizedPnL < -1)
+    .filter((p) => p.unrealizedPnL < -1)
     .sort((a, b) => a.unrealizedPnL - b.unrealizedPnL); // Més pèrdua primer
 
   let neededLoss = totalRealizedNetGains;
@@ -83,11 +83,9 @@ export function calculateTaxLossHarvesting(
 
     const availableLoss = Math.abs(pos.unrealizedPnL);
     const lossToUse = Math.min(availableLoss, neededLoss);
-    
+
     // Validar regla dels 2 mesos (si s'ha comprat fa menys de 2 mesos, alerta de recompra)
-    const isRecentPurchase = pos.lastPurchaseDate 
-      ? isWithinTwoMonths(pos.lastPurchaseDate) 
-      : false;
+    const isRecentPurchase = pos.lastPurchaseDate ? isWithinTwoMonths(pos.lastPurchaseDate) : false;
 
     recommendedSales.push({
       positionId: pos.id,
@@ -95,8 +93,8 @@ export function calculateTaxLossHarvesting(
       unrealizedLoss: availableLoss,
       amountToSellEUR: (lossToUse / availableLoss) * pos.currentMarketValue,
       washSaleRisk: isRecentPurchase,
-      washSaleWarning: isRecentPurchase 
-        ? '⚠️ Atenció: Has comprat títols d\'aquest valor en els darrers 2 mesos. Si el vens ara amb pèrdues, la pèrdua quedarà suspesa segons l\'Art. 33.5.f LIRPF fins que no venguis la totalitat dels títols.'
+      washSaleWarning: isRecentPurchase
+        ? "⚠️ Atenció: Has comprat títols d'aquest valor en els darrers 2 mesos. Si el vens ara amb pèrdues, la pèrdua quedarà suspesa segons l'Art. 33.5.f LIRPF fins que no venguis la totalitat dels títols."
         : '✅ Compatible AEAT: Sense operacions en els 2 mesos previs.',
     });
 

@@ -27,7 +27,8 @@ export function renderSimulator(): HTMLElement {
 
   // Escenari 1: Aportació extra a pla de pensions (+1000€)
   const scenario1Data: DeclaracionData = JSON.parse(JSON.stringify(baseData));
-  scenario1Data.deductions.pensionPlanContributions = (scenario1Data.deductions.pensionPlanContributions || 0) + 1000;
+  scenario1Data.deductions.pensionPlanContributions =
+    (scenario1Data.deductions.pensionPlanContributions || 0) + 1000;
   const scenario1Result = calculateIRPF(scenario1Data);
 
   // Escenari 2: Venda amb pèrdues (-2000€)
@@ -40,13 +41,13 @@ export function renderSimulator(): HTMLElement {
     transferDate: '2024-12-31',
     acquisitionValue: 5000,
     transferValue: 3000,
-    expenses: 0
+    expenses: 0,
   });
   const scenario2Result = calculateIRPF(scenario2Data);
 
   const grid = document.createElement('div');
   grid.className = 'dashboard-charts';
-  
+
   grid.appendChild(createScenarioCard('Actual (Base)', baseResult, true));
   grid.appendChild(createScenarioCard('+1.000€ Pla Pensions', scenario1Result, false, baseResult));
   grid.appendChild(createScenarioCard('Aflorar pèrdues (-2.000€)', scenario2Result, false, baseResult));
@@ -111,16 +112,16 @@ export function renderSimulator(): HTMLElement {
 }
 
 function createScenarioCard(
-  title: string, 
-  result: FiscalResult, 
+  title: string,
+  result: FiscalResult,
   isBase: boolean = false,
-  baseResult?: FiscalResult
+  baseResult?: FiscalResult,
 ): HTMLElement {
   const card = document.createElement('div');
   card.className = `card ${isBase ? 'card--accent' : ''}`;
-  
+
   const isRefund = result.result < 0;
-  
+
   let diffHtml = '';
   if (!isBase && baseResult) {
     const diff = result.result - baseResult.result;
@@ -166,6 +167,6 @@ function createScenarioCard(
       </div>
     </div>
   `;
-  
+
   return card;
 }

@@ -39,7 +39,7 @@ export function renderRealEstateTaxes(): HTMLElement {
 
   function renderData() {
     const data = store.getData();
-    
+
     // ITP
     let itpHtml = `<h2 class="text-xl font-bold text-blue-600 dark:text-blue-400 mb-4 border-b pb-2">ITP / AJD (Mod 600)</h2>`;
     if (!data.patrimonialTaxes?.itpAjd || data.patrimonialTaxes.itpAjd.length === 0) {
@@ -110,13 +110,13 @@ export function renderRealEstateTaxes(): HTMLElement {
         disabilityDegree: 0,
         largeFamily: false,
         taxRate: 0,
-        amountDue: 0
+        amountDue: 0,
       };
 
       const calculated = ITPAndAJDEngine.calculateITPAJD(simITP);
 
       store.update('patrimonialTaxes', {
-        itpAjd: [...(data.patrimonialTaxes?.itpAjd || []), calculated]
+        itpAjd: [...(data.patrimonialTaxes?.itpAjd || []), calculated],
       });
       renderData();
     });
@@ -136,13 +136,13 @@ export function renderRealEstateTaxes(): HTMLElement {
         realBase: 0,
         chosenMethod: 'objective',
         taxableBase: 0,
-        amountDue: 0
+        amountDue: 0,
       };
 
       const calculated = ITPAndAJDEngine.calculatePlusvalia(simPlusvalia);
 
       store.update('patrimonialTaxes', {
-        plusvalia: [...(data.patrimonialTaxes?.plusvalia || []), calculated]
+        plusvalia: [...(data.patrimonialTaxes?.plusvalia || []), calculated],
       });
       renderData();
     });

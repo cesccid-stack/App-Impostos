@@ -1,5 +1,9 @@
 import { store } from '../store.ts';
-import { ModelReconciliationEngine, CROSS_CHECK_RULES, type ModelDiscrepancy } from '../fiscal/model-reconciliation-engine.ts';
+import {
+  ModelReconciliationEngine,
+  CROSS_CHECK_RULES,
+  type ModelDiscrepancy,
+} from '../fiscal/model-reconciliation-engine.ts';
 
 export function renderTaxReconciliation(): HTMLElement {
   const container = document.createElement('div');
@@ -96,7 +100,7 @@ export function renderTaxReconciliation(): HTMLElement {
                 <h3 class="font-bold text-base text-gray-900 dark:text-white">${d.title}</h3>
               </div>
               <div class="flex gap-1 flex-wrap">
-                ${d.modelsInvolved.map(m => `<span class="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded text-xs font-mono">${m}</span>`).join('')}
+                ${d.modelsInvolved.map((m) => `<span class="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded text-xs font-mono">${m}</span>`).join('')}
               </div>
             </div>
 
@@ -120,27 +124,54 @@ export function renderTaxReconciliation(): HTMLElement {
     // 3. Matrix of Reconciled Cross-Checks (200 creuaments totals)
     matrixCard.className = 'card p-6';
 
-    const failedSet = new Set(report.discrepancies.map(d => d.id));
+    const failedSet = new Set(report.discrepancies.map((d) => d.id));
 
     // Filtrar regles per categoria i cerca
-    const filteredRules = CROSS_CHECK_RULES.filter(rule => {
+    const filteredRules = CROSS_CHECK_RULES.filter((rule) => {
       const matchCat = currentCategoryFilter === 'all' || rule.category === currentCategoryFilter;
-      const matchQuery = !searchQuery || 
-        rule.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchQuery =
+        !searchQuery ||
+        rule.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         rule.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        rule.modelsInvolved.some(m => m.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        rule.modelsInvolved.some((m) => m.toLowerCase().includes(searchQuery.toLowerCase())) ||
         rule.legalReference.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCat && matchQuery;
     });
 
     const categoryCounts: Record<string, number> = {
       all: CROSS_CHECK_RULES.length,
-      iva: CROSS_CHECK_RULES.filter(r => r.category === 'iva' || r.category === 'vies_349').length,
-      irpf_130: CROSS_CHECK_RULES.filter(r => r.category === 'irpf_130' || r.category === 'withholdings_111_115' || r.category === 'withholdings_190_193_187').length,
-      properties_limits: CROSS_CHECK_RULES.filter(r => r.category === 'properties_limits' || r.category === 'rental_incasol_115' || r.category === 'tourist_model_179' || r.category === 'home_office_utilities').length,
-      wealth_714_718_720: CROSS_CHECK_RULES.filter(r => r.category === 'wealth_714_718_720' || r.category === 'wealth_formal_obligation' || r.category === 'patrimonial_taxes').length,
-      crypto_gains: CROSS_CHECK_RULES.filter(r => r.category === 'crypto_gains' || r.category === 'loss_carryover_4years').length,
-      catalan_deductions_rules: CROSS_CHECK_RULES.filter(r => r.category === 'catalan_deductions_rules' || r.category === 'catalan_birth' || r.category === 'donations_182' || r.category === 'energy_efficiency' || r.category === 'startups_282' || r.category === 'family_minimums').length,
+      iva: CROSS_CHECK_RULES.filter((r) => r.category === 'iva' || r.category === 'vies_349').length,
+      irpf_130: CROSS_CHECK_RULES.filter(
+        (r) =>
+          r.category === 'irpf_130' ||
+          r.category === 'withholdings_111_115' ||
+          r.category === 'withholdings_190_193_187',
+      ).length,
+      properties_limits: CROSS_CHECK_RULES.filter(
+        (r) =>
+          r.category === 'properties_limits' ||
+          r.category === 'rental_incasol_115' ||
+          r.category === 'tourist_model_179' ||
+          r.category === 'home_office_utilities',
+      ).length,
+      wealth_714_718_720: CROSS_CHECK_RULES.filter(
+        (r) =>
+          r.category === 'wealth_714_718_720' ||
+          r.category === 'wealth_formal_obligation' ||
+          r.category === 'patrimonial_taxes',
+      ).length,
+      crypto_gains: CROSS_CHECK_RULES.filter(
+        (r) => r.category === 'crypto_gains' || r.category === 'loss_carryover_4years',
+      ).length,
+      catalan_deductions_rules: CROSS_CHECK_RULES.filter(
+        (r) =>
+          r.category === 'catalan_deductions_rules' ||
+          r.category === 'catalan_birth' ||
+          r.category === 'donations_182' ||
+          r.category === 'energy_efficiency' ||
+          r.category === 'startups_282' ||
+          r.category === 'family_minimums',
+      ).length,
     };
 
     matrixCard.innerHTML = `
@@ -175,14 +206,15 @@ export function renderTaxReconciliation(): HTMLElement {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-slate-800">
-            ${filteredRules.map(rule => {
-              const isFailed = failedSet.has(rule.code);
-              return `
+            ${filteredRules
+              .map((rule) => {
+                const isFailed = failedSet.has(rule.code);
+                return `
                 <tr class="${isFailed ? 'bg-red-50/40 dark:bg-red-950/20' : 'hover:bg-gray-50/60 dark:hover:bg-slate-800/40'}">
                   <td class="p-3 text-center font-mono text-xs text-gray-400 font-bold">${rule.id}</td>
                   <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">
                     <div class="flex items-center gap-1.5 flex-wrap">
-                      ${rule.modelsInvolved.map(m => `<span class="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded text-xs font-mono">${m}</span>`).join('')}
+                      ${rule.modelsInvolved.map((m) => `<span class="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded text-xs font-mono">${m}</span>`).join('')}
                     </div>
                     <div class="text-xs text-gray-700 dark:text-gray-300 font-bold mt-1">${rule.name}</div>
                   </td>
@@ -197,7 +229,8 @@ export function renderTaxReconciliation(): HTMLElement {
                   </td>
                 </tr>
               `;
-            }).join('')}
+              })
+              .join('')}
           </tbody>
         </table>
       </div>
@@ -208,7 +241,7 @@ export function renderTaxReconciliation(): HTMLElement {
     `;
 
     // Reconnect dynamic handlers
-    matrixCard.querySelectorAll('.filter-tab').forEach(btn => {
+    matrixCard.querySelectorAll('.filter-tab').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const cat = (e.currentTarget as HTMLElement).getAttribute('data-cat') || 'all';
         currentCategoryFilter = cat;
@@ -266,7 +299,9 @@ export function renderTaxReconciliation(): HTMLElement {
       }
 
       renderData();
-      alert('⚡ Cuadre Automàtic Integral executat amb èxit! Totes les 200 regles de creuament tributari han estat recalculades i sincronitzades per coincidir al 100% amb la normativa de l\'AEAT, ATC, TGSS, Plataformes, Cadastre, CMAC, ICAA, ICAEN, BME, Facturae, DGSFP i Veri*Factu.');
+      alert(
+        "⚡ Cuadre Automàtic Integral executat amb èxit! Totes les 200 regles de creuament tributari han estat recalculades i sincronitzades per coincidir al 100% amb la normativa de l'AEAT, ATC, TGSS, Plataformes, Cadastre, CMAC, ICAA, ICAEN, BME, Facturae, DGSFP i Veri*Factu.",
+      );
     });
 
     renderData();

@@ -16,25 +16,27 @@ export type FiscalQuarter = '1T' | '2T' | '3T' | '4T';
 export interface Model130Quarterly {
   quarter: FiscalQuarter;
   year: number;
-  
+
   // Rendiments activitats econòmiques (des de 1 gener fins fi trimestre)
-  incomeTotal: number;          // Ingressos acumulats
-  expensesTotal: number;        // Despeses acumulades
-  netYield: number;             // Rendiment net (income - expenses)
-  
+  incomeTotal: number; // Ingressos acumulats
+  expensesTotal: number; // Despeses acumulades
+  netYield: number; // Rendiment net (income - expenses)
+
   // Càlcul del pagament
-  taxRate: number;              // 20% per defecte
-  grossTax: number;             // Quota bruta (20% del netYield)
-  
+  taxRate: number; // 20% per defecte
+  grossTax: number; // Quota bruta (20% del netYield)
+
   // Deduccions i minoracions
   withholdingsPrevious: number; // Retencions suportades des de 1 de gener
   fractionalPaymentsPrevious: number; // Pagaments fraccionats anteriors (ex: 1T per al càlcul del 2T)
-  minoracion: number;           // Art. 80 bis (si escau per baix rendiment)
-  deductionHomeLoan: number;    // Deducció per adquisició habitatge habitual (2%)
-  
-  netTax: number;               // Resultat declaració (a pagar o negatiu)
-  
+  minoracion: number; // Art. 80 bis (si escau per baix rendiment)
+  deductionHomeLoan: number; // Deducció per adquisició habitatge habitual (2%)
+
+  netTax: number; // Resultat declaració (a pagar o negatiu)
+
   status: 'draft' | 'filed';
+  isLinearSimulation?: boolean; // Indica si el càlcul prové d'una distribució lineal estimada
+  simulationWarning?: string; // Avís legal didàctic per a la UI
 }
 
 /**
@@ -43,18 +45,18 @@ export interface Model130Quarterly {
 export interface Model111Quarterly {
   quarter: FiscalQuarter;
   year: number;
-  
+
   // Rendiments del treball
-  workRecipientsCount: number;  // Número de perceptors
-  workBaseTotal: number;        // Import de les percepcions (Base)
-  workWithholdings: number;     // Retencions a ingressar
-  
+  workRecipientsCount: number; // Número de perceptors
+  workBaseTotal: number; // Import de les percepcions (Base)
+  workWithholdings: number; // Retencions a ingressar
+
   // Rendiments d'activitats econòmiques (Professionals)
   profRecipientsCount: number;
   profBaseTotal: number;
-  profWithholdings: number;     // 15% o 7%
-  
-  totalToPay: number;           // Resultat a ingressar
+  profWithholdings: number; // 15% o 7%
+
+  totalToPay: number; // Resultat a ingressar
   status: 'draft' | 'filed';
 }
 
@@ -64,12 +66,12 @@ export interface Model111Quarterly {
 export interface Model115Quarterly {
   quarter: FiscalQuarter;
   year: number;
-  
-  recipientsCount: number;      // Número de perceptors (arrendadors) - Casella [01]
-  baseTotal: number;            // Base de les retencions - Casella [02]
-  withholdingsTotal: number;    // Retencions a ingressar (19%) - Casella [03]
+
+  recipientsCount: number; // Número de perceptors (arrendadors) - Casella [01]
+  baseTotal: number; // Base de les retencions - Casella [02]
+  withholdingsTotal: number; // Retencions a ingressar (19%) - Casella [03]
   previousQuarterAdjustments?: number; // A deduir - Casella [04]
-  totalToPay: number;           // Resultat a ingressar - Casella [05]
+  totalToPay: number; // Resultat a ingressar - Casella [05]
   status: 'draft' | 'filed';
 }
 
@@ -80,15 +82,15 @@ export interface Model115LeaseInput {
   id: string;
   landlordNif: string;
   landlordName: string;
-  cadastralReference: string;   // 20 caràcters oficials del cadastre
+  cadastralReference: string; // 20 caràcters oficials del cadastre
   address: string;
   postalCode: string;
   municipality: string;
   provinceCode: string;
   propertySituation: '1' | '2' | '3' | '4'; // 1: Espanya amb Ref. Cadastral, 2: País Basc/Navarra, 3: Sense Ref. Cadastral, 4: Estranger
-  monthlyRent: number;          // Renda mensual neta
-  withholdingRate: number;      // General: 0.19 (19%)
-  isExempt: boolean;            // Si està exempt (e.g. < 900€ anuals o IAE 861.2)
+  monthlyRent: number; // Renda mensual neta
+  withholdingRate: number; // General: 0.19 (19%)
+  isExempt: boolean; // Si està exempt (e.g. < 900€ anuals o IAE 861.2)
   exemptionReason?: 'under_900_annual' | 'iae_861_exemption_cert' | 'residential_use' | 'financial_leasing';
 }
 
@@ -104,9 +106,9 @@ export interface Model180PerceptorItem {
   municipality: string;
   provinceCode: string;
   propertySituation: '1' | '2' | '3' | '4';
-  annualBase: number;           // Suma de bases anuals
-  withholdingRate: number;      // 19%
-  annualWithholding: number;    // Total retencions ingressades
+  annualBase: number; // Suma de bases anuals
+  withholdingRate: number; // 19%
+  annualWithholding: number; // Total retencions ingressades
 }
 
 /**
@@ -115,7 +117,7 @@ export interface Model180PerceptorItem {
 export interface Model180Annual {
   year: number;
   totalRecipientsCount: number; // Número total de perceptors
-  totalBaseAnnual: number;      // Suma total de bases anuals
+  totalBaseAnnual: number; // Suma total de bases anuals
   totalWithholdingsAnnual: number; // Suma total de retencions anuals
   perceptors: Model180PerceptorItem[];
   reconciliationWith115Status: 'perfect' | 'discrepancy';
@@ -130,14 +132,14 @@ export interface Model347Entity {
   name: string;
   type: 'client' | 'supplier';
   provinceCode: string;
-  
+
   // Imports trimestrals
   q1Amount: number;
   q2Amount: number;
   q3Amount: number;
   q4Amount: number;
-  
-  totalAmount: number;          // Ha de ser > 3005.06 per incloure's
+
+  totalAmount: number; // Ha de ser > 3005.06 per incloure's
 }
 
 export interface Model347Yearly {

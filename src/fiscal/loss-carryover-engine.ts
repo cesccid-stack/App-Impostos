@@ -9,7 +9,7 @@ import { exactAdd, exactSub, round2 } from '../utils/exact-math.ts';
 export interface SavingsCompensationResult {
   initialMobiliary: number;
   initialGains: number;
-  
+
   // Compensació d'exercicis anteriors (4 anys - Caselles 0426 i 0443)
   priorMobiliaryCompensated: number;
   priorGainsCompensated: number;
@@ -39,7 +39,7 @@ export function calculateSavingsCompensation(
   netMobiliary: number,
   netGains: number,
   pendingPriorMobiliary: PriorLossItem[] = [],
-  pendingPriorGains: PriorLossItem[] = []
+  pendingPriorGains: PriorLossItem[] = [],
 ): SavingsCompensationResult {
   let mob = round2(netMobiliary);
   let gains = round2(netGains);
@@ -50,14 +50,14 @@ export function calculateSavingsCompensation(
     const maxOffset = round2(gains * 0.25);
     const offset = Math.min(Math.abs(mob), maxOffset);
     crossCompensationApplied = offset;
-    mob = exactAdd(mob, offset);   // Es redueix el saldo negatiu
+    mob = exactAdd(mob, offset); // Es redueix el saldo negatiu
     gains = exactSub(gains, offset); // Es redueix el saldo positiu de guanys
   } else if (gains < 0 && mob > 0) {
     const maxOffset = round2(mob * 0.25);
     const offset = Math.min(Math.abs(gains), maxOffset);
     crossCompensationApplied = offset;
     gains = exactAdd(gains, offset); // Es redueix la pèrdua patrimonial
-    mob = exactSub(mob, offset);   // Es redueix el rendiment positiu
+    mob = exactSub(mob, offset); // Es redueix el rendiment positiu
   }
 
   const mobiliaryAfterCross = mob;

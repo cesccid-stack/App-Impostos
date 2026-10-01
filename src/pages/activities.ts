@@ -5,12 +5,18 @@
 
 import { store } from '../store.ts';
 import { createField, createFormRow, createFormSection } from '../components/form-field.ts';
-import { exportSalesBookCSV, exportExpensesBookCSV, type SalesBookEntry, type ExpensesBookEntry } from '../utils/activity-books-generator.ts';
+import {
+  exportSalesBookCSV,
+  exportExpensesBookCSV,
+  type SalesBookEntry,
+  type ExpensesBookEntry,
+} from '../utils/activity-books-generator.ts';
 import { showToast } from '../components/toast.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
 import { calculateRETACotization } from '../fiscal/social-security-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
+import { createInfoTooltip } from '../components/info-tooltip.ts';
 
 export function renderActivities(): HTMLElement {
   const page = document.createElement('div');
@@ -19,7 +25,16 @@ export function renderActivities(): HTMLElement {
   const data = store.getData();
   const a = data.activities;
   const compliance = runAutomatedComplianceChecks(data);
-  const actIssues = compliance.issues.filter(i => i.module === 'activities' || i.id.includes('cross'));
+  const actIssues = compliance.issues.filter((i) => i.module === 'activities' || i.id.includes('cross'));
+
+  const incomeTotal = a.income || 0;
+  const expensesTotal = a.expenses || 0;
+  const ssTotal = a.socialSecuritySelfEmployed || 0;
+  const totalOperatingExpenses = expensesTotal + ssTotal;
+  const preliminaryNet = Math.max(0, incomeTotal - totalOperatingExpenses);
+  const difficultProvision =
+    a.estimationType === 'direct_simplified' ? Math.min(2000, preliminaryNet * 0.05) : 0;
+  const netActivityIncome = Math.max(0, preliminaryNet - difficultProvision);
 
   page.innerHTML = `
     <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:var(--space-md);">
@@ -32,7 +47,51 @@ export function renderActivities(): HTMLElement {
       </button>
     </div>
 
-    ${actIssues.length > 0 ? `
+    <!-- Banner Didàctic: Com es calcula el Rendiment Net d'Autònom -->
+    <div class="card" style="margin-bottom:var(--space-lg); background:linear-gradient(145deg, rgba(99, 102, 241, 0.04), var(--bg-surface-elevated)); border:1px solid var(--border-accent); padding:var(--space-md);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); margin-bottom:var(--space-sm);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.2rem;">💡</span>
+          <strong style="font-size:var(--text-sm); color:var(--text-primary);">Com es calcula el teu Rendiment Net d'Autònom?</strong>
+          <span class="tax-info-tooltip-mount" data-concept="rendiment_activitats"></span>
+        </div>
+        <span class="badge badge--primary" style="font-size:0.75rem;">Art. 28-30 LIRPF</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:var(--space-sm); font-size:0.8rem;">
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➕ Ingressos d'Explotació</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--text-primary);">${formatCurrency(incomeTotal)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Casella 0180 AEAT</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➖ Despeses d'Activitat</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-warning);">-${formatCurrency(expensesTotal)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Factures deduïbles</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem;">➖ Quota RETA (SS)</div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-warning);">-${formatCurrency(ssTotal)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Seguretat Social autònoms</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+          <div style="color:var(--text-muted); font-size:0.7rem; display:flex; align-items:center; gap:4px;">
+            <span>➖ 5% Difícil Justificació</span>
+            <span class="tax-info-tooltip-mount" data-concept="despeses_dificil_justificacio"></span>
+          </div>
+          <div style="font-weight:800; font-size:1.1rem; color:var(--color-success);">-${formatCurrency(difficultProvision)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Màxim 2.000 € anuals</div>
+        </div>
+        <div style="background:var(--bg-surface); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--color-primary); background:rgba(99,102,241,0.04);">
+          <div style="color:var(--color-primary); font-size:0.7rem; font-weight:700;">🟰 Rendiment Net a Base</div>
+          <div style="font-weight:900; font-size:1.1rem; color:var(--color-primary);">${formatCurrency(netActivityIncome)}</div>
+          <div style="font-size:0.65rem; color:var(--text-secondary);">Casella 0224 AEAT</div>
+        </div>
+      </div>
+    </div>
+
+    ${
+      actIssues.length > 0
+        ? `
       <div class="card" style="margin-bottom:var(--space-lg); padding:10px 16px; border-left:4px solid var(--color-warning); background:var(--bg-surface-elevated); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
         <div style="display:flex; align-items:center; gap:var(--space-sm);">
           <span style="font-size:1.2rem;">⚠️</span>
@@ -45,7 +104,9 @@ export function renderActivities(): HTMLElement {
           ⚡ Auto-Corregir / Sincronitzar
         </button>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
   `;
 
   page.querySelector('#btn-open-act-compliance')?.addEventListener('click', () => {
@@ -69,14 +130,17 @@ export function renderActivities(): HTMLElement {
   typeCard.className = 'card';
   typeCard.appendChild(
     createFormSection(
-      'Mètode d\'estimació',
+      "Mètode d'estimació",
       createField({
         id: 'estimation-type',
-        label: 'Tipus d\'estimació',
+        label: "Tipus d'estimació",
         type: 'select',
         value: a.estimationType,
         options: [
-          { value: 'direct_simplified', label: 'Estimació directa simplificada (5% despeses difícil justificació)' },
+          {
+            value: 'direct_simplified',
+            label: 'Estimació directa simplificada (5% despeses difícil justificació)',
+          },
           { value: 'direct_normal', label: 'Estimació directa normal' },
         ],
         onChange: (val) => {
@@ -94,7 +158,7 @@ export function renderActivities(): HTMLElement {
   incomeCard.className = 'card';
   incomeCard.appendChild(
     createFormSection(
-      'Ingressos i despeses de l\'exercici',
+      "Ingressos i despeses de l'exercici",
       createFormRow(
         createField({
           id: 'activity-income',
@@ -106,7 +170,7 @@ export function renderActivities(): HTMLElement {
         }),
         createField({
           id: 'activity-expenses',
-          label: 'Despeses deduïbles d\'activitat',
+          label: "Despeses deduïbles d'activitat",
           value: a.expenses,
           suffix: '€',
           placeholder: '0,00',
@@ -227,9 +291,10 @@ export function renderActivities(): HTMLElement {
   const calcTeleworking = () => {
     const m2Work = parseFloat((helperCard.querySelector('#tele-m2-work') as HTMLInputElement)?.value) || 0;
     const m2Total = parseFloat((helperCard.querySelector('#tele-m2-total') as HTMLInputElement)?.value) || 1;
-    const supplies = parseFloat((helperCard.querySelector('#tele-supplies-total') as HTMLInputElement)?.value) || 0;
+    const supplies =
+      parseFloat((helperCard.querySelector('#tele-supplies-total') as HTMLInputElement)?.value) || 0;
     const ratio = Math.min(1, Math.max(0, m2Work / m2Total));
-    const ded = Math.round(supplies * ratio * 0.30 * 100) / 100;
+    const ded = Math.round(supplies * ratio * 0.3 * 100) / 100;
     const resultEl = helperCard.querySelector('#tele-result-val');
     if (resultEl) resultEl.textContent = `${ded.toFixed(2)} €`;
     return ded;
@@ -237,18 +302,19 @@ export function renderActivities(): HTMLElement {
 
   const calcDiets = () => {
     const daysEs = parseFloat((helperCard.querySelector('#diet-days-es') as HTMLInputElement)?.value) || 0;
-    const daysIntl = parseFloat((helperCard.querySelector('#diet-days-intl') as HTMLInputElement)?.value) || 0;
-    const ded = Math.round(((daysEs * 26.67) + (daysIntl * 48.08)) * 100) / 100;
+    const daysIntl =
+      parseFloat((helperCard.querySelector('#diet-days-intl') as HTMLInputElement)?.value) || 0;
+    const ded = Math.round((daysEs * 26.67 + daysIntl * 48.08) * 100) / 100;
     const resultEl = helperCard.querySelector('#diet-result-val');
     if (resultEl) resultEl.textContent = `${ded.toFixed(2)} €`;
     return ded;
   };
 
-  ['#tele-m2-work', '#tele-m2-total', '#tele-supplies-total'].forEach(id => {
+  ['#tele-m2-work', '#tele-m2-total', '#tele-supplies-total'].forEach((id) => {
     helperCard.querySelector(id)?.addEventListener('input', calcTeleworking);
   });
 
-  ['#diet-days-es', '#diet-days-intl'].forEach(id => {
+  ['#diet-days-es', '#diet-days-intl'].forEach((id) => {
     helperCard.querySelector(id)?.addEventListener('input', calcDiets);
   });
 
@@ -323,9 +389,13 @@ export function renderActivities(): HTMLElement {
   `;
 
   const renderRETACalculation = () => {
-    const isSocietario = (retaCard.querySelector('#reta-autonomo-type') as HTMLSelectElement)?.value === 'societario';
+    const isSocietario =
+      (retaCard.querySelector('#reta-autonomo-type') as HTMLSelectElement)?.value === 'societario';
     const hasFlatRate = (retaCard.querySelector('#reta-flat-rate') as HTMLSelectElement)?.value === 'flat80';
-    const actualPaid = parseFloat((retaCard.querySelector('#reta-actual-paid') as HTMLInputElement)?.value) || (a.socialSecuritySelfEmployed || 0);
+    const actualPaid =
+      parseFloat((retaCard.querySelector('#reta-actual-paid') as HTMLInputElement)?.value) ||
+      a.socialSecuritySelfEmployed ||
+      0;
 
     const retaResult = calculateRETACotization(
       a.income || 0,
@@ -333,7 +403,7 @@ export function renderActivities(): HTMLElement {
       actualPaid,
       isSocietario,
       hasFlatRate,
-      data.year || 2024
+      data.year || 2024,
     );
 
     const container = retaCard.querySelector('#reta-calculation-container');
@@ -395,29 +465,34 @@ export function renderActivities(): HTMLElement {
               <span>${formatCurrency(retaResult.recommendedAnnualQuota)}</span>
             </div>
             <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border-default); padding-top:4px; font-weight:700; font-size:0.9rem; color:${isUnderpaid ? 'var(--color-error)' : isOverpaid ? 'var(--color-success)' : 'var(--text-primary)'};">
-              <span>${isUnderpaid ? '⚠️ Ingrés Complementari Exigible:' : isOverpaid ? '↩ Devolució d\'Ofici Estimada:' : 'Diferència Regularització:'}</span>
+              <span>${isUnderpaid ? '⚠️ Ingrés Complementari Exigible:' : isOverpaid ? "↩ Devolució d'Ofici Estimada:" : 'Diferència Regularització:'}</span>
               <span>${formatCurrency(Math.abs(diff))}</span>
             </div>
           </div>
         </div>
         <div style="font-size:0.7rem; color:var(--text-muted); background:var(--bg-surface); padding:6px 8px; border-radius:var(--radius-sm);">
-          ${isUnderpaid 
-            ? `⚠️ Segons la teva facturació has cotitzat per sota del teu tram real. La Seguretat Social et notificarà la liquidació de la diferència (${formatCurrency(diff)}).`
-            : isOverpaid 
-            ? `💡 Has cotitzat per sobre del tram mínim corresponent als teus ingressos reals. Pots sol·licitar la devolució de l'excés (${formatCurrency(Math.abs(diff))}) o mantenir la base més alta.`
-            : `✅ Les quotes cotitzades coincideixen amb el tram assignat pels teus rendiments nets d'activitat.`}
+          ${
+            isUnderpaid
+              ? `⚠️ Segons la teva facturació has cotitzat per sota del teu tram real. La Seguretat Social et notificarà la liquidació de la diferència (${formatCurrency(diff)}).`
+              : isOverpaid
+                ? `💡 Has cotitzat per sobre del tram mínim corresponent als teus ingressos reals. Pots sol·licitar la devolució de l'excés (${formatCurrency(Math.abs(diff))}) o mantenir la base més alta.`
+                : `✅ Les quotes cotitzades coincideixen amb el tram assignat pels teus rendiments nets d'activitat.`
+          }
         </div>
       </div>
     `;
 
     retaCard.querySelector('#btn-sync-reta-to-activity')?.addEventListener('click', () => {
       store.update('activities', { socialSecuritySelfEmployed: retaResult.recommendedAnnualQuota });
-      showToast(`Quota de Seguretat Social actualitzada a ${formatCurrency(retaResult.recommendedAnnualQuota)}`, 'success');
+      showToast(
+        `Quota de Seguretat Social actualitzada a ${formatCurrency(retaResult.recommendedAnnualQuota)}`,
+        'success',
+      );
       page.replaceWith(renderActivities());
     });
   };
 
-  ['#reta-autonomo-type', '#reta-flat-rate'].forEach(id => {
+  ['#reta-autonomo-type', '#reta-flat-rate'].forEach((id) => {
     retaCard.querySelector(id)?.addEventListener('change', renderRETACalculation);
   });
   retaCard.querySelector('#reta-actual-paid')?.addEventListener('input', renderRETACalculation);
@@ -476,13 +551,16 @@ export function renderActivities(): HTMLElement {
 
   ivaLinkCard.querySelector('#btn-sync-to-iva-from-act')?.addEventListener('click', () => {
     const res = store.syncIVAFromActivities();
-    showToast(`Sincronitzat amb èxit amb el Mòdul d'IVA (+${res.addedIssued} factures emeses, +${res.addedReceived} rebudes)`, 'success');
+    showToast(
+      `Sincronitzat amb èxit amb el Mòdul d'IVA (+${res.addedIssued} factures emeses, +${res.addedReceived} rebudes)`,
+      'success',
+    );
     page.replaceWith(renderActivities());
   });
 
   ivaLinkCard.querySelector('#btn-sync-from-iva-to-act')?.addEventListener('click', () => {
     store.syncActivitiesFromIVA();
-    showToast('Ingressos i despeses actualitzats des del Llibre d\'IVA', 'success');
+    showToast("Ingressos i despeses actualitzats des del Llibre d'IVA", 'success');
     page.replaceWith(renderActivities());
   });
 
@@ -528,7 +606,7 @@ export function renderActivities(): HTMLElement {
   booksCard.querySelector('#btn-export-sales-book')?.addEventListener('click', () => {
     let sales: SalesBookEntry[] = [];
     if (data.iva?.issuedInvoices && data.iva.issuedInvoices.length > 0) {
-      sales = data.iva.issuedInvoices.map(inv => ({
+      sales = data.iva.issuedInvoices.map((inv) => ({
         date: inv.date || `${data.year}-03-15`,
         invoiceNumber: inv.invoiceNumber || `F-${data.year}-001`,
         clientName: inv.clientName || 'Client Principal SL',
@@ -536,10 +614,10 @@ export function renderActivities(): HTMLElement {
         concept: inv.concept || 'Serveis professionals',
         taxableBase: inv.taxableBase || 0,
         vatRate: inv.vatRate || 21,
-        vatAmount: inv.vatAmount || ((inv.taxableBase || 0) * (inv.vatRate || 21) / 100),
+        vatAmount: inv.vatAmount || ((inv.taxableBase || 0) * (inv.vatRate || 21)) / 100,
         withholdingRate: inv.withholdingRate || 0,
         withholdingAmount: inv.withholdingAmount || 0,
-        totalInvoice: inv.totalInvoice || ((inv.taxableBase || 0) + (inv.vatAmount || 0)),
+        totalInvoice: inv.totalInvoice || (inv.taxableBase || 0) + (inv.vatAmount || 0),
       }));
     } else {
       sales = [
@@ -555,7 +633,7 @@ export function renderActivities(): HTMLElement {
           withholdingRate: 15,
           withholdingAmount: (a.income > 0 ? a.income : 5000) * 0.15,
           totalInvoice: (a.income > 0 ? a.income : 5000) * 1.06,
-        }
+        },
       ];
     }
     exportSalesBookCSV(sales);
@@ -565,15 +643,15 @@ export function renderActivities(): HTMLElement {
   booksCard.querySelector('#btn-export-expenses-book')?.addEventListener('click', () => {
     let expenses: ExpensesBookEntry[] = [];
     if (data.iva?.receivedInvoices && data.iva.receivedInvoices.length > 0) {
-      expenses = data.iva.receivedInvoices.map(inv => ({
+      expenses = data.iva.receivedInvoices.map((inv) => ({
         date: inv.date || `${data.year}-02-10`,
         invoiceNumber: inv.invoiceNumber || 'INV-001',
         supplierName: inv.supplierName || 'Proveïdor',
         supplierNif: inv.supplierNif || 'A-00000000',
-        concept: inv.concept || 'Despesa d\'activitat',
+        concept: inv.concept || "Despesa d'activitat",
         deductibleExpenseIRPF: inv.taxableBase || 0,
-        vatDeductible: inv.vatAmount || ((inv.taxableBase || 0) * (inv.vatRate || 21) / 100),
-        totalExpense: inv.totalInvoice || ((inv.taxableBase || 0) + (inv.vatAmount || 0)),
+        vatDeductible: inv.vatAmount || ((inv.taxableBase || 0) * (inv.vatRate || 21)) / 100,
+        totalExpense: inv.totalInvoice || (inv.taxableBase || 0) + (inv.vatAmount || 0),
       }));
     } else {
       expenses = [
@@ -582,11 +660,11 @@ export function renderActivities(): HTMLElement {
           invoiceNumber: 'INV-2024-88',
           supplierName: 'Proveïdor Tecnològic SA',
           supplierNif: 'A-28824360',
-          concept: 'Software, servidors i material d\'oficina',
+          concept: "Software, servidors i material d'oficina",
           deductibleExpenseIRPF: a.expenses > 0 ? a.expenses : 1200,
           vatDeductible: (a.expenses > 0 ? a.expenses : 1200) * 0.21,
           totalExpense: (a.expenses > 0 ? a.expenses : 1200) * 1.21,
-        }
+        },
       ];
     }
     exportExpensesBookCSV(expenses);
@@ -601,6 +679,14 @@ export function renderActivities(): HTMLElement {
     'text-align:center;padding:var(--space-lg) 0;color:var(--text-muted);font-size:var(--text-xs);';
   infoBar.textContent = '💾 Les dades es guarden automàticament';
   page.appendChild(infoBar);
+
+  // Mount tooltips
+  page.querySelectorAll<HTMLElement>('.tax-info-tooltip-mount').forEach((mount) => {
+    const concept = mount.dataset.concept;
+    if (concept) {
+      mount.appendChild(createInfoTooltip(concept));
+    }
+  });
 
   return page;
 }

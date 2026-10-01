@@ -40,7 +40,7 @@ export function createDonutChart(
   container.style.margin = '0 auto';
 
   const canvas = document.createElement('canvas');
-  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
   const size = opts.size ?? 280;
   canvas.width = size * dpr;
   canvas.height = size * dpr;
@@ -162,8 +162,7 @@ export function createBarChart(
     row.style.gap = '12px';
 
     const label = document.createElement('span');
-    label.style.cssText =
-      'font-size:0.8rem;color:var(--text-secondary);min-width:120px;text-align:right;';
+    label.style.cssText = 'font-size:0.8rem;color:var(--text-secondary);min-width:120px;text-align:right;';
     label.textContent = item.label;
 
     const barBg = document.createElement('div');
@@ -204,9 +203,7 @@ export function createBarChart(
 /**
  * Create a simple stacked percentage bar.
  */
-export function createStackedBar(
-  items: ChartDataItem[],
-): HTMLElement {
+export function createStackedBar(items: ChartDataItem[]): HTMLElement {
   let total = 0;
   for (let i = 0; i < items.length; i++) {
     total += Math.abs(items[i].value);

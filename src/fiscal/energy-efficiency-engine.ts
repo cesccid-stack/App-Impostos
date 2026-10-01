@@ -6,26 +6,26 @@
 
 import { roundCurrency } from '../utils/math.ts';
 
-export type EnergyEfficiencyType = 
-  | 'heating_cooling_20'       // Modalitat 1: Reducció del 7% en demanda de calefacció i refrigeració (20%)
-  | 'non_renewable_energy_40'  // Modalitat 2: Reducció del 30% en consum d'energia primària no renovable (40%)
-  | 'building_retrofit_60';    // Modalitat 3: Obres de rehabilitació energètica en edificis complets (60%)
+export type EnergyEfficiencyType =
+  | 'heating_cooling_20' // Modalitat 1: Reducció del 7% en demanda de calefacció i refrigeració (20%)
+  | 'non_renewable_energy_40' // Modalitat 2: Reducció del 30% en consum d'energia primària no renovable (40%)
+  | 'building_retrofit_60'; // Modalitat 3: Obres de rehabilitació energètica en edificis complets (60%)
 
 export interface EnergyEfficiencyWorkItem {
   id: string;
   type: EnergyEfficiencyType;
-  amountsPaid: number;          // Imports satisfets per les obres (€)
-  subsidiesReceived?: number;   // Subvencions públiques rebudes (no deduïbles) (€)
+  amountsPaid: number; // Imports satisfets per les obres (€)
+  subsidiesReceived?: number; // Subvencions públiques rebudes (no deduïbles) (€)
   certificateBeforeDate: string; // Data certificat previ
-  certificateAfterDate: string;  // Data certificat posterior
+  certificateAfterDate: string; // Data certificat posterior
   reductionPercentageAchieved: number; // % reducció aconseguit
 }
 
 export interface EnergyEfficiencyResult {
   eligibleBase: number;
-  deductionRate: number;        // 0.20, 0.40 o 0.60
-  deductionAmount: number;      // Quota deduïble en aquest exercici (€)
-  pendingCarryover: number;     // Excés pendent d'aplicar en exercicis futurs (€)
+  deductionRate: number; // 0.20, 0.40 o 0.60
+  deductionAmount: number; // Quota deduïble en aquest exercici (€)
+  pendingCarryover: number; // Excés pendent d'aplicar en exercicis futurs (€)
   meetsLegalRequirement: boolean;
   validationMessage: string;
 }
@@ -35,17 +35,17 @@ export interface EnergyEfficiencyResult {
  */
 export function calculateEnergyEfficiencyDeduction(item: EnergyEfficiencyWorkItem): EnergyEfficiencyResult {
   const netPaid = Math.max(0, (item.amountsPaid || 0) - (item.subsidiesReceived || 0));
-  
+
   if (item.type === 'heating_cooling_20') {
     const meetsLegalRequirement = item.reductionPercentageAchieved >= 7;
     const maxBase = 5000;
     const eligibleBase = Math.min(netPaid, maxBase);
-    const deductionAmount = roundCurrency(eligibleBase * 0.20);
+    const deductionAmount = roundCurrency(eligibleBase * 0.2);
     const pendingCarryover = 0; // No s'arrossega en la modalitat 1
 
     return {
       eligibleBase,
-      deductionRate: 0.20,
+      deductionRate: 0.2,
       deductionAmount: meetsLegalRequirement ? deductionAmount : 0,
       pendingCarryover,
       meetsLegalRequirement,
@@ -59,12 +59,12 @@ export function calculateEnergyEfficiencyDeduction(item: EnergyEfficiencyWorkIte
     const meetsLegalRequirement = item.reductionPercentageAchieved >= 30;
     const maxBase = 7500;
     const eligibleBase = Math.min(netPaid, maxBase);
-    const deductionAmount = roundCurrency(eligibleBase * 0.40);
+    const deductionAmount = roundCurrency(eligibleBase * 0.4);
     const pendingCarryover = 0;
 
     return {
       eligibleBase,
-      deductionRate: 0.40,
+      deductionRate: 0.4,
       deductionAmount: meetsLegalRequirement ? deductionAmount : 0,
       pendingCarryover,
       meetsLegalRequirement,
@@ -78,12 +78,12 @@ export function calculateEnergyEfficiencyDeduction(item: EnergyEfficiencyWorkIte
   const meetsLegalRequirement = item.reductionPercentageAchieved >= 30;
   const maxAnnualBase = 5000;
   const eligibleBase = Math.min(netPaid, maxAnnualBase);
-  const deductionAmount = roundCurrency(eligibleBase * 0.60);
+  const deductionAmount = roundCurrency(eligibleBase * 0.6);
   const pendingCarryover = Math.max(0, netPaid - maxAnnualBase);
 
   return {
     eligibleBase,
-    deductionRate: 0.60,
+    deductionRate: 0.6,
     deductionAmount: meetsLegalRequirement ? deductionAmount : 0,
     pendingCarryover: meetsLegalRequirement ? pendingCarryover : 0,
     meetsLegalRequirement,

@@ -1,16 +1,15 @@
 /**
  * @module fiscal/verifactu-engine
  * Motor de Compliment Veri*Factu, Inalterabilitat de Registres i Traçabilitat de Factures.
- * 
+ *
  * Normativa aplicable:
  * - Llei 11/2021 de Mesures de Prevenció i Lluita contra el Frau Fiscal (Art. 29.2.j LGT).
  * - Reial Decret 1007/2023 (Reglament de Sistemes Informàtics de Facturació - Veri*Factu).
  * - Ordre HAC/773/2019 (Format de Llibres Registre en IRPF i IVA).
- * 
+ *
  * Sancions previstes en cas d'incompliment:
  * - Art. 201 bis LGT: 50.000 € per cada exercici en què s'utilitzi programari sense traçabilitat o amb doble comptabilitat.
  */
-
 
 export interface VerifactuInvoiceRecord {
   readonly id: string;
@@ -26,7 +25,7 @@ export interface VerifactuInvoiceRecord {
   readonly taxAmount: number;
   readonly totalAmount: number;
   readonly previousRecordHash: string; // Hash encadenat del registre anterior
-  readonly currentRecordHash: string;  // Hash SHA-256 d'aquest registre
+  readonly currentRecordHash: string; // Hash SHA-256 d'aquest registre
   readonly signatureTimestamp: string;
   readonly cancelled?: boolean;
 }
@@ -47,7 +46,7 @@ async function computeSha256(text: string): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
   // Fallback senzill si no hi ha crypto.subtle disponible
   return pseudoSha256(text);
@@ -79,14 +78,14 @@ export function buildVerifactuPayload(
   invoiceNumber: string,
   issueDate: string,
   totalAmount: number,
-  previousRecordHash: string
+  previousRecordHash: string,
 ): string {
   return [
     issuerNif.trim().toUpperCase(),
     invoiceNumber.trim(),
     issueDate.trim(),
     totalAmount.toFixed(2),
-    previousRecordHash || 'GENESIS_RECORD_00000000000000000000000000000000000000000000000000'
+    previousRecordHash || 'GENESIS_RECORD_00000000000000000000000000000000000000000000000000',
   ].join('|');
 }
 
@@ -108,16 +107,16 @@ export async function createChainedInvoiceRecord(
     taxAmount: number;
     totalAmount: number;
   },
-  previousRecordHash: string = ''
+  previousRecordHash: string = '',
 ): Promise<VerifactuInvoiceRecord> {
   const payload = buildVerifactuPayload(
     invoice.issuerNif,
     invoice.invoiceNumber,
     invoice.issueDate,
     invoice.totalAmount,
-    previousRecordHash
+    previousRecordHash,
   );
-  
+
   const currentRecordHash = await computeSha256(payload);
 
   return {
@@ -133,7 +132,7 @@ export async function createChainedInvoiceRecord(
  * Si alguna factura ha estat modificada, suprimida o reordenada, detecta el punt exacte de ruptura.
  */
 export async function verifyInvoiceChainIntegrity(
-  records: readonly VerifactuInvoiceRecord[]
+  records: readonly VerifactuInvoiceRecord[],
 ): Promise<VerifactuChainVerification> {
   if (!records.length) {
     return { isValid: true, totalRecords: 0 };
@@ -170,7 +169,7 @@ export async function verifyInvoiceChainIntegrity(
       rec.invoiceNumber,
       rec.issueDate,
       rec.totalAmount,
-      rec.previousRecordHash
+      rec.previousRecordHash,
     );
     const computedHash = await computeSha256(expectedPayload);
 

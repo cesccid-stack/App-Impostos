@@ -31,10 +31,13 @@ import { round2, exactAdd } from '../utils/exact-math.ts';
 export function computeCatalanDeductions(
   data: DeclaracionData,
   actualGeneralBase?: number,
-  actualSavingsBase?: number
+  actualSavingsBase?: number,
 ): number {
   const d = data.deductions;
-  const isSpecialFamily = d.catalanRentalSituation === 'large_family' || d.catalanRentalSituation === 'single_parent' || data.personal.taxDeclarationType === 'single_parent';
+  const isSpecialFamily =
+    d.catalanRentalSituation === 'large_family' ||
+    d.catalanRentalSituation === 'single_parent' ||
+    data.personal.taxDeclarationType === 'single_parent';
   const isJointOrSpecial = data.personal.taxDeclarationType === 'joint' || isSpecialFamily;
 
   let totalCatalan = 0;
@@ -42,24 +45,30 @@ export function computeCatalanDeductions(
   // 1. Deducció per lloguer de l'habitatge habitual (arrendatari)
   if (d.catalanRentalDeduction && d.catalanRentalAmount > 0 && d.catalanRentalSituation !== 'none') {
     // Límit de suma de bases imposables: 20.000€ individual / 30.000€ família nombrosa o conjunta
-    const maxIncomeThreshold = isSpecialFamily || data.personal.taxDeclarationType === 'joint'
-      ? CAT_RENTAL_INCOME_LIMIT_SPECIAL
-      : CAT_RENTAL_INCOME_LIMIT_INDIVIDUAL;
+    const maxIncomeThreshold =
+      isSpecialFamily || data.personal.taxDeclarationType === 'joint'
+        ? CAT_RENTAL_INCOME_LIMIT_SPECIAL
+        : CAT_RENTAL_INCOME_LIMIT_INDIVIDUAL;
 
     // Base computable: si es passa la base real calculada es fa servir, si no, càlcul estimat
     let totalBase = 0;
     if (actualGeneralBase !== undefined) {
       totalBase = exactAdd(actualGeneralBase, actualSavingsBase || 0);
     } else {
-      const workNet = Math.max(0, (data.workIncome.employers.reduce((s, e) => s + e.grossSalary + e.inKind, 0)) - (data.workIncome.employers.reduce((s, e) => s + e.socialSecurity, 0) + 2000));
+      const workNet = Math.max(
+        0,
+        data.workIncome.employers.reduce((s, e) => s + e.grossSalary + e.inKind, 0) -
+          (data.workIncome.employers.reduce((s, e) => s + e.socialSecurity, 0) + 2000),
+      );
       totalBase = workNet + ((data.activities?.income || 0) - (data.activities?.expenses || 0));
     }
 
     // Només s'aplica si compleix els límits legals de renda
     if (totalBase <= maxIncomeThreshold || maxIncomeThreshold === Infinity) {
-      const maxLimit = isSpecialFamily || data.personal.taxDeclarationType === 'joint'
-        ? CAT_RENTAL_LIMIT_SPECIAL
-        : CAT_RENTAL_LIMIT_GENERAL;
+      const maxLimit =
+        isSpecialFamily || data.personal.taxDeclarationType === 'joint'
+          ? CAT_RENTAL_LIMIT_SPECIAL
+          : CAT_RENTAL_LIMIT_GENERAL;
 
       const deduction = round2(Math.min(d.catalanRentalAmount * CAT_RENTAL_RATE, maxLimit));
       totalCatalan = exactAdd(totalCatalan, deduction);
@@ -87,9 +96,7 @@ export function computeCatalanDeductions(
 
   // 4. Viduïtat a Catalunya
   if (d.catalanWidowhood) {
-    totalCatalan += d.catalanWidowhoodWithDependents 
-      ? CAT_WIDOWHOOD_WITH_DEPENDENTS 
-      : CAT_WIDOWHOOD_GENERAL;
+    totalCatalan += d.catalanWidowhoodWithDependents ? CAT_WIDOWHOOD_WITH_DEPENDENTS : CAT_WIDOWHOOD_GENERAL;
   }
 
   // 5. Interessos de préstecs per a estudis de màster i doctorat (AGAUR)

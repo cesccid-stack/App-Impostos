@@ -30,7 +30,7 @@ export class ITPAndAJDEngine {
     return {
       ...data,
       taxRate,
-      amountDue
+      amountDue,
     };
   }
 
@@ -63,12 +63,13 @@ export class ITPAndAJDEngine {
     if (data.yearsOwned < 1) coeficientAEAT = 0.14;
     else if (data.yearsOwned === 1) coeficientAEAT = 0.13;
     else if (data.yearsOwned <= 5) coeficientAEAT = 0.15;
-    else if (data.yearsOwned <= 10) coeficientAEAT = 0.10;
+    else if (data.yearsOwned <= 10) coeficientAEAT = 0.1;
     else if (data.yearsOwned <= 15) coeficientAEAT = 0.12;
     else coeficientAEAT = 0.45; // 20 anys o més
 
     const municipalityFactor = data.municipalityCoef || 1.0;
-    const objectiveBase = Math.round(data.cadastralLandValue * coeficientAEAT * municipalityFactor * 100) / 100;
+    const objectiveBase =
+      Math.round(data.cadastralLandValue * coeficientAEAT * municipalityFactor * 100) / 100;
 
     // 4. Comparativa i elecció del mètode més beneficiós per al contribuent
     const taxableBase = Math.min(realBase, objectiveBase);
@@ -83,7 +84,7 @@ export class ITPAndAJDEngine {
       realBase,
       chosenMethod,
       taxableBase,
-      amountDue
+      amountDue,
     };
   }
 }

@@ -29,10 +29,10 @@ export const STATE_GENERAL_TAX_BRACKETS: readonly TaxBracket[] = [
  */
 export const CATALAN_GENERAL_TAX_BRACKETS: readonly TaxBracket[] = [
   { upTo: 12_450, rate: 0.105 },
-  { upTo: 17_707.20, rate: 0.12 },
+  { upTo: 17_707.2, rate: 0.12 },
   { upTo: 21_000, rate: 0.14 },
-  { upTo: 33_007.20, rate: 0.15 },
-  { upTo: 53_407.20, rate: 0.188 },
+  { upTo: 33_007.2, rate: 0.15 },
+  { upTo: 53_407.2, rate: 0.188 },
   { upTo: 90_000, rate: 0.215 },
   { upTo: 120_000, rate: 0.235 },
   { upTo: 175_000, rate: 0.245 },
@@ -102,7 +102,7 @@ export const WORK_OTHER_EXPENSES = 2_000;
  * Reducció per rendiments del treball (2024-2026).
  */
 export const WORK_REDUCTION_THRESHOLD_LOW = 14_852;
-export const WORK_REDUCTION_THRESHOLD_HIGH = 19_747.50;
+export const WORK_REDUCTION_THRESHOLD_HIGH = 19_747.5;
 export const WORK_REDUCTION_MAX = 7_302;
 export const WORK_REDUCTION_COEFFICIENT = 1.75;
 /**
@@ -115,6 +115,19 @@ export const WORK_REDUCTION_OTHER_RENTS_LIMIT = 6_500;
 export const WORK_REDUCTION_DISABILITY_EXTRA = 3_500;
 /** Art. 20.3 LIRPF: increment reforçat (ajuda de tercers / movilitat reduïda / ≥ 65%) */
 export const WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED = 7_750;
+
+/* ── Dietes i desplaçaments (Art. 9 RIRPF) ─────────────────── */
+
+/** Dietes sense pernoctació en territori espanyol (€/dia) */
+export const DIET_EXEMPT_NATIONAL_NO_PERNOCTATION = 26.67;
+/** Dietes amb pernoctació en territori espanyol (€/dia) */
+export const DIET_EXEMPT_NATIONAL_PERNOCTATION = 53.34;
+/** Dietes sense pernoctació a l'estranger (€/dia) */
+export const DIET_EXEMPT_ABROAD_NO_PERNOCTATION = 48.08;
+/** Dietes amb pernoctació a l'estranger (€/dia) */
+export const DIET_EXEMPT_ABROAD_PERNOCTATION = 91.35;
+/** Quota de quilometratge exempt de gravamen (€/km segons Ordre HFP/792/2023) */
+export const MILEAGE_EXEMPT_RATE_PER_KM = 0.26;
 
 /* ── Plans de pensions ─────────────────────────────────────── */
 
@@ -138,17 +151,17 @@ export const HOUSING_DEDUCTION_MAX_BASE = 9_040;
 
 /** Deduccions per donatius (Llei 49/2002 actualitzada per RD-Llei 6/2023) */
 export const DONATION_FIRST_TIER = 250;
-export const DONATION_FIRST_TIER_RATE = 0.80;
-export const DONATION_REST_RATE = 0.40;
+export const DONATION_FIRST_TIER_RATE = 0.8;
+export const DONATION_REST_RATE = 0.4;
 export const DONATION_REST_RECURRING_RATE = 0.45;
 
 /** Deducció per donatius a fundacions i associacions d'utilitat pública no acollides (Art. 68.3.b) */
-export const DONATION_PUBLIC_UTILITY_RATE = 0.10;
+export const DONATION_PUBLIC_UTILITY_RATE = 0.1;
 /** Deducció per aportacions a partits polítics, federacions i agrupacions d'electors (Art. 68.3.c) */
-export const DONATION_POLITICAL_PARTY_RATE = 0.20;
+export const DONATION_POLITICAL_PARTY_RATE = 0.2;
 export const DONATION_POLITICAL_PARTY_MAX_BASE = 600;
 /** Límit conjunt de la base de les deduccions dels apartats b) i c): 10% de la base liquidable */
-export const DONATION_CAPPED_BASE_LIMIT_RATE = 0.10;
+export const DONATION_CAPPED_BASE_LIMIT_RATE = 0.1;
 
 /** Deducció per maternitat */
 export const MATERNITY_DEDUCTION_PER_MONTH = 100;
@@ -158,7 +171,7 @@ export const MATERNITY_NURSERY_MAX = 1_000; // Despeses de custòdia / guarderia
 /* ── Deduccions Autonòmiques de Catalunya ──────────────────── */
 
 /** Deducció per lloguer d'habitatge habitual a Catalunya */
-export const CAT_RENTAL_RATE = 0.10;
+export const CAT_RENTAL_RATE = 0.1;
 export const CAT_RENTAL_LIMIT_GENERAL = 300;
 export const CAT_RENTAL_LIMIT_SPECIAL = 600; // Família nombrosa, monoparental o conjunta
 export const CAT_RENTAL_INCOME_LIMIT_INDIVIDUAL = 20_000;
@@ -169,9 +182,9 @@ export const CAT_BIRTH_INDIVIDUAL = 150;
 export const CAT_BIRTH_SPECIAL = 300; // Monoparental o conjunta
 
 /** Inversió en empreses de nova creació a Catalunya */
-export const CAT_STARTUP_GENERAL_RATE = 0.30;
+export const CAT_STARTUP_GENERAL_RATE = 0.3;
 export const CAT_STARTUP_GENERAL_MAX = 6_000;
-export const CAT_STARTUP_RESEARCH_RATE = 0.50; // Spin-off universitat o centre de recerca
+export const CAT_STARTUP_RESEARCH_RATE = 0.5; // Spin-off universitat o centre de recerca
 export const CAT_STARTUP_RESEARCH_MAX = 12_000;
 
 /** Viduïtat a Catalunya */
@@ -225,9 +238,13 @@ export const AUTONOMOUS_COMMUNITIES: readonly { code: string; name: string }[] =
 
 /** O(1) map for autonomous community name resolution */
 export const COMMUNITY_NAME_MAP: ReadonlyMap<string, string> = new Map(
-  AUTONOMOUS_COMMUNITIES.map(c => [c.code, c.name])
+  AUTONOMOUS_COMMUNITIES.map((c) => [c.code, c.name]),
 );
 
-/** Available fiscal years */
+/**
+ * Available fiscal years.
+ * Nota: Les taules i paràmetres de l'exercici 2026 són estimacions provisionals
+ * consolidades sobre 2024-2025, pendents de l'aprovació definitiva de la Llei de PGE.
+ */
 export const FISCAL_YEARS = Object.freeze([2024, 2025, 2026] as const);
 export type FiscalYear = (typeof FISCAL_YEARS)[number];

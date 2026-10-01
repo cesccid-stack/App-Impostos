@@ -10,26 +10,27 @@
  * - Radar de Riscos i Calendari Fiscal Oficial de l'AEAT.
  */
 
-import type { 
-  IVAData, 
-  IVAInvoiceIssued, 
-  IVAInvoiceReceived, 
-  IVABienInversion, 
-  FiscalQuarter, 
-  Model303QuarterResult, 
+import type {
+  IVAData,
+  IVAInvoiceIssued,
+  IVAInvoiceReceived,
+  IVABienInversion,
+  FiscalQuarter,
+  Model303QuarterResult,
   Model390AnnualSummary,
   Model349Entry,
-  IVAProrrataConfig
+  IVAProrrataConfig,
 } from '../types-iva.ts';
 import { calculateComplementaryIVAQuarter } from './complementary-engine.ts';
+import { round2 } from '../utils/exact-math.ts';
 
 export const QUARTERS: readonly FiscalQuarter[] = ['1T', '2T', '3T', '4T'];
 
 /** Terminis oficials de presentació de l'AEAT */
 export const IVA_FILING_DEADLINES = {
-  '1T': { label: '1r Trimestre (1T)', deadline: '20 d\'abril', days: '1 - 20 d\'abril' },
+  '1T': { label: '1r Trimestre (1T)', deadline: "20 d'abril", days: "1 - 20 d'abril" },
   '2T': { label: '2n Trimestre (2T)', deadline: '20 de juliol', days: '1 - 20 de juliol' },
-  '3T': { label: '3r Trimestre (3T)', deadline: '20 d\'octubre', days: '1 - 20 d\'octubre' },
+  '3T': { label: '3r Trimestre (3T)', deadline: "20 d'octubre", days: "1 - 20 d'octubre" },
   '4T': { label: '4t Trimestre (4T) & Model 390/349', deadline: '30 de gener', days: '1 - 30 de gener' },
 };
 
@@ -40,7 +41,7 @@ export const IVA_FILING_DEADLINES = {
  */
 export function calculateProrrataPercentage(
   operationsWithDeduction: number,
-  totalOperationsVolume: number
+  totalOperationsVolume: number,
 ): number {
   if (totalOperationsVolume <= 0) return 100;
   if (operationsWithDeduction >= totalOperationsVolume) return 100;
@@ -57,7 +58,7 @@ export function calculateProrrataPercentage(
 export function calculateBienInversionAnnualRegularization(
   bien: IVABienInversion,
   currentYear: number,
-  currentYearProrrata: number
+  currentYearProrrata: number,
 ): number {
   if (bien.status === 'disposed') {
     // Si s'ha venut / transmès durant l'exercici (Art. 110 LIVA)
@@ -68,8 +69,9 @@ export function calculateBienInversionAnnualRegularization(
   const acqYear = new Date(bien.acquisitionDate || `${currentYear}-01-01`).getFullYear();
   const yearDiff = currentYear - acqYear;
 
-  // Ha d'estar dins del període de regularització (4 anys posteriors a l'adquisició per mobles, 9 per immobles)
-  if (yearDiff <= 0 || yearDiff >= bien.regularizationYears) {
+  // Ha d'estar dins del període de regularització (4 anys posteriors a l'adquisició per mobles, 9 per immobles, inclosius)
+  const maxYearsFollowing = bien.regularizationYears === 10 ? 9 : 4;
+  if (yearDiff <= 0 || yearDiff > maxYearsFollowing) {
     return 0;
   }
 
@@ -83,7 +85,7 @@ export function calculateBienInversionAnnualRegularization(
 
   // Import anual = (IVA suportat a l'adquisició / anys de regularització) * (Prorrata actual - Prorrata inicial) / 100
   const annualQuota = (bien.totalVatPaid / bien.regularizationYears) * (prorrataDiff / 100);
-  return annualQuota;
+  return round2(annualQuota);
 }
 
 /**
@@ -98,25 +100,33 @@ export function calculateModel303Quarter(
   investmentAssets: IVABienInversion[],
   prorrataConfig: IVAProrrataConfig,
   pendingCarryoverFromBefore: number,
-  isREDEME: boolean = false
+  isREDEME: boolean = false,
 ): { quarterResult: Model303QuarterResult; remainingCarryover: number } {
   // Filtrar factures del trimestre
-  const qIssued = issuedInvoices.filter(i => i.quarter === quarter);
-  const qReceived = receivedInvoices.filter(i => i.quarter === quarter);
+  const qIssued = issuedInvoices.filter((i) => i.quarter === quarter);
+  const qReceived = receivedInvoices.filter((i) => i.quarter === quarter);
 
   // 1. ── IVA DEVENGAT ──────────────────────────────────────────
-  let base21 = 0, cuota21 = 0;
-  let base10 = 0, cuota10 = 0;
-  let base4 = 0, cuota4 = 0;
-  let base0 = 0, cuota0 = 0;
-  let modBase = 0, modCuota = 0;
-  let recargoBases = 0, recargoCuotas = 0;
-  let intraEuBase = 0, intraEuCuota = 0;
-  let ispBase = 0, ispCuota = 0;
+  let base21 = 0,
+    cuota21 = 0;
+  let base10 = 0,
+    cuota10 = 0;
+  let base4 = 0,
+    cuota4 = 0;
+  let base0 = 0,
+    cuota0 = 0;
+  let modBase = 0,
+    modCuota = 0;
+  let recargoBases = 0,
+    recargoCuotas = 0;
+  let intraEuBase = 0,
+    intraEuCuota = 0;
+  let ispBase = 0,
+    ispCuota = 0;
 
   for (const inv of qIssued) {
     const b = inv.taxableBase || 0;
-    const c = inv.vatAmount || (b * ((inv.vatRate || 0) / 100));
+    const c = inv.vatAmount || b * ((inv.vatRate || 0) / 100);
 
     if (inv.isRectification) {
       modBase += b;
@@ -140,7 +150,7 @@ export function calculateModel303Quarter(
 
     if (inv.recargoRate && inv.recargoRate > 0) {
       recargoBases += b;
-      recargoCuotas += inv.recargoAmount || (b * (inv.recargoRate / 100));
+      recargoCuotas += inv.recargoAmount || b * (inv.recargoRate / 100);
     }
   }
 
@@ -149,31 +159,39 @@ export function calculateModel303Quarter(
     if (rInv.category === 'intra_eu_acquisition') {
       intraEuBase += rInv.taxableBase || 0;
       intraEuCuota += rInv.vatAmount || 0;
-    } else if (rInv.category === 'professional_services' && rInv.vatAmount > 0 && rInv.notes?.includes('ISP')) {
+    } else if (
+      rInv.category === 'professional_services' &&
+      rInv.vatAmount > 0 &&
+      rInv.notes?.includes('ISP')
+    ) {
       ispBase += rInv.taxableBase || 0;
       ispCuota += rInv.vatAmount || 0;
     }
   }
 
-  const totalDevengado = cuota21 + cuota10 + cuota4 + cuota0 + modCuota + recargoCuotas + intraEuCuota + ispCuota;
+  const totalDevengado =
+    cuota21 + cuota10 + cuota4 + cuota0 + modCuota + recargoCuotas + intraEuCuota + ispCuota;
 
   // 2. ── IVA DEDUÏBLE ──────────────────────────────────────────
-  let deducibleCorrienteBase = 0, deducibleCorrienteCuota = 0;
-  let deducibleInversionBase = 0, deducibleInversionCuota = 0;
-  let deducibleImportacionesBase = 0, deducibleImportacionesCuota = 0;
-  let deducibleIntraEuBase = 0, deducibleIntraEuCuota = 0;
+  let deducibleCorrienteBase = 0,
+    deducibleCorrienteCuota = 0;
+  let deducibleInversionBase = 0,
+    deducibleInversionCuota = 0;
+  let deducibleImportacionesBase = 0,
+    deducibleImportacionesCuota = 0;
+  let deducibleIntraEuBase = 0,
+    deducibleIntraEuCuota = 0;
   const rectificacionDeducciones = 0;
 
   // Aplicar coeficient de prorrata si està actiu (Prorrata provisional en 1T-3T, definitiva en 4T)
-  const effectiveProrrata = quarter === '4T'
-    ? prorrataConfig.definitivePercentage
-    : prorrataConfig.provisionalPercentage;
-  
-  const prorrataMultiplier = prorrataConfig.type === 'general' ? (effectiveProrrata / 100) : 1.0;
+  const effectiveProrrata =
+    quarter === '4T' ? prorrataConfig.definitivePercentage : prorrataConfig.provisionalPercentage;
+
+  const prorrataMultiplier = prorrataConfig.type === 'general' ? effectiveProrrata / 100 : 1.0;
 
   for (const inv of qReceived) {
     const b = inv.taxableBase || 0;
-    const vat = inv.vatAmount || (b * ((inv.vatRate || 0) / 100));
+    const vat = inv.vatAmount || b * ((inv.vatRate || 0) / 100);
     const dedRatio = (inv.deductiblePercentage ?? 100) / 100;
     const allowedVat = vat * dedRatio * prorrataMultiplier;
 
@@ -202,33 +220,37 @@ export function calculateModel303Quarter(
       regularizacionBienesInversion += calculateBienInversionAnnualRegularization(
         bien,
         year,
-        prorrataConfig.definitivePercentage
+        prorrataConfig.definitivePercentage,
       );
     }
 
     // Casella 44: Regularització per aplicació del percentatge definitiu de prorrata als trimestres 1T-3T
-    if (prorrataConfig.type === 'general' && prorrataConfig.provisionalPercentage !== prorrataConfig.definitivePercentage) {
+    if (
+      prorrataConfig.type === 'general' &&
+      prorrataConfig.provisionalPercentage !== prorrataConfig.definitivePercentage
+    ) {
       // Diferència de deducció aplicada en 1T-3T
-      const prorrataDelta = (prorrataConfig.definitivePercentage - prorrataConfig.provisionalPercentage) / 100;
-      
-      const previousQuartersReceived = receivedInvoices.filter(i => i.quarter !== '4T');
+      const prorrataDelta =
+        (prorrataConfig.definitivePercentage - prorrataConfig.provisionalPercentage) / 100;
+
+      const previousQuartersReceived = receivedInvoices.filter((i) => i.quarter !== '4T');
       const totalPreviousVatSupported = previousQuartersReceived.reduce((s, i) => {
-        const vat = i.vatAmount || ((i.taxableBase || 0) * ((i.vatRate || 0) / 100));
+        const vat = i.vatAmount || (i.taxableBase || 0) * ((i.vatRate || 0) / 100);
         const ded = (i.deductiblePercentage ?? 100) / 100;
-        return s + (vat * ded);
+        return s + vat * ded;
       }, 0);
 
       regularizacionProrrata = totalPreviousVatSupported * prorrataDelta;
     }
   }
 
-  const totalDeducible = 
-    deducibleCorrienteCuota + 
-    deducibleInversionCuota + 
-    deducibleImportacionesCuota + 
-    deducibleIntraEuCuota + 
-    rectificacionDeducciones + 
-    regularizacionBienesInversion + 
+  const totalDeducible =
+    deducibleCorrienteCuota +
+    deducibleInversionCuota +
+    deducibleImportacionesCuota +
+    deducibleIntraEuCuota +
+    rectificacionDeducciones +
+    regularizacionBienesInversion +
     regularizacionProrrata;
 
   // 3. ── RESULTAT DE LA LIQUIDACIÓ ────────────────────────────
@@ -267,20 +289,32 @@ export function calculateModel303Quarter(
   const quarterResult: Model303QuarterResult = {
     quarter,
     year,
-    base21, cuota21,
-    base10, cuota10,
-    base4, cuota4,
-    base0, cuota0,
-    modBase, modCuota,
-    recargoBases, recargoCuotas,
-    intraEuBase, intraEuCuota,
-    ispBase, ispCuota,
+    base21,
+    cuota21,
+    base10,
+    cuota10,
+    base4,
+    cuota4,
+    base0,
+    cuota0,
+    modBase,
+    modCuota,
+    recargoBases,
+    recargoCuotas,
+    intraEuBase,
+    intraEuCuota,
+    ispBase,
+    ispCuota,
     totalDevengado,
 
-    deducibleCorrienteBase, deducibleCorrienteCuota,
-    deducibleInversionBase, deducibleInversionCuota,
-    deducibleImportacionesBase, deducibleImportacionesCuota,
-    deducibleIntraEuBase, deducibleIntraEuCuota,
+    deducibleCorrienteBase,
+    deducibleCorrienteCuota,
+    deducibleInversionBase,
+    deducibleInversionCuota,
+    deducibleImportacionesBase,
+    deducibleImportacionesCuota,
+    deducibleIntraEuBase,
+    deducibleIntraEuCuota,
     rectificacionDeducciones,
     regularizacionBienesInversion,
     regularizacionProrrata,
@@ -298,17 +332,23 @@ export function calculateModel303Quarter(
   return { quarterResult, remainingCarryover };
 }
 
-const quartersCache = new WeakMap<IVAData, {
-  quarters: Record<FiscalQuarter, Model303QuarterResult>;
-  finalPendingCarryover: number;
-}>();
+const quartersCache = new WeakMap<
+  IVAData,
+  {
+    quarters: Record<FiscalQuarter, Model303QuarterResult>;
+    finalPendingCarryover: number;
+  }
+>();
 
 /**
  * Calcula en cascada els 4 trimestres complets de l'exercici (1T, 2T, 3T, 4T),
  * arrossegant automàticament els saldos a compensar d'un trimestre al següent.
  * Memoitzat via WeakMap per estalviar CPU en crides redundants de renderització.
  */
-export function calculateAllQuarters(ivaData: IVAData, year: number): {
+export function calculateAllQuarters(
+  ivaData: IVAData,
+  year: number,
+): {
   quarters: Record<FiscalQuarter, Model303QuarterResult>;
   finalPendingCarryover: number;
 } {
@@ -320,7 +360,10 @@ export function calculateAllQuarters(ivaData: IVAData, year: number): {
   return result;
 }
 
-function calculateAllQuartersInternal(ivaData: IVAData, year: number): {
+function calculateAllQuartersInternal(
+  ivaData: IVAData,
+  year: number,
+): {
   quarters: Record<FiscalQuarter, Model303QuarterResult>;
   finalPendingCarryover: number;
 } {
@@ -345,7 +388,7 @@ function calculateAllQuartersInternal(ivaData: IVAData, year: number): {
       ivaData.investmentAssets || [],
       prorrataConfig,
       currentCarryover,
-      ivaData.config.isREDEME
+      ivaData.config.isREDEME,
     );
 
     const storedQ = ivaData.quarters?.[q];
@@ -356,10 +399,7 @@ function calculateAllQuartersInternal(ivaData: IVAData, year: number): {
       quarterResult.previousResultIngressat = storedQ.previousResultIngressat;
       quarterResult.extemporaneousMonths = storedQ.extemporaneousMonths;
 
-      const compCalc = calculateComplementaryIVAQuarter(
-        quarterResult,
-        storedQ.extemporaneousMonths || 0
-      );
+      const compCalc = calculateComplementaryIVAQuarter(quarterResult, storedQ.extemporaneousMonths || 0);
       quarterResult.resultadoComplementaria = compCalc.resultadoComplementaria;
       quarterResult.surchargeExtemporaneous = compCalc.surcharge.finalSurchargeAmount;
       quarterResult.extemporaneousRate = compCalc.surcharge.nominalRatePercentage;
@@ -404,10 +444,7 @@ export function computeAutoProrrataFromInvoices(issuedInvoices: IVAInvoiceIssued
 /**
  * Genera el Resum Anual del Model 390 i valida la concordança amb els 4 trimestres del 303.
  */
-export function calculateModel390Annual(
-  ivaData: IVAData,
-  year: number
-): Model390AnnualSummary {
+export function calculateModel390Annual(ivaData: IVAData, year: number): Model390AnnualSummary {
   const { quarters, finalPendingCarryover } = calculateAllQuarters(ivaData, year);
 
   let sumOfQuarterDevengado = 0;
@@ -427,7 +464,7 @@ export function calculateModel390Annual(
   let totalIntraEuDeliveries = 0;
   let totalExports = 0;
 
-  for (const inv of (ivaData.issuedInvoices || [])) {
+  for (const inv of ivaData.issuedInvoices || []) {
     const b = inv.taxableBase || 0;
     if (inv.category === 'property_exempt_rental') {
       totalExemptWithoutRight += b;
@@ -442,10 +479,22 @@ export function calculateModel390Annual(
     }
   }
 
-  const totalVolumeOperations = totalGeneralRegimeBase + totalExemptWithRight + totalExemptWithoutRight + totalIntraEuDeliveries + totalExports;
+  const totalVolumeOperations =
+    totalGeneralRegimeBase +
+    totalExemptWithRight +
+    totalExemptWithoutRight +
+    totalIntraEuDeliveries +
+    totalExports;
 
   const definitiveProrrata = ivaData.config?.prorrata?.definitivePercentage ?? 100;
-  const discrepancyAmount = Math.abs((sumOfQuarterDevengado - sumOfQuarterDeducible) - (quarters['1T'].diferencia + quarters['2T'].diferencia + quarters['3T'].diferencia + quarters['4T'].diferencia));
+  const discrepancyAmount = Math.abs(
+    sumOfQuarterDevengado -
+      sumOfQuarterDeducible -
+      (quarters['1T'].diferencia +
+        quarters['2T'].diferencia +
+        quarters['3T'].diferencia +
+        quarters['4T'].diferencia),
+  );
 
   // Auditoria comparativa Prorrata General vs Especial (Art. 103.Dos.1r LIVA)
   const prorrataComparison = calculateProrrataComparison(ivaData, definitiveProrrata);
@@ -469,7 +518,7 @@ export function calculateModel390Annual(
       sumOfQuarterDeducible,
       isBalanced: discrepancyAmount < 0.05,
       discrepancyAmount,
-    }
+    },
   };
 }
 
@@ -479,7 +528,7 @@ export function calculateModel390Annual(
  */
 export function calculateProrrataComparison(
   ivaData: IVAData,
-  generalProrrataPercentage: number
+  generalProrrataPercentage: number,
 ): {
   generalDeductionAmount: number;
   specialDeductionAmount: number;
@@ -512,7 +561,7 @@ export function calculateProrrataComparison(
   const generalDeductionAmount = totalInputVat * (generalProrrataPercentage / 100);
 
   // 2. Deducció amb Prorrata Especial (Art. 106 LIVA)
-  const specialDeductionAmount = directWithRightVat + (commonVat * (generalProrrataPercentage / 100));
+  const specialDeductionAmount = directWithRightVat + commonVat * (generalProrrataPercentage / 100);
 
   // 3. Comparativa de desviació
   const differenceAmount = generalDeductionAmount - specialDeductionAmount;
@@ -522,7 +571,11 @@ export function calculateProrrataComparison(
   }
 
   const isSpecialProrrataMandatoryByLaw = divergencePercentage >= 10.0;
-  const recommendedRegime = isSpecialProrrataMandatoryByLaw ? 'special' : (generalDeductionAmount >= specialDeductionAmount ? 'general' : 'special');
+  const recommendedRegime = isSpecialProrrataMandatoryByLaw
+    ? 'special'
+    : generalDeductionAmount >= specialDeductionAmount
+      ? 'general'
+      : 'special';
 
   let warningMessage: string | undefined;
   if (isSpecialProrrataMandatoryByLaw) {
@@ -547,7 +600,7 @@ export function extractModel349Entries(ivaData: IVAData): Model349Entry[] {
   const map = new Map<string, Model349Entry>();
 
   // Factures emeses (Lliuraments intracomunitaris - Clau E o S)
-  for (const inv of (ivaData.issuedInvoices || [])) {
+  for (const inv of ivaData.issuedInvoices || []) {
     if (inv.category === 'intra_eu_delivery') {
       const key = `${inv.clientNif}_E`;
       if (!map.has(key)) {
@@ -564,7 +617,7 @@ export function extractModel349Entries(ivaData: IVAData): Model349Entry[] {
   }
 
   // Factures rebudes (Adquisicions intracomunitàries - Clau A o I)
-  for (const inv of (ivaData.receivedInvoices || [])) {
+  for (const inv of ivaData.receivedInvoices || []) {
     if (inv.category === 'intra_eu_acquisition') {
       const key = `${inv.supplierNif}_A`;
       if (!map.has(key)) {
@@ -591,12 +644,13 @@ export function auditIVARisks(ivaData: IVAData): Array<{
   title: string;
   message: string;
 }> {
-  const alerts: Array<{ type: 'warning' | 'error' | 'info' | 'success'; title: string; message: string }> = [];
+  const alerts: Array<{ type: 'warning' | 'error' | 'info' | 'success'; title: string; message: string }> =
+    [];
 
   const issued = ivaData.issuedInvoices || [];
 
   // 1. Factures d'import elevat sense NIF
-  const missingNifIssued = issued.filter(i => !i.clientNif || i.clientNif.trim() === '');
+  const missingNifIssued = issued.filter((i) => !i.clientNif || i.clientNif.trim() === '');
   if (missingNifIssued.length > 0) {
     alerts.push({
       type: 'warning',
@@ -610,17 +664,17 @@ export function auditIVARisks(ivaData: IVAData): Array<{
   if (carryover > 5000) {
     alerts.push({
       type: 'info',
-      title: 'Bossa de crèdits d\'IVA pendents de compensar',
+      title: "Bossa de crèdits d'IVA pendents de compensar",
       message: `Tens un saldo acumulat a compensar de ${carryover.toFixed(2)} €. Recorda que tens un termini de 4 anys per compensar-lo o pots sol·licitar la devolució al 4T (o via REDEME).`,
     });
   }
 
   // 3. Impacte de la prorrata per arrendament d'habitatges
-  const hasExemptRentals = issued.some(i => i.category === 'property_exempt_rental');
+  const hasExemptRentals = issued.some((i) => i.category === 'property_exempt_rental');
   if (hasExemptRentals && !ivaData.config?.hasProrrata) {
     alerts.push({
       type: 'error',
-      title: 'Règim de Prorrata obligatori per lloguer d\'habitatges',
+      title: "Règim de Prorrata obligatori per lloguer d'habitatges",
       message: `Tens ingressos per arrendament d'habitatge (exempts d'IVA). Segons l'Art. 102 LIVA, has d'aplicar la Regla de Prorrata a l'IVA suportat de les despeses comunes.`,
     });
   }
@@ -629,7 +683,7 @@ export function auditIVARisks(ivaData: IVAData): Array<{
   if (ivaData.investmentAssets && ivaData.investmentAssets.length > 0) {
     alerts.push({
       type: 'success',
-      title: 'Control de Béns d\'Inversió actiu',
+      title: "Control de Béns d'Inversió actiu",
       message: `S'estan auditant ${ivaData.investmentAssets.length} actiu/s d'inversió per al període de regularització de 5/10 anys (Art. 107-110 LIVA).`,
     });
   }

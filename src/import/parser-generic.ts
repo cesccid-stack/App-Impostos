@@ -26,19 +26,57 @@ export interface ColumnMapping {
  * Detecta automàticament les columnes del CSV segons les capçaleres en Català, Castellà i Anglès.
  */
 export function autoDetectMapping(headers: string[]): ColumnMapping {
-  const norm = headers.map(h => h.trim().toLowerCase().replace(/['"_]/g, ' '));
+  const norm = headers.map((h) => h.trim().toLowerCase().replace(/['"_]/g, ' '));
 
   const findCol = (keywords: string[]): number => {
-    return norm.findIndex(h => keywords.some(k => h.includes(k)));
+    return norm.findIndex((h) => keywords.some((k) => h.includes(k)));
   };
 
   const dateIdx = Math.max(0, findCol(['data', 'fecha', 'date', 'time', 'timestamp', 'executed']));
   const isinIdx = findCol(['isin', 'codi isin', 'identificador']);
-  const symbolIdx = Math.max(0, findCol(['symbol', 'ticker', 'simbolo', 'titol', 'producto', 'product', 'asset', 'instrument', 'name', 'nombre', 'actiu']));
+  const symbolIdx = Math.max(
+    0,
+    findCol([
+      'symbol',
+      'ticker',
+      'simbolo',
+      'titol',
+      'producto',
+      'product',
+      'asset',
+      'instrument',
+      'name',
+      'nombre',
+      'actiu',
+    ]),
+  );
   const typeIdx = Math.max(0, findCol(['type', 'tipo', 'tipus', 'action', 'side', 'operation', 'operacion']));
-  const qtyIdx = Math.max(0, findCol(['quantity', 'qty', 'cantidad', 'quantitat', 'units', 'titulos', 'unidades', 'shares', 'amount', 'volumen']));
+  const qtyIdx = Math.max(
+    0,
+    findCol([
+      'quantity',
+      'qty',
+      'cantidad',
+      'quantitat',
+      'units',
+      'titulos',
+      'unidades',
+      'shares',
+      'amount',
+      'volumen',
+    ]),
+  );
   const priceIdx = Math.max(0, findCol(['price', 'preu', 'precio', 'kurs', 'trade price', 'prezzo', 'rate']));
-  const totalEURIdx = findCol(['total', 'importe', 'import', 'value', 'valor', 'net amount', 'proceeds', 'gesamtwert']);
+  const totalEURIdx = findCol([
+    'total',
+    'importe',
+    'import',
+    'value',
+    'valor',
+    'net amount',
+    'proceeds',
+    'gesamtwert',
+  ]);
   const currencyIdx = findCol(['currency', 'divisa', 'moneda', 'curr']);
   const commissionIdx = findCol(['commission', 'comision', 'comissio', 'fee', 'gebühr', 'tasas']);
 
@@ -63,15 +101,15 @@ export function autoDetectMapping(headers: string[]): ColumnMapping {
 export async function parseGeneric(
   csv: string,
   customMapping?: ColumnMapping,
-  broker: TradeRecord['broker'] = 'generic'
+  broker: TradeRecord['broker'] = 'generic',
 ): Promise<TradeRecord[]> {
   if (!csv || csv.trim().length === 0) return [];
 
   // Detectar delimitador automàticament (, ; \t)
   let delimiter = ',';
-  if (csv.includes(';') && (csv.split(';').length > csv.split(',').length)) {
+  if (csv.includes(';') && csv.split(';').length > csv.split(',').length) {
     delimiter = ';';
-  } else if (csv.includes('\t') && (csv.split('\t').length > csv.split(',').length)) {
+  } else if (csv.includes('\t') && csv.split('\t').length > csv.split(',').length) {
     delimiter = '\t';
   }
 
@@ -163,7 +201,13 @@ export async function parseGeneric(
     // Detecció del tipus d'actiu segons ticker / ISIN
     let assetClass: TradeRecord['assetClass'] = 'shares';
     const symUpper = symbolRaw.toUpperCase();
-    if (symUpper.includes('BTC') || symUpper.includes('ETH') || symUpper.includes('SOL') || symUpper.includes('USDT') || symUpper.includes('CRYPTO')) {
+    if (
+      symUpper.includes('BTC') ||
+      symUpper.includes('ETH') ||
+      symUpper.includes('SOL') ||
+      symUpper.includes('USDT') ||
+      symUpper.includes('CRYPTO')
+    ) {
       assetClass = 'crypto';
     } else if (symUpper.includes('ETF') || isinRaw.startsWith('IE') || isinRaw.startsWith('LU')) {
       assetClass = 'etf';
@@ -184,9 +228,13 @@ export async function parseGeneric(
       exchangeRate: 1,
       commission,
       totalEUR,
-      marketType: isinRaw.startsWith('ES') || isinRaw.startsWith('FR') || isinRaw.startsWith('DE') || isinRaw.startsWith('IT')
-        ? 'regulated_eu'
-        : 'unregulated_or_foreign',
+      marketType:
+        isinRaw.startsWith('ES') ||
+        isinRaw.startsWith('FR') ||
+        isinRaw.startsWith('DE') ||
+        isinRaw.startsWith('IT')
+          ? 'regulated_eu'
+          : 'unregulated_or_foreign',
       // Un ISIN (ISO 6166) identifica un valor negociable, per tant es considera admès a
       // negociació a efectes del termini de 2 mesos de l'Art. 33.5.f LIRPF.
       isListed: isinRaw.length > 0,

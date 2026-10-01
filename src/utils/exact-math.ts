@@ -1,7 +1,7 @@
 /**
  * @module utils/exact-math
  * Motor d'Aritmètica Decimal Financera i Arrodoniments Oficials AEAT.
- * 
+ *
  * Garanteix una precisió del 100% lliure d'errors de coma flotant IEEE-754
  * (com ara 0.1 + 0.2 !== 0.3 o pèrdues de precisió en agregacions massives).
  * Utilitza aritmètica entera de cèntims i escala de 4 decimals per a càlculs
@@ -9,7 +9,7 @@
  */
 
 const PRECISION_SCALE = 10_000n; // 4 decimals per a precisió intermèdia
-const CENT_SCALE = 100n;         // 2 decimals per a liquidació oficial
+const CENT_SCALE = 100n; // 2 decimals per a liquidació oficial
 
 /**
  * Converteix una quantitat en euros (number) a cèntims enters (BigInt).
@@ -60,10 +60,26 @@ export function fromFixedScaled(scaledVal: bigint): number {
 /**
  * Suma exacta de múltiples valors monetaris.
  */
+export function exactAdd(
+  a: number | string | null | undefined,
+  b: number | string | null | undefined,
+): number;
+export function exactAdd(
+  a: number | string | null | undefined,
+  b: number | string | null | undefined,
+  c: number | string | null | undefined,
+): number;
+export function exactAdd(...amounts: Array<number | string | null | undefined>): number;
 export function exactAdd(...amounts: Array<number | string | null | undefined>): number {
+  if (amounts.length === 2) {
+    return centsToEuros(eurosToCents(amounts[0]) + eurosToCents(amounts[1]));
+  }
+  if (amounts.length === 3) {
+    return centsToEuros(eurosToCents(amounts[0]) + eurosToCents(amounts[1]) + eurosToCents(amounts[2]));
+  }
   let totalCents = 0n;
-  for (const amt of amounts) {
-    totalCents += eurosToCents(amt);
+  for (let i = 0; i < amounts.length; i++) {
+    totalCents += eurosToCents(amounts[i]);
   }
   return centsToEuros(totalCents);
 }
@@ -73,7 +89,7 @@ export function exactAdd(...amounts: Array<number | string | null | undefined>):
  */
 export function exactSub(
   minuend: number | string | null | undefined,
-  subtrahend: number | string | null | undefined
+  subtrahend: number | string | null | undefined,
 ): number {
   return centsToEuros(eurosToCents(minuend) - eurosToCents(subtrahend));
 }
@@ -84,11 +100,11 @@ export function exactSub(
  */
 export function exactMultiply(
   amount: number | string | null | undefined,
-  rate: number | string | null | undefined
+  rate: number | string | null | undefined,
 ): number {
   const cents = eurosToCents(amount);
   const rateScaled = toFixedScaled(rate);
-  const isNegative = (cents < 0n) !== (rateScaled < 0n);
+  const isNegative = cents < 0n !== rateScaled < 0n;
   const absCents = cents < 0n ? -cents : cents;
   const absRate = rateScaled < 0n ? -rateScaled : rateScaled;
 
@@ -104,7 +120,7 @@ export function exactMultiply(
  */
 export function exactDivide(
   amount: number | string | null | undefined,
-  divisor: number | string | null | undefined
+  divisor: number | string | null | undefined,
 ): number {
   const div = typeof divisor === 'string' ? parseFloat(divisor.replace(',', '.')) : Number(divisor);
   if (!div || !Number.isFinite(div)) return 0;
@@ -112,12 +128,12 @@ export function exactDivide(
   if (scaledDiv === 0n) return 0;
 
   const cents = eurosToCents(amount);
-  const isNegative = (cents < 0n) !== (scaledDiv < 0n);
+  const isNegative = cents < 0n !== scaledDiv < 0n;
   const absCents = cents < 0n ? -cents : cents;
   const absDiv = scaledDiv < 0n ? -scaledDiv : scaledDiv;
 
   const scaledNumerator = absCents * PRECISION_SCALE;
-  const roundedCents = (scaledNumerator + (absDiv / 2n)) / absDiv;
+  const roundedCents = (scaledNumerator + absDiv / 2n) / absDiv;
   const result = centsToEuros(roundedCents);
   return isNegative ? -result : result;
 }
@@ -138,7 +154,7 @@ export interface ExactBracketResult {
 
 export function applyTaxBracketsExact(
   taxableBase: number,
-  brackets: readonly { readonly upTo: number; readonly rate: number }[]
+  brackets: readonly { readonly upTo: number; readonly rate: number }[],
 ): ExactBracketResult {
   if (!taxableBase || taxableBase <= 0 || !brackets.length) {
     return { totalTax: 0, brackets: [] };
@@ -159,16 +175,16 @@ export function applyTaxBracketsExact(
     if (remainingBaseCents <= 0n) break;
 
     const bracketLimitCents = bracket.upTo === Infinity ? -1n : eurosToCents(bracket.upTo);
-    const bracketSpanCents = bracketLimitCents === -1n
-      ? remainingBaseCents
-      : bracketLimitCents - previousLimitCents;
+    const bracketSpanCents =
+      bracketLimitCents === -1n ? remainingBaseCents : bracketLimitCents - previousLimitCents;
 
     if (bracketSpanCents <= 0n) {
       previousLimitCents = bracketLimitCents;
       continue;
     }
 
-    const baseInThisBracketCents = remainingBaseCents > bracketSpanCents ? bracketSpanCents : remainingBaseCents;
+    const baseInThisBracketCents =
+      remainingBaseCents > bracketSpanCents ? bracketSpanCents : remainingBaseCents;
     const rateScaled = toFixedScaled(bracket.rate);
 
     // Càlcul del tribut en aquest tram amb arrodoniment cèntim
@@ -211,7 +227,7 @@ export interface ExactInvoiceLineTax {
 export function calculateInvoiceLineTaxExact(
   base: number,
   ivaRate: number,
-  reqRate: number = 0
+  reqRate: number = 0,
 ): ExactInvoiceLineTax {
   const baseCents = eurosToCents(base);
   const ivaAmount = exactMultiply(base, ivaRate);

@@ -78,9 +78,15 @@ export function renderAdvisor(): HTMLElement {
       <div style="display:flex; flex-direction:column; gap:var(--space-lg);">
         <h3 style="margin:0; font-size:var(--text-lg);">📋 Pla d'Acció i Oportunitats d'Optimització</h3>
 
-        ${audit.adviceList.map((adv) => {
-          const badgeClass = adv.badgeType === 'success' ? 'badge--success' : adv.badgeType === 'warning' ? 'badge--warning' : 'badge--primary';
-          return `
+        ${audit.adviceList
+          .map((adv) => {
+            const badgeClass =
+              adv.badgeType === 'success'
+                ? 'badge--success'
+                : adv.badgeType === 'warning'
+                  ? 'badge--warning'
+                  : 'badge--primary';
+            return `
             <div class="card" style="border:1px solid var(--border-default); display:flex; flex-direction:column; gap:var(--space-md);">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:var(--space-sm);">
                 <div>
@@ -104,7 +110,8 @@ export function renderAdvisor(): HTMLElement {
               </div>
             </div>
           `;
-        }).join('')}
+          })
+          .join('')}
       </div>
     `;
 

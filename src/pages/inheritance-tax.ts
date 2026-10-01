@@ -77,7 +77,7 @@ export function renderInheritanceTax(): HTMLElement {
   setTimeout(() => {
     document.getElementById('add-inheritance-btn')?.addEventListener('click', () => {
       const data = store.getData();
-      
+
       // MOCK DATA PARA DEMO
       const newSim: InheritanceDonationData = {
         type: 'inheritance',
@@ -100,13 +100,13 @@ export function renderInheritanceTax(): HTMLElement {
         multiplierBase: 1,
         netTax: 0,
         autonomicBonus: 0,
-        amountDue: 0
+        amountDue: 0,
       };
 
       const calculated = InheritanceTaxEngine.calculate(newSim);
 
       store.update('patrimonialTaxes', {
-        inheritance: [...(data.patrimonialTaxes?.inheritance || []), calculated]
+        inheritance: [...(data.patrimonialTaxes?.inheritance || []), calculated],
       });
 
       renderData();

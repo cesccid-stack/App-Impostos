@@ -19,18 +19,18 @@ export interface MonteCarloSimulationResult {
   iterations: number;
   tradeHorizon: number;
   initialCapital: number;
-  
+
   medianFinalCapital: number;
   p5WorstCaseCapital: number;
   p95BestCaseCapital: number;
-  
-  riskOfDrawdown20Pct: number;    // % de simulacions amb DD > 20%
-  riskOfDrawdown30Pct: number;    // % de simulacions amb DD > 30%
-  riskOfDrawdown50Pct: number;    // % de simulacions amb DD > 50% (Risc de Ruïna)
-  
-  probabilityOfProfit: number;    // % de simulacions amb P&L final positiu
+
+  riskOfDrawdown20Pct: number; // % de simulacions amb DD > 20%
+  riskOfDrawdown30Pct: number; // % de simulacions amb DD > 30%
+  riskOfDrawdown50Pct: number; // % de simulacions amb DD > 50% (Risc de Ruïna)
+
+  probabilityOfProfit: number; // % de simulacions amb P&L final positiu
   expectedAfterTaxWealth: number; // Patrimoni net esperat després d'IRPF
-  
+
   fanChartPoints: MonteCarloPercentilePoint[];
 }
 
@@ -40,10 +40,10 @@ export interface MonteCarloSimulationResult {
 export function runMonteCarloSimulation(
   metrics: TradePerformanceMetrics,
   initialCapital: number = 10000,
-  tradeHorizon: number = 100
+  tradeHorizon: number = 100,
 ): MonteCarloSimulationResult {
   const iterations = 1000;
-  const winProb = metrics.totalTrades > 0 ? (metrics.winRate / 100) : 0.55;
+  const winProb = metrics.totalTrades > 0 ? metrics.winRate / 100 : 0.55;
   const avgWin = metrics.avgWin > 0 ? metrics.avgWin : 250;
   const avgLoss = metrics.avgLoss > 0 ? metrics.avgLoss : 150;
 
@@ -81,7 +81,7 @@ export function runMonteCarloSimulation(
     for (let t = 1; t <= tradeHorizon; t++) {
       const isWin = Math.random() < winProb;
       const randomFactor = 0.7 + Math.random() * 0.6;
-      const pnl = isWin ? (avgWin * randomFactor) : (-avgLoss * randomFactor);
+      const pnl = isWin ? avgWin * randomFactor : -avgLoss * randomFactor;
 
       capital = Math.max(0, capital + pnl);
 
@@ -108,13 +108,16 @@ export function runMonteCarloSimulation(
   const fanChartPoints: MonteCarloPercentilePoint[] = [];
   const p5Idx = Math.floor(iterations * 0.05);
   const p25Idx = Math.floor(iterations * 0.25);
-  const p50Idx = Math.floor(iterations * 0.50);
+  const p50Idx = Math.floor(iterations * 0.5);
   const p75Idx = Math.floor(iterations * 0.75);
   const p95Idx = Math.floor(iterations * 0.95);
 
   for (let s = 0; s < numSamples; s++) {
     const offset = s * iterations;
-    const slice = sampledValues.subarray(offset, offset + iterations).slice().sort();
+    const slice = sampledValues
+      .subarray(offset, offset + iterations)
+      .slice()
+      .sort();
     fanChartPoints.push({
       tradeNumber: sampleSteps[s],
       p5WorstCase: slice[p5Idx],
@@ -125,7 +128,10 @@ export function runMonteCarloSimulation(
     });
   }
 
-  const finalSlice = sampledValues.subarray((numSamples - 1) * iterations, numSamples * iterations).slice().sort();
+  const finalSlice = sampledValues
+    .subarray((numSamples - 1) * iterations, numSamples * iterations)
+    .slice()
+    .sort();
   const medianFinalCapital = finalSlice[p50Idx];
   const p5WorstCaseCapital = finalSlice[p5Idx];
   const p95BestCaseCapital = finalSlice[p95Idx];

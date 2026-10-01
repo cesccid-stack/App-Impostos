@@ -10,16 +10,16 @@ export async function parseDegiro(csv: string): Promise<TradeRecord[]> {
   const lines = parseCSV(csv, ',');
   if (lines.length < 2) return [];
 
-  const headers = lines[0].map(h => h.trim().toLowerCase());
-  
+  const headers = lines[0].map((h) => h.trim().toLowerCase());
+
   // Find column indices
-  const dateIdx = headers.findIndex(h => h.includes('fecha'));
-  const productIdx = headers.findIndex(h => h.includes('producto'));
-  const isinIdx = headers.findIndex(h => h.includes('isin'));
-  const qtyIdx = headers.findIndex(h => h.includes('cantidad'));
-  const priceIdx = headers.findIndex(h => h.includes('precio'));
-  const totalIdx = headers.findIndex(h => h.includes('total') || h.includes('valor'));
-  // Degiro has "Valor local" and "Valor" (in EUR) usually. 
+  const dateIdx = headers.findIndex((h) => h.includes('fecha'));
+  const productIdx = headers.findIndex((h) => h.includes('producto'));
+  const isinIdx = headers.findIndex((h) => h.includes('isin'));
+  const qtyIdx = headers.findIndex((h) => h.includes('cantidad'));
+  const priceIdx = headers.findIndex((h) => h.includes('precio'));
+  const totalIdx = headers.findIndex((h) => h.includes('total') || h.includes('valor'));
+  // Degiro has "Valor local" and "Valor" (in EUR) usually.
   const valIdx = headers.indexOf('valor');
 
   const trades: TradeRecord[] = [];
@@ -45,7 +45,7 @@ export async function parseDegiro(csv: string): Promise<TradeRecord[]> {
     const type = qty > 0 ? 'buy' : 'sell';
     const absQty = Math.abs(qty);
     const price = parseNumber(row[priceIdx]);
-    
+
     // We assume Degiro's "Valor" is in EUR
     const totalEUR = Math.abs(parseNumber(row[valIdx > -1 ? valIdx : totalIdx]));
 

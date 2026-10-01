@@ -23,8 +23,8 @@ export function renderComparator(): HTMLElement {
     const data2 = store.getProfileData(profile2Id, currentYear);
     const comparison = compareIndividualVsJoint(data1, data2, isSingleParent);
 
-    const p1 = profiles.find(p => p.id === profile1Id) || profiles[0];
-    const p2 = profiles.find(p => p.id === profile2Id) || profiles[1] || profiles[0];
+    const p1 = profiles.find((p) => p.id === profile1Id) || profiles[0];
+    const p2 = profiles.find((p) => p.id === profile2Id) || profiles[1] || profiles[0];
 
     const isJointBest = comparison.recommendedOption === 'joint';
     const isIndividualBest = comparison.recommendedOption === 'individual';
@@ -49,21 +49,29 @@ export function renderComparator(): HTMLElement {
           <div>
             <label class="form-label">Declarant 1</label>
             <select class="form-input" id="select-profile-1">
-              ${profiles.map(p => `
+              ${profiles
+                .map(
+                  (p) => `
                 <option value="${p.id}" ${p.id === profile1Id ? 'selected' : ''}>
                   👤 ${p.name} (${p.relation})
                 </option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </div>
           <div>
             <label class="form-label">Declarant 2 (Cònjuge / Parella)</label>
             <select class="form-input" id="select-profile-2">
-              ${profiles.map(p => `
+              ${profiles
+                .map(
+                  (p) => `
                 <option value="${p.id}" ${p.id === profile2Id ? 'selected' : ''}>
                   👤 ${p.name} (${p.relation})
                 </option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </div>
         </div>

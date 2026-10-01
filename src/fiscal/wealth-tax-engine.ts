@@ -6,23 +6,30 @@
 
 export interface WealthAssetItem {
   id: string;
-  category: 'real_estate' | 'bank_accounts' | 'shares_funds' | 'crypto' | 'vehicles_luxury' | 'business_exempt' | 'other';
+  category:
+    | 'real_estate'
+    | 'bank_accounts'
+    | 'shares_funds'
+    | 'crypto'
+    | 'vehicles_luxury'
+    | 'business_exempt'
+    | 'other';
   description: string;
-  grossValue: number;         // Valor fiscal segons regles LIP (€)
+  grossValue: number; // Valor fiscal segons regles LIP (€)
   isPrimaryResidence?: boolean; // Habitatge habitual (exempt fins a 300.000 €)
-  isBusinessExempt?: boolean;   // Empresa familiar / activitat econòmica exempta
+  isBusinessExempt?: boolean; // Empresa familiar / activitat econòmica exempta
 }
 
 export interface WealthDebtItem {
   id: string;
   description: string;
-  amount: number;             // Deute deduïble a 31 de desembre (€)
+  amount: number; // Deute deduïble a 31 de desembre (€)
 }
 
 export interface WealthTaxData {
   assets: WealthAssetItem[];
   debts: WealthDebtItem[];
-  community: string;          // Default: CAT (Catalunya)
+  community: string; // Default: CAT (Catalunya)
 }
 
 export interface WealthTaxCalculationResult {
@@ -31,25 +38,25 @@ export interface WealthTaxCalculationResult {
   primaryResidenceExemption: number;
   businessExemption: number;
   computableGrossAssets: number;
-  
+
   totalDeductibleDebts: number;
-  netWealth: number;          // Patrimoni Net
-  
-  minimumExempt: number;      // 500.000 € a Catalunya
-  taxableBase: number;        // Base liquidable
-  
-  grossTax: number;           // Quota íntegra de Patrimoni
-  
+  netWealth: number; // Patrimoni Net
+
+  minimumExempt: number; // 500.000 € a Catalunya
+  taxableBase: number; // Base liquidable
+
+  grossTax: number; // Quota íntegra de Patrimoni
+
   // Blindatge del límit conjunt Renda-Patrimoni (Art. 31 LIP - Límit 60%)
-  jointLimitBase60: number;   // 60% de la base d'IRPF
+  jointLimitBase60: number; // 60% de la base d'IRPF
   totalTaxesBeforeShield: number; // IRPF + Patrimoni
   shieldReductionApplied: number; // Reducció aplicada pel límit del 60%
-  netWealthTax: number;       // Quota líquida final d'Impost sobre el Patrimoni
-  
+  netWealthTax: number; // Quota líquida final d'Impost sobre el Patrimoni
+
   // Impost de Solidaritat de les Grans Fortunes (ISGF Model 718)
   isgfApplicable: boolean;
   isgfNetTax: number;
-  
+
   isObligatedToDeclare: boolean; // Obligació de declarar (>2M€ bruts o quota positiva)
 }
 
@@ -67,7 +74,7 @@ export const CATALAN_WEALTH_TAX_BRACKETS = [
 
 /** Trams de l'Impost de Solidaritat de les Grans Fortunes (Model 718) */
 export const ISGF_TAX_BRACKETS = [
-  { upTo: 3000000.00, rate: 0.000 },
+  { upTo: 3000000.0, rate: 0.0 },
   { upTo: 5347998.03, rate: 0.017 },
   { upTo: 10695996.06, rate: 0.021 },
   { upTo: Infinity, rate: 0.035 },
@@ -79,7 +86,7 @@ export function calculateWealthTax(
   wealthData: WealthTaxData,
   irpfGeneralBase: number = 0,
   irpfSavingsBase: number = 0,
-  irpfNetTax: number = 0
+  irpfNetTax: number = 0,
 ): WealthTaxCalculationResult {
   const baseKey = `${irpfGeneralBase}_${irpfSavingsBase}_${irpfNetTax}`;
   const cached = wealthTaxCache.get(wealthData);
@@ -96,7 +103,7 @@ function computeWealthTaxInternal(
   wealthData: WealthTaxData,
   irpfGeneralBase: number = 0,
   irpfSavingsBase: number = 0,
-  irpfNetTax: number = 0
+  irpfNetTax: number = 0,
 ): WealthTaxCalculationResult {
   const assets = wealthData.assets || [];
   const debts = wealthData.debts || [];
@@ -143,7 +150,7 @@ function computeWealthTaxInternal(
   // Límit Conjunt Renda - Patrimoni (Art. 31 LIP)
   // Quota IRPF + Quota Patrimoni no pot superar el 60% de les bases imposables d'IRPF
   const totalIrpfBase = irpfGeneralBase + irpfSavingsBase;
-  const jointLimitBase60 = totalIrpfBase > 0 ? (totalIrpfBase * 0.60) : 0;
+  const jointLimitBase60 = totalIrpfBase > 0 ? totalIrpfBase * 0.6 : 0;
   const totalTaxesBeforeShield = irpfNetTax + grossTax;
 
   let shieldReductionApplied = 0;
@@ -151,31 +158,31 @@ function computeWealthTaxInternal(
 
   if (totalIrpfBase > 0 && totalTaxesBeforeShield > jointLimitBase60 && grossTax > 0) {
     const excess = totalTaxesBeforeShield - jointLimitBase60;
-    const maxReduction = grossTax * 0.80; // La reducció no pot superar el 80% de la quota de patrimoni
+    const maxReduction = grossTax * 0.8; // La reducció no pot superar el 80% de la quota de patrimoni
     shieldReductionApplied = Math.min(excess, maxReduction);
-    netWealthTax = Math.max(grossTax * 0.20, grossTax - shieldReductionApplied);
+    netWealthTax = Math.max(grossTax * 0.2, grossTax - shieldReductionApplied);
   }
 
-  // Càlcul ISGF (Model 718) per patrimonis > 3M€
+  // Càlcul ISGF (Model 718 / Llei 38/2022) per patrimonis nets > 3M€
   let isgfNetTax = 0;
   let isgfApplicable = false;
   if (netWealth > 3000000) {
     isgfApplicable = true;
     let isgfGross = 0;
-    let rem = netWealth - 3700000; // 3M + 700k mínim exempt estatal
-    if (rem > 0) {
-      let prev = 0;
-      for (const b of ISGF_TAX_BRACKETS) {
-        if (b.rate === 0) continue;
-        const tier = b.upTo - prev;
-        const taxable = Math.min(rem, tier);
-        isgfGross += taxable * b.rate;
-        rem -= taxable;
-        prev = b.upTo;
-        if (rem <= 0) break;
+    // Art. 3.Nueve Llei 38/2022: Mínim exempt estatal de 700.000 € sobre el patrimoni net
+    const isgfBase = Math.max(0, netWealth - 700000);
+    let prev = 0;
+    for (const b of ISGF_TAX_BRACKETS) {
+      if (isgfBase > prev) {
+        const taxable = Math.min(isgfBase, b.upTo) - prev;
+        if (b.rate > 0) {
+          isgfGross += taxable * b.rate;
+        }
       }
+      prev = b.upTo;
+      if (isgfBase <= b.upTo) break;
     }
-    // Descomptem la quota satisfeta a Catalunya per evitar doble imposició
+    // Descomptem la quota satisfeta a l'Impost sobre el Patrimoni (Model 714) per evitar doble imposició
     isgfNetTax = Math.max(0, isgfGross - netWealthTax);
   }
 

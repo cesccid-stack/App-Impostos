@@ -3,7 +3,12 @@
  * Motor fiscal per al càlcul del Rendiment del Capital Immobiliari, Amortitzacions i Imputació de Rendes (Art. 23 & 85 LIRPF).
  */
 
-import type { RentalProperty, PropertyFiscalResult, InventoryAmortizationBreakdown, RentalReductionType } from '../types-properties.ts';
+import type {
+  RentalProperty,
+  PropertyFiscalResult,
+  InventoryAmortizationBreakdown,
+  RentalReductionType,
+} from '../types-properties.ts';
 import { calculateItemAnnualAmortization } from './amortization-tables.ts';
 
 /**
@@ -67,16 +72,19 @@ export function getRentalReductionRate(
 /**
  * Calcula el compte d'explotació fiscal d'un immoble individual (incloent ús mixt i imputació de rendes).
  */
-export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: number = 2024): PropertyFiscalResult {
+export function calculatePropertyFiscalResult(
+  p: RentalProperty,
+  fiscalYear: number = 2024,
+): PropertyFiscalResult {
   const ownRatio = (p.ownershipPercentage || 100) / 100;
-  
+
   // Ràtio de dies de lloguer si és ús mixt (Art. 23 & 85 LIRPF)
   let rentalTimeRatio = 1.0;
   let ownUseDays = 0;
   if (p.isMixedUsage && (p.rentalDays !== undefined || p.ownUseDays !== undefined)) {
     const rDays = Math.max(0, p.rentalDays || 0);
     const oDays = Math.max(0, p.ownUseDays || 0);
-    const totalDays = (rDays + oDays) > 0 ? (rDays + oDays) : 365;
+    const totalDays = rDays + oDays > 0 ? rDays + oDays : 365;
     rentalTimeRatio = Math.min(1, Math.max(0, rDays / totalDays));
     ownUseDays = oDays;
   }
@@ -137,7 +145,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
         fiscalYear,
         item.acquisitionDate,
         item.disposalDate,
-        item.status
+        item.status,
       );
       const amortYear = calc.annualAmount * ownRatio * rentalTimeRatio;
 
@@ -168,14 +176,14 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
 
   // 4.3. Amortització Legacy (Compatibilitat enrere)
   const legacyImprovements = (p.improvements || []).reduce((acc, imp) => {
-    return acc + (imp.amount * ((imp.amortizationRate || 3) / 100) * ownRatio * rentalTimeRatio);
+    return acc + imp.amount * ((imp.amortizationRate || 3) / 100) * ownRatio * rentalTimeRatio;
   }, 0);
   const legacyFurniture = (p.furniture || []).reduce((acc, f) => {
-    return acc + (f.amount * ((f.amortizationRate || 10) / 100) * ownRatio * rentalTimeRatio);
+    return acc + f.amount * ((f.amortizationRate || 10) / 100) * ownRatio * rentalTimeRatio;
   }, 0);
 
   const improvementsAmortization = inventoryBreakdown.group1Improvements3 + legacyImprovements;
-  const furnitureAmortization = 
+  const furnitureAmortization =
     inventoryBreakdown.group6Tools30 +
     inventoryBreakdown.group5Computer26 +
     inventoryBreakdown.group4Transport16 +
@@ -183,7 +191,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
     inventoryBreakdown.group2Furniture10 +
     legacyFurniture;
 
-  inventoryBreakdown.totalInventoryAmortization = 
+  inventoryBreakdown.totalInventoryAmortization =
     inventoryBreakdown.group6Tools30 +
     inventoryBreakdown.group5Computer26 +
     inventoryBreakdown.group4Transport16 +
@@ -198,11 +206,12 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
   const netIncome = grossIncome - totalExpenses;
 
   // 6. Reducció per arrendament d'habitatge habitual (Llei 12/2023)
-  const reductionRate = netIncome > 0
-    ? getRentalReductionRate(p.reductionType, p.usageType, p.contractStartDate || p.contractDate)
-    : 0;
+  const reductionRate =
+    netIncome > 0
+      ? getRentalReductionRate(p.reductionType, p.usageType, p.contractStartDate || p.contractDate)
+      : 0;
 
-  const reductionAmount = (netIncome > 0) ? (netIncome * (reductionRate / 100)) : 0;
+  const reductionAmount = netIncome > 0 ? netIncome * (reductionRate / 100) : 0;
   const netReducedIncome = netIncome - reductionAmount;
 
   // 7. Imputació de rendes per als dies d'ús propi (Art. 85 LIRPF)
@@ -243,7 +252,7 @@ export function calculatePropertyFiscalResult(p: RentalProperty, fiscalYear: num
     reductionAmount,
     netReducedIncome,
     imputedIncomeForOwnUse,
-    withholding19: p.usageType === 'commercial' ? (grossIncome * 0.19) : 0,
+    withholding19: p.usageType === 'commercial' ? grossIncome * 0.19 : 0,
   };
 
   // Càlcul de rendibilitats financeres
@@ -276,7 +285,10 @@ const propertyResultCache = new WeakMap<RentalProperty, { year: number; result: 
 /**
  * Calcula l'agregat de tots els immobles del contribuent amb un únic recorregut O(N).
  */
-export function calculateAllProperties(properties: RentalProperty[], fiscalYear: number = 2024): {
+export function calculateAllProperties(
+  properties: RentalProperty[],
+  fiscalYear: number = 2024,
+): {
   results: PropertyFiscalResult[];
   totalGrossIncome: number;
   totalExpenses: number;

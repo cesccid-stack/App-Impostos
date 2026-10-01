@@ -7,10 +7,10 @@
 export interface TaxPrescriptionStatus {
   fiscalYear: number;
   taxType: 'IRPF' | 'IVA' | 'PATRIMONI' | 'SUCCESSIONS';
-  filingDeadline: string;       // Data límit oficial de presentació
-  prescriptionDate: string;     // Data exacta en què prescriu el dret d'Hisenda
-  isPrescribed: boolean;        // True si han passat els 4 anys sense interrupció
-  daysRemaining: number;        // Dies restants fins a la prescripció (o 0 si ja ha prescrit)
+  filingDeadline: string; // Data límit oficial de presentació
+  prescriptionDate: string; // Data exacta en què prescriu el dret d'Hisenda
+  isPrescribed: boolean; // True si han passat els 4 anys sense interrupció
+  daysRemaining: number; // Dies restants fins a la prescripció (o 0 si ja ha prescrit)
   statusLabel: string;
 }
 
@@ -20,7 +20,7 @@ export interface TaxPrescriptionStatus {
 export function checkTaxPrescription(
   fiscalYear: number,
   taxType: 'IRPF' | 'IVA' | 'PATRIMONI' | 'SUCCESSIONS' = 'IRPF',
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
 ): TaxPrescriptionStatus {
   let deadlineYear = fiscalYear + 1;
   let deadlineMonth = 6; // Juny (0-indexed: 5, però fem servir dates ISO reals)
@@ -34,7 +34,7 @@ export function checkTaxPrescription(
   }
 
   const filingDeadlineDate = new Date(deadlineYear, deadlineMonth - 1, deadlineDay);
-  
+
   // La prescripció es consuma exactament 4 anys després del final del termini de declaració
   const prescriptionDateObj = new Date(deadlineYear + 4, deadlineMonth - 1, deadlineDay);
 
@@ -52,8 +52,8 @@ export function checkTaxPrescription(
     prescriptionDate: formatDateISO(prescriptionDateObj),
     isPrescribed,
     daysRemaining,
-    statusLabel: isPrescribed 
-      ? `Exercici ${fiscalYear} Prescrit (Hisenda ja no pot liquidar ni sancionar)` 
+    statusLabel: isPrescribed
+      ? `Exercici ${fiscalYear} Prescrit (Hisenda ja no pot liquidar ni sancionar)`
       : `Exercici ${fiscalYear} Inspeccionable (${daysRemaining} dies restants)`,
   };
 }

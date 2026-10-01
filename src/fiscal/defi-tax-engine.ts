@@ -1,4 +1,5 @@
 import type { CryptoTransaction, CryptoCapitalGain, CryptoData, Model721Data } from '../types-crypto.ts';
+import { round2 } from '../utils/exact-math.ts';
 
 export class DefiTaxEngine {
   /**
@@ -7,8 +8,10 @@ export class DefiTaxEngine {
    */
   public static processTransactions(transactions: CryptoTransaction[]): CryptoData {
     // 1. Ordenar per data ascendent
-    const sortedTxs = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+    const sortedTxs = [...transactions].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+
     // 2. Separar ingressos DeFi
     let defiIncome = 0;
     const inventory: Record<string, { amount: number; eurCost: number; date: string }[]> = {};
@@ -24,7 +27,7 @@ export class DefiTaxEngine {
         inventory[tx.assetIn].push({
           amount: tx.amountIn,
           eurCost: tx.fiatValueInEUR,
-          date: tx.date
+          date: tx.date,
         });
         continue;
       }
@@ -36,7 +39,7 @@ export class DefiTaxEngine {
         inventory[tx.assetIn].push({
           amount: tx.amountIn,
           eurCost: tx.fiatValueInEUR,
-          date: tx.date
+          date: tx.date,
         });
       }
 
@@ -45,9 +48,9 @@ export class DefiTaxEngine {
         const assetSold = tx.assetIn; // El que donem
         let amountToSell = tx.amountIn;
         const totalSellValue = tx.fiatValueInEUR; // Valor fiat obtingut per la venda
-        
+
         const pool = inventory[assetSold] || [];
-        
+
         while (amountToSell > 0 && pool.length > 0) {
           const firstIn = pool[0]; // FIFO
           if (firstIn.amount <= amountToSell) {
@@ -61,7 +64,7 @@ export class DefiTaxEngine {
               sellFiatValue: proportionValue,
               buyDate: firstIn.date,
               buyFiatValue: firstIn.eurCost,
-              capitalGain: proportionValue - firstIn.eurCost
+              capitalGain: proportionValue - firstIn.eurCost,
             });
             amountToSell -= firstIn.amount;
             pool.shift(); // Elimina el lot
@@ -69,7 +72,7 @@ export class DefiTaxEngine {
             // Esgota només una part del lot
             const costProportion = (amountToSell / firstIn.amount) * firstIn.eurCost;
             const sellProportionValue = (amountToSell / tx.amountIn) * totalSellValue;
-            
+
             capitalGains.push({
               id: `cg-${crypto.randomUUID()}`,
               asset: assetSold,
@@ -78,22 +81,22 @@ export class DefiTaxEngine {
               sellFiatValue: sellProportionValue,
               buyDate: firstIn.date,
               buyFiatValue: costProportion,
-              capitalGain: sellProportionValue - costProportion
+              capitalGain: sellProportionValue - costProportion,
             });
-            
+
             firstIn.amount -= amountToSell;
             firstIn.eurCost -= costProportion;
             amountToSell = 0;
           }
         }
-        
+
         // Si és un 'exchange', entra el nou actiu a l'inventari
         if (tx.type === 'exchange' && tx.assetOut && tx.amountOut) {
           if (!inventory[tx.assetOut]) inventory[tx.assetOut] = [];
           inventory[tx.assetOut].push({
             amount: tx.amountOut,
             eurCost: totalSellValue, // El cost d'adquisició és el valor de mercat al moment de l'intercanvi
-            date: tx.date
+            date: tx.date,
           });
         }
       }
@@ -102,45 +105,113 @@ export class DefiTaxEngine {
     return {
       transactions: sortedTxs,
       capitalGains,
-      defiIncome
+      defiIncome,
     };
   }
 
   /**
-   * Genera les dades del model 721 (declaració de criptomonedes a l'estranger)
-   * Només obligatori si el saldo a l'estranger > 50.000 € a 31 de desembre.
+   * Genera les dades oficials del Model 721 (declaració informativa de criptomonedes a l'estranger).
+   * Obligatori només si el saldo conjunt en exchanges o custòdia a l'estranger supera els 50.000 € a 31 de desembre.
    */
-  public static calculateModel721(year: number): Model721Data {
-    // Simulació per l'exemple (en la realitat necessitaríem els balanços a 31 de desembre a l'estranger per exchange)
-    
-    // Per l'exemple, suposarem un balanç agregat basat en les transaccions d'entrada menys les de sortida/venda per exchange estranger.
-    // Aquí farem un mock raonable si hi ha moviments.
-    
-    // Mock de valor per a demostració:
-    const mockAssets = [
-      {
-        asset: 'BTC',
-        balance: 1.5,
-        eurValueAtDec31: 65000,
-        exchangeName: 'Binance',
-        country: 'MT' // Malta
-      },
-      {
-        asset: 'ETH',
-        balance: 10,
-        eurValueAtDec31: 25000,
-        exchangeName: 'Kraken',
-        country: 'IE' // Irlanda
-      }
-    ];
+  public static calculateModel721(year: number, transactions: CryptoTransaction[] = []): Model721Data {
+    if (!transactions || transactions.length === 0) {
+      return {
+        year,
+        assets: [],
+        totalValue: 0,
+        requiresFiling: false,
+      };
+    }
 
-    const totalValue = mockAssets.reduce((sum, a) => sum + a.eurValueAtDec31, 0);
+    const endOfYear = new Date(`${year}-12-31T23:59:59Z`).getTime();
+    const relevantTxs = transactions.filter((tx) => new Date(tx.date).getTime() <= endOfYear);
+
+    const foreignBalances: Record<
+      string,
+      { balance: number; eurValueAtDec31: number; exchangeName: string; country: string }
+    > = {};
+
+    for (const tx of relevantTxs) {
+      const exchange = tx.walletOrExchange || 'Desconegut';
+      const isSpanish =
+        exchange.toLowerCase().includes('bit2me') || exchange.toLowerCase().includes('ledger_es');
+      if (isSpanish) continue;
+
+      const country = exchange.toLowerCase().includes('binance')
+        ? 'MT'
+        : exchange.toLowerCase().includes('kraken')
+          ? 'IE'
+          : exchange.toLowerCase().includes('coinbase')
+            ? 'IE'
+            : exchange.toLowerCase().includes('kucoin')
+              ? 'SC'
+              : 'XX';
+
+      if (['buy', 'transfer_in', 'staking_reward', 'airdrop', 'hard_fork'].includes(tx.type)) {
+        const key = `${exchange}_${tx.assetIn}`;
+        if (!foreignBalances[key]) {
+          foreignBalances[key] = { balance: 0, eurValueAtDec31: 0, exchangeName: exchange, country };
+        }
+        foreignBalances[key].balance += tx.amountIn;
+        foreignBalances[key].eurValueAtDec31 += tx.fiatValueInEUR;
+      }
+
+      if (['sell', 'transfer_out'].includes(tx.type)) {
+        const key = `${exchange}_${tx.assetIn}`;
+        if (foreignBalances[key]) {
+          const ratio =
+            tx.amountIn > 0 && foreignBalances[key].balance > 0
+              ? Math.min(1, tx.amountIn / foreignBalances[key].balance)
+              : 0;
+          foreignBalances[key].balance = Math.max(0, foreignBalances[key].balance - tx.amountIn);
+          foreignBalances[key].eurValueAtDec31 = Math.max(
+            0,
+            foreignBalances[key].eurValueAtDec31 * (1 - ratio),
+          );
+        }
+      }
+
+      if (tx.type === 'exchange') {
+        const keyOut = `${exchange}_${tx.assetIn}`;
+        if (foreignBalances[keyOut]) {
+          const ratio =
+            tx.amountIn > 0 && foreignBalances[keyOut].balance > 0
+              ? Math.min(1, tx.amountIn / foreignBalances[keyOut].balance)
+              : 0;
+          foreignBalances[keyOut].balance = Math.max(0, foreignBalances[keyOut].balance - tx.amountIn);
+          foreignBalances[keyOut].eurValueAtDec31 = Math.max(
+            0,
+            foreignBalances[keyOut].eurValueAtDec31 * (1 - ratio),
+          );
+        }
+        if (tx.assetOut && tx.amountOut) {
+          const keyIn = `${exchange}_${tx.assetOut}`;
+          if (!foreignBalances[keyIn]) {
+            foreignBalances[keyIn] = { balance: 0, eurValueAtDec31: 0, exchangeName: exchange, country };
+          }
+          foreignBalances[keyIn].balance += tx.amountOut;
+          foreignBalances[keyIn].eurValueAtDec31 += tx.fiatValueInEUR;
+        }
+      }
+    }
+
+    const assets = Object.entries(foreignBalances)
+      .filter(([_, b]) => b.balance > 0.000001)
+      .map(([key, b]) => ({
+        asset: key.split('_')[1] || key,
+        balance: round2(b.balance),
+        eurValueAtDec31: round2(b.eurValueAtDec31),
+        exchangeName: b.exchangeName,
+        country: b.country,
+      }));
+
+    const totalValue = assets.reduce((sum, a) => sum + a.eurValueAtDec31, 0);
 
     return {
       year,
-      assets: mockAssets,
-      totalValue,
-      requiresFiling: totalValue > 50000
+      assets,
+      totalValue: round2(totalValue),
+      requiresFiling: totalValue > 50000,
     };
   }
 }

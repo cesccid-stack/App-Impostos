@@ -25,11 +25,7 @@ function ensureContainer(): HTMLElement {
 }
 
 /** Show a toast notification. */
-export function showToast(
-  message: string,
-  type: ToastType = 'info',
-  durationMs = 4000,
-): void {
+export function showToast(message: string, type: ToastType = 'info', durationMs = 4000): void {
   if (typeof document === 'undefined') return;
   const c = ensureContainer();
 

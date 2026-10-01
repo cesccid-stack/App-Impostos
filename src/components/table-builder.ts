@@ -124,7 +124,7 @@ export function buildTable<T>(config: TableConfig<T>): HTMLElement {
             ${act.icon ? `<span>${escapeHtml(act.icon)}</span>` : ''}
             ${act.label ? `<span>${escapeHtml(act.label)}</span>` : ''}
           </button>
-        `
+        `,
         )
         .join('');
       tr.appendChild(tdActions);

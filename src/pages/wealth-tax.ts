@@ -6,7 +6,12 @@
 
 import { store } from '../store.ts';
 import { calculateIRPF } from '../fiscal/irpf.ts';
-import { calculateWealthTax, type WealthTaxData, type WealthAssetItem, type WealthDebtItem } from '../fiscal/wealth-tax-engine.ts';
+import {
+  calculateWealthTax,
+  type WealthTaxData,
+  type WealthAssetItem,
+  type WealthDebtItem,
+} from '../fiscal/wealth-tax-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
 import type { DeclaracionData, GainItem, RentalProperty } from '../types.ts';
@@ -19,9 +24,10 @@ export function renderWealthTax(): HTMLElement {
   const irpfResult = calculateIRPF(data);
 
   // Carregar estat existent del magatzem o auto-inicialitzar amb immobles i accions de la renda
-  const currentWealth: WealthTaxData = data.wealth && data.wealth.assets && data.wealth.assets.length > 0
-    ? data.wealth
-    : initializeWealthFromIRPF(data);
+  const currentWealth: WealthTaxData =
+    data.wealth && data.wealth.assets && data.wealth.assets.length > 0
+      ? data.wealth
+      : initializeWealthFromIRPF(data);
 
   function saveAndRender() {
     store.update('wealth', currentWealth);
@@ -33,7 +39,7 @@ export function renderWealthTax(): HTMLElement {
       currentWealth,
       irpfResult.liquidableGeneralBase,
       irpfResult.liquidableSavingsBase,
-      irpfResult.netTax
+      irpfResult.netTax,
     );
 
     page.innerHTML = `
@@ -120,7 +126,9 @@ export function renderWealthTax(): HTMLElement {
           <button class="btn btn--secondary btn--sm" id="btn-add-asset">＋ Afegir Actiu</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${currentWealth.assets.map((a) => `
+          ${currentWealth.assets
+            .map(
+              (a) => `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--border-default); font-size:var(--text-sm);">
               <div>
                 <strong>${a.description}</strong>
@@ -131,7 +139,9 @@ export function renderWealthTax(): HTMLElement {
                 <button class="btn btn--ghost btn--sm btn--icon" data-del-asset="${a.id}">🗑</button>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
 
@@ -142,7 +152,9 @@ export function renderWealthTax(): HTMLElement {
           <button class="btn btn--secondary btn--sm" id="btn-add-debt">＋ Afegir Deute</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          ${currentWealth.debts.map((d) => `
+          ${currentWealth.debts
+            .map(
+              (d) => `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--border-default); font-size:var(--text-sm);">
               <div>
                 <strong>${d.description}</strong>
@@ -152,7 +164,9 @@ export function renderWealthTax(): HTMLElement {
                 <button class="btn btn--ghost btn--sm btn--icon" data-del-debt="${d.id}">🗑</button>
               </div>
             </div>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </div>
       </div>
 
@@ -191,7 +205,7 @@ export function renderWealthTax(): HTMLElement {
       window.location.hash = '/iva';
     });
     page.querySelector('#btn-add-asset')?.addEventListener('click', () => {
-      const desc = prompt('Descripció de l\'actiu (ex: Compte Corrent CaixaBank):');
+      const desc = prompt("Descripció de l'actiu (ex: Compte Corrent CaixaBank):");
       if (desc) {
         const val = parseFloat(prompt('Valor fiscal en euros (€):') || '0') || 0;
         currentWealth.assets.push({
@@ -219,18 +233,18 @@ export function renderWealthTax(): HTMLElement {
       }
     });
 
-    page.querySelectorAll('[data-del-asset]').forEach(btn => {
+    page.querySelectorAll('[data-del-asset]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.delAsset;
-        currentWealth.assets = currentWealth.assets.filter(a => a.id !== id);
+        currentWealth.assets = currentWealth.assets.filter((a) => a.id !== id);
         saveAndRender();
       });
     });
 
-    page.querySelectorAll('[data-del-debt]').forEach(btn => {
+    page.querySelectorAll('[data-del-debt]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.delDebt;
-        currentWealth.debts = currentWealth.debts.filter(d => d.id !== id);
+        currentWealth.debts = currentWealth.debts.filter((d) => d.id !== id);
         saveAndRender();
       });
     });
@@ -253,12 +267,15 @@ function initializeWealthFromIRPF(data: DeclaracionData): WealthTaxData {
     });
   });
 
-  const totalGainsValue = (data.gains?.items || []).reduce((s: number, i: GainItem) => s + (i.transferValue || i.acquisitionValue || 0), 0);
+  const totalGainsValue = (data.gains?.items || []).reduce(
+    (s: number, i: GainItem) => s + (i.transferValue || i.acquisitionValue || 0),
+    0,
+  );
   if (totalGainsValue > 0) {
     autoAssets.push({
       id: 'shares-auto',
       category: 'shares_funds',
-      description: '📈 Cartera d\'Accions i Fons d\'Inversió',
+      description: "📈 Cartera d'Accions i Fons d'Inversió",
       grossValue: totalGainsValue,
     });
   }
@@ -275,14 +292,34 @@ function initializeWealthFromIRPF(data: DeclaracionData): WealthTaxData {
   });
 
   return {
-    assets: autoAssets.length > 0 ? autoAssets : [
-      { id: '1', category: 'real_estate', description: '🏠 Habitatge Habitual', grossValue: 350000, isPrimaryResidence: true },
-      { id: '2', category: 'bank_accounts', description: '🏦 Comptes bancaris i dipòsits', grossValue: 200000 },
-      { id: '3', category: 'shares_funds', description: '📈 Fons d\'inversió i accions', grossValue: 400000 },
-    ],
-    debts: autoDebts.length > 0 ? autoDebts : [
-      { id: 'd1', description: 'Préstec hipotecari restant', amount: 80000 },
-    ],
+    assets:
+      autoAssets.length > 0
+        ? autoAssets
+        : [
+            {
+              id: '1',
+              category: 'real_estate',
+              description: '🏠 Habitatge Habitual',
+              grossValue: 350000,
+              isPrimaryResidence: true,
+            },
+            {
+              id: '2',
+              category: 'bank_accounts',
+              description: '🏦 Comptes bancaris i dipòsits',
+              grossValue: 200000,
+            },
+            {
+              id: '3',
+              category: 'shares_funds',
+              description: "📈 Fons d'inversió i accions",
+              grossValue: 400000,
+            },
+          ],
+    debts:
+      autoDebts.length > 0
+        ? autoDebts
+        : [{ id: 'd1', description: 'Préstec hipotecari restant', amount: 80000 }],
     community: 'CAT',
   };
 }

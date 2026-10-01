@@ -5,21 +5,21 @@
  * Formats CSV normalitzats i desglossaments oficials de liquidació (Models 303 i 390).
  */
 
-import type { 
-  IVAInvoiceIssued, 
-  IVAInvoiceReceived, 
-  IVABienInversion, 
+import type {
+  IVAInvoiceIssued,
+  IVAInvoiceReceived,
+  IVABienInversion,
   Model303QuarterResult,
-  FiscalQuarter
+  FiscalQuarter,
 } from '../types-iva.ts';
 
 /**
  * Exporta el Llibre Registre de Factures Expedides en format CSV homologat AEAT.
  */
 export function exportIssuedInvoicesCSV(
-  invoices: IVAInvoiceIssued[], 
+  invoices: IVAInvoiceIssued[],
   download = true,
-  filename = 'llibre_registre_factures_expedides_aeat.csv'
+  filename = 'llibre_registre_factures_expedides_aeat.csv',
 ): string {
   const headers = [
     'Trimestre',
@@ -39,10 +39,10 @@ export function exportIssuedInvoicesCSV(
     'Total_Factura_EUR',
     'Categoria_Operacio',
     'Document_PDF_Adjunt',
-    'Notes'
+    'Notes',
   ];
 
-  const rows = invoices.map(i => [
+  const rows = invoices.map((i) => [
     i.quarter,
     i.date,
     `"${i.invoiceNumber}"`,
@@ -60,10 +60,10 @@ export function exportIssuedInvoicesCSV(
     (i.totalInvoice || 0).toFixed(2),
     i.category,
     i.hasAttachment ? `"${i.attachmentStandardizedName || 'DOCUMENTAT'}"` : 'SENSE_DOC',
-    `"${(i.notes || '').replace(/"/g, '""')}"`
+    `"${(i.notes || '').replace(/"/g, '""')}"`,
   ]);
 
-  const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+  const content = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
   if (download) {
     downloadCSV(content, filename);
   }
@@ -74,9 +74,9 @@ export function exportIssuedInvoicesCSV(
  * Exporta el Llibre Registre de Factures Rebudes en format CSV homologat AEAT.
  */
 export function exportReceivedInvoicesCSV(
-  invoices: IVAInvoiceReceived[], 
+  invoices: IVAInvoiceReceived[],
   download = true,
-  filename = 'llibre_registre_factures_rebudes_aeat.csv'
+  filename = 'llibre_registre_factures_rebudes_aeat.csv',
 ): string {
   const headers = [
     'Trimestre',
@@ -95,10 +95,10 @@ export function exportReceivedInvoicesCSV(
     'Categoria_Despesa',
     'Es_Be_Inversio',
     'Document_PDF_Adjunt',
-    'Notes'
+    'Notes',
   ];
 
-  const rows = invoices.map(i => [
+  const rows = invoices.map((i) => [
     i.quarter,
     i.date,
     `"${i.invoiceNumber}"`,
@@ -115,10 +115,10 @@ export function exportReceivedInvoicesCSV(
     i.category,
     i.isInvestmentAsset ? 'SI' : 'NO',
     i.hasAttachment ? `"${i.attachmentStandardizedName || 'DOCUMENTAT'}"` : 'SENSE_DOC',
-    `"${(i.notes || '').replace(/"/g, '""')}"`
+    `"${(i.notes || '').replace(/"/g, '""')}"`,
   ]);
 
-  const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+  const content = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
   if (download) {
     downloadCSV(content, filename);
   }
@@ -129,9 +129,9 @@ export function exportReceivedInvoicesCSV(
  * Exporta el Llibre Registre de Béns d'Inversió (Art. 107-110 LIVA).
  */
 export function exportInvestmentAssetsCSV(
-  assets: IVABienInversion[], 
+  assets: IVABienInversion[],
   download = true,
-  filename = 'llibre_registre_bens_inversio_aeat.csv'
+  filename = 'llibre_registre_bens_inversio_aeat.csv',
 ): string {
   const headers = [
     'ID_Actiu',
@@ -147,10 +147,10 @@ export function exportInvestmentAssetsCSV(
     'Anys_Regularitzacio',
     'Estat',
     'Data_Baixa',
-    'Valor_Baixa_EUR'
+    'Valor_Baixa_EUR',
   ];
 
-  const rows = assets.map(a => [
+  const rows = assets.map((a) => [
     `"${a.id}"`,
     `"${(a.description || '').replace(/"/g, '""')}"`,
     a.assetType,
@@ -164,10 +164,10 @@ export function exportInvestmentAssetsCSV(
     a.regularizationYears,
     a.status,
     a.disposalDate || '',
-    (a.disposalValue || 0).toFixed(2)
+    (a.disposalValue || 0).toFixed(2),
   ]);
 
-  const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+  const content = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
   if (download) {
     downloadCSV(content, filename);
   }
@@ -180,10 +180,10 @@ export function exportInvestmentAssetsCSV(
 export function exportModel303SummaryCSV(
   quarterResultOrQuarters: Model303QuarterResult | Record<FiscalQuarter, Model303QuarterResult>,
   year = 2024,
-  download = true
+  download = true,
 ): string {
   const isSingle = 'quarter' in quarterResultOrQuarters;
-  const quartersList: Model303QuarterResult[] = isSingle 
+  const quartersList: Model303QuarterResult[] = isSingle
     ? [quarterResultOrQuarters as Model303QuarterResult]
     : Object.values(quarterResultOrQuarters as Record<FiscalQuarter, Model303QuarterResult>);
 
@@ -191,7 +191,7 @@ export function exportModel303SummaryCSV(
     `MODEL 303 - RESUM D'AUTOLIQUIDACIONS D'IVA - EXERCICI ${year}`,
     `Data de generació: ${new Date().toISOString().slice(0, 10)}`,
     '',
-    'TRIMESTRE;CASELLA;CONCEPTE;BASE_EUR;TIPUS_PCT;QUOTA_EUR'
+    'TRIMESTRE;CASELLA;CONCEPTE;BASE_EUR;TIPUS_PCT;QUOTA_EUR',
   ];
 
   for (const qr of quartersList) {
@@ -217,7 +217,7 @@ export function exportModel303SummaryCSV(
       `${qr.quarter};46;Diferència (Casella 27 - Casella 45);;;${qr.diferencia.toFixed(2)}`,
       `${qr.quarter};110;Quotes a compensar aplicades de períodes anteriors;;;${qr.cuotasCompensarPeriodosAnteriores.toFixed(2)}`,
       `${qr.quarter};71;RESULTAT FINAL DE LA LIQUIDACIÓ;;;${qr.resultadoLiquidacion.toFixed(2)}`,
-      `${qr.quarter};TIPUS_RESULTAT;${qr.paymentType.toUpperCase()};;;`
+      `${qr.quarter};TIPUS_RESULTAT;${qr.paymentType.toUpperCase()};;;`,
     );
   }
 

@@ -5,7 +5,11 @@
  */
 
 import { store } from '../store.ts';
-import { runAutomatedComplianceChecks, executeAutoFix, type ValidationReport } from '../fiscal/auto-validator.ts';
+import {
+  runAutomatedComplianceChecks,
+  executeAutoFix,
+  type ValidationReport,
+} from '../fiscal/auto-validator.ts';
 import { showToast } from './toast.ts';
 
 export function openComplianceModal(onUpdated?: () => void): void {
@@ -18,7 +22,8 @@ export function openComplianceModal(onUpdated?: () => void): void {
   const modal = document.createElement('div');
   modal.id = 'compliance-audit-modal';
   modal.className = 'modal-backdrop';
-  modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md); backdrop-filter:blur(4px);';
+  modal.style.cssText =
+    'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md); backdrop-filter:blur(4px);';
 
   function renderModalContent() {
     report = runAutomatedComplianceChecks(store.getData());
@@ -34,7 +39,7 @@ export function openComplianceModal(onUpdated?: () => void): void {
           <div>
             <div style="display:flex; align-items:center; gap:var(--space-xs);">
               <h2 style="margin:0; font-size:var(--text-lg);">🛡️ Diagnòstic & Comprovacions Fiscals Automàtiques</h2>
-              <span class="badge ${isPerfect ? 'badge--success' : (hasCritical ? 'badge--error' : 'badge--warning')}">
+              <span class="badge ${isPerfect ? 'badge--success' : hasCritical ? 'badge--error' : 'badge--warning'}">
                 ${report.complianceScore}% Conformitat
               </span>
             </div>
@@ -49,7 +54,7 @@ export function openComplianceModal(onUpdated?: () => void): void {
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:var(--space-sm); margin-bottom:var(--space-lg);">
           <div style="background:var(--bg-surface-elevated); padding:var(--space-sm) var(--space-md); border-radius:var(--radius-md); text-align:center; border:1px solid var(--border-default);">
             <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Puntuació Legal</div>
-            <div style="font-size:1.4rem; font-weight:bold; color:${isPerfect ? 'var(--color-success)' : (hasCritical ? 'var(--color-error)' : 'var(--color-warning)')};">
+            <div style="font-size:1.4rem; font-weight:bold; color:${isPerfect ? 'var(--color-success)' : hasCritical ? 'var(--color-error)' : 'var(--color-warning)'};">
               ${report.complianceScore}%
             </div>
           </div>
@@ -69,7 +74,9 @@ export function openComplianceModal(onUpdated?: () => void): void {
 
         <!-- Llista de Comprovacions -->
         <div style="display:flex; flex-direction:column; gap:var(--space-md); margin-bottom:var(--space-xl);">
-          ${isPerfect ? `
+          ${
+            isPerfect
+              ? `
             <div style="padding:var(--space-xl); text-align:center; background:var(--bg-surface-elevated); border-radius:var(--radius-md); border:1px solid var(--color-success);">
               <div style="font-size:2.5rem; margin-bottom:var(--space-xs);">🎉</div>
               <h3 style="margin:0 0 var(--space-xs) 0; color:var(--color-success);">Tot és 100% Correcte!</h3>
@@ -77,17 +84,20 @@ export function openComplianceModal(onUpdated?: () => void): void {
                 No s'ha detectat cap incongruència entre el Mòdul d'IVA, Activitats i Immobles. La declaració s'ajusta als criteris d'inspecció de l'AEAT.
               </p>
             </div>
-          ` : `
-            ${report.issues.map(issue => `
-              <div style="background:var(--bg-surface-elevated); border-radius:var(--radius-md); padding:var(--space-md); border:1px solid var(--border-default); border-left:4px solid ${issue.severity === 'critical' ? 'var(--color-error)' : (issue.severity === 'warning' ? 'var(--color-warning)' : 'var(--color-info)')};">
+          `
+              : `
+            ${report.issues
+              .map(
+                (issue) => `
+              <div style="background:var(--bg-surface-elevated); border-radius:var(--radius-md); padding:var(--space-md); border:1px solid var(--border-default); border-left:4px solid ${issue.severity === 'critical' ? 'var(--color-error)' : issue.severity === 'warning' ? 'var(--color-warning)' : 'var(--color-info)'};">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-sm); margin-bottom:4px;">
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span style="font-size:1.1rem;">
-                      ${issue.severity === 'critical' ? '🔴' : (issue.severity === 'warning' ? '🟡' : 'ℹ️')}
+                      ${issue.severity === 'critical' ? '🔴' : issue.severity === 'warning' ? '🟡' : 'ℹ️'}
                     </span>
                     <strong style="font-size:var(--text-sm);">${issue.title}</strong>
                   </div>
-                  <span class="badge ${issue.severity === 'critical' ? 'badge--error' : (issue.severity === 'warning' ? 'badge--warning' : 'badge--info')}">
+                  <span class="badge ${issue.severity === 'critical' ? 'badge--error' : issue.severity === 'warning' ? 'badge--warning' : 'badge--info'}">
                     ${issue.severity.toUpperCase()}
                   </span>
                 </div>
@@ -98,15 +108,22 @@ export function openComplianceModal(onUpdated?: () => void): void {
 
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); border-top:1px solid var(--border-subtle); padding-top:6px; font-size:0.75rem;">
                   <span style="color:var(--text-muted);">⚖️ ${issue.legalReference}</span>
-                  ${issue.autoFixable && issue.autoFixKey ? `
+                  ${
+                    issue.autoFixable && issue.autoFixKey
+                      ? `
                     <button class="btn btn--primary btn--sm btn-autofix" data-fix-key="${issue.autoFixKey}" style="font-size:0.75rem; padding:3px 10px;">
                       ⚡ ${issue.autoFixLabel || 'Auto-Corregir'}
                     </button>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                 </div>
               </div>
-            `).join('')}
-          `}
+            `,
+              )
+              .join('')}
+          `
+          }
         </div>
 
         <!-- Footer -->
@@ -137,7 +154,7 @@ export function openComplianceModal(onUpdated?: () => void): void {
       showToast('Comprovacions fiscals actualitzades', 'info');
     });
 
-    modal.querySelectorAll('.btn-autofix').forEach(btn => {
+    modal.querySelectorAll('.btn-autofix').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const key = (e.currentTarget as HTMLElement).dataset.fixKey!;
         const result = executeAutoFix(key);

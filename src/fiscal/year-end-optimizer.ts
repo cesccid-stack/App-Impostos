@@ -6,16 +6,21 @@
 
 import type { DeclaracionData } from '../types.ts';
 import { calculateIRPF } from './irpf.ts';
-import { STATE_GENERAL_TAX_BRACKETS, CATALAN_GENERAL_TAX_BRACKETS, STATE_SAVINGS_TAX_BRACKETS, AUTONOMIC_SAVINGS_TAX_BRACKETS } from './constants.ts';
+import {
+  STATE_GENERAL_TAX_BRACKETS,
+  CATALAN_GENERAL_TAX_BRACKETS,
+  STATE_SAVINGS_TAX_BRACKETS,
+  AUTONOMIC_SAVINGS_TAX_BRACKETS,
+} from './constants.ts';
 import { roundCurrency, safeMultiply } from '../utils/math.ts';
 
 export interface MarginalRates {
-  stateGeneralRate: number;       // %
-  autonomicGeneralRate: number;   // %
+  stateGeneralRate: number; // %
+  autonomicGeneralRate: number; // %
   totalGeneralMarginalRate: number; // % (Suma estatal + autonòmic)
-  
-  stateSavingsRate: number;       // %
-  autonomicSavingsRate: number;   // %
+
+  stateSavingsRate: number; // %
+  autonomicSavingsRate: number; // %
   totalSavingsMarginalRate: number; // %
 }
 
@@ -100,7 +105,8 @@ export function generateYearEndOptimization(data: DeclaracionData): YearEndOptim
       title: `Aporta ${remainingPension.toFixed(2)} € al teu Pla de Pensions`,
       description: `Com que el teu tipus marginal és del ${marginal.totalGeneralMarginalRate.toFixed(1)}%, una aportació de ${remainingPension.toFixed(2)} € abans del 31 de desembre redueix directament la teva base imposable.`,
       potentialSavings: savings,
-      actionRecommendation: 'Realitza una aportació extraordinària al teu pla de pensions abans de final d\'any.',
+      actionRecommendation:
+        "Realitza una aportació extraordinària al teu pla de pensions abans de final d'any.",
     });
   }
 
@@ -108,7 +114,7 @@ export function generateYearEndOptimization(data: DeclaracionData): YearEndOptim
   const currentDonations = (data.deductions.donations || []).reduce((s, d) => s + (d.amount || 0), 0);
   if (currentDonations < 250) {
     const remainingDonation = 250 - currentDonations;
-    const donationSavings = safeMultiply(remainingDonation, 0.80);
+    const donationSavings = safeMultiply(remainingDonation, 0.8);
     tips.push({
       id: 'tip_donation',
       category: 'donations',
@@ -129,7 +135,7 @@ export function generateYearEndOptimization(data: DeclaracionData): YearEndOptim
       title: `Compensa Guanys amb Pèrdues Latents`,
       description: `Tens una base de l'estalvi positiva. Pots materialitzar posicions amb pèrdues latents abans del 31/12 per reduir la factura fiscal.`,
       potentialSavings: taxLossSavings,
-      actionRecommendation: 'Revisa la teva cartera d\'inversions per aplicar Tax-Loss Harvesting.',
+      actionRecommendation: "Revisa la teva cartera d'inversions per aplicar Tax-Loss Harvesting.",
     });
   }
 

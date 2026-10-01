@@ -34,6 +34,11 @@ import {
   JOINT_TAXATION_REDUCTION_SINGLE_PARENT,
   SIMPLIFIED_EXPENSES_RATE,
   SIMPLIFIED_EXPENSES_MAX,
+  DIET_EXEMPT_NATIONAL_NO_PERNOCTATION,
+  DIET_EXEMPT_NATIONAL_PERNOCTATION,
+  DIET_EXEMPT_ABROAD_NO_PERNOCTATION,
+  DIET_EXEMPT_ABROAD_PERNOCTATION,
+  MILEAGE_EXEMPT_RATE_PER_KM,
   type TaxBracket,
 } from './constants.ts';
 import { getAutonomicBrackets } from './autonomic-tax-scales.ts';
@@ -47,10 +52,7 @@ import { exactAdd, exactSub, round2, applyTaxBracketsExact } from '../utils/exac
 /**
  * Apply progressive tax brackets to a given base amount with exact AEAT cents precision.
  */
-export function applyBrackets(
-  amount: number,
-  brackets: readonly TaxBracket[],
-): number {
+export function applyBrackets(amount: number, brackets: readonly TaxBracket[]): number {
   if (amount <= 0) return 0;
   return applyTaxBracketsExact(amount, brackets).totalTax;
 }
@@ -58,10 +60,7 @@ export function applyBrackets(
 /**
  * Compute the effective tax rate for a given amount and brackets.
  */
-export function effectiveRate(
-  amount: number,
-  brackets: readonly TaxBracket[],
-): number {
+export function effectiveRate(amount: number, brackets: readonly TaxBracket[]): number {
   if (amount <= 0) return 0;
   return applyBrackets(amount, brackets) / amount;
 }
@@ -69,7 +68,10 @@ export function effectiveRate(
 /**
  * Compute net work income (rendimiento neto del trabajo) including Art. 7.p and Art. 18.2.
  */
-function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
+function computeNetWorkIncome(
+  data: DeclaracionData,
+  otherRents: number,
+): {
   netIncome: number;
   reduction: number;
   foreignWorkExemptionApplied: number;
@@ -80,20 +82,28 @@ function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
   taxableSeverancePay: number;
 } {
   const w = data.workIncome;
-  
+
   let totalGrossSalary = 0;
   let totalInKind = 0;
   let totalSocialSecurity = 0;
   let totalTaxableDiets = 0;
   let totalTaxableMileage = 0;
 
-  for (const emp of (w.employers || [])) {
+  for (const emp of w.employers || []) {
     totalGrossSalary += emp.grossSalary || 0;
     totalInKind += emp.inKind || 0;
     totalSocialSecurity += emp.socialSecurity || 0;
-    
-    const dietsExempt = (emp.dietsDays || 0) * 26.67;
-    const mileageExempt = (emp.mileageKm || 0) * 0.26;
+
+    let dietDailyRate = DIET_EXEMPT_NATIONAL_NO_PERNOCTATION;
+    if (emp.dietsAbroad) {
+      dietDailyRate = emp.dietsWithPernoctation
+        ? DIET_EXEMPT_ABROAD_PERNOCTATION
+        : DIET_EXEMPT_ABROAD_NO_PERNOCTATION;
+    } else if (emp.dietsWithPernoctation) {
+      dietDailyRate = DIET_EXEMPT_NATIONAL_PERNOCTATION;
+    }
+    const dietsExempt = (emp.dietsDays || 0) * dietDailyRate;
+    const mileageExempt = (emp.mileageKm || 0) * MILEAGE_EXEMPT_RATE_PER_KM;
 
     totalTaxableDiets += Math.max(0, (emp.dietsIncome || 0) - dietsExempt);
     totalTaxableMileage += Math.max(0, (emp.mileageIncome || 0) - mileageExempt);
@@ -110,12 +120,13 @@ function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
 
   // 2. Exempció per treballs a l'estranger (Art. 7.p LIRPF - Màx 60.100 €)
   const foreignWorkExemptionApplied = Math.min(60100, Math.max(0, w.foreignWorkExemption7p || 0));
-  const rawSalary = totalGrossSalary + totalInKind + totalTaxableDiets + totalTaxableMileage + taxableSeverancePay;
+  const rawSalary =
+    totalGrossSalary + totalInKind + totalTaxableDiets + totalTaxableMileage + taxableSeverancePay;
   const grossAfterExemption = Math.max(0, rawSalary - foreignWorkExemptionApplied);
 
   // 3. Reducció del 30% per rendiments irregulars o > 2 anys (Art. 18.2 LIRPF - Base màx 300.000 €)
   const irregularBase = Math.min(300000, Math.max(0, w.irregularIncomeAmount || 0));
-  const irregularWorkReduction = irregularBase * 0.30;
+  const irregularWorkReduction = irregularBase * 0.3;
   const grossIncome = Math.max(0, grossAfterExemption - irregularWorkReduction);
 
   // 4. Despeses deduïbles específiques (Art. 19.2 LIRPF)
@@ -140,10 +151,8 @@ function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
   let reduction = 0;
   if (netIncome <= WORK_REDUCTION_THRESHOLD_LOW && !exceedsOtherRents) {
     reduction = WORK_REDUCTION_MAX;
-  } else if (netIncome <= WORK_REDUCTION_THRESHOLD_HIGH || exceedsOtherRents) {
-    reduction =
-      WORK_REDUCTION_MAX -
-      WORK_REDUCTION_COEFFICIENT * (netIncome - WORK_REDUCTION_THRESHOLD_LOW);
+  } else if (netIncome <= WORK_REDUCTION_THRESHOLD_HIGH) {
+    reduction = WORK_REDUCTION_MAX - WORK_REDUCTION_COEFFICIENT * (netIncome - WORK_REDUCTION_THRESHOLD_LOW);
   }
   reduction = Math.max(0, reduction);
 
@@ -152,12 +161,12 @@ function computeNetWorkIncome(data: DeclaracionData, otherRents: number): {
   // movilitat reduïda o un grau de discapacitat ≥ 65%.
   const workerDisability = data.personal?.disability || 0;
   if (workerDisability >= 33) {
-    const enhanced =
-      data.personal?.reducedMobility === true || workerDisability >= 65;
-    reduction += enhanced
-      ? WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED
-      : WORK_REDUCTION_DISABILITY_EXTRA;
+    const enhanced = data.personal?.reducedMobility === true || workerDisability >= 65;
+    reduction += enhanced ? WORK_REDUCTION_DISABILITY_EXTRA_ENHANCED : WORK_REDUCTION_DISABILITY_EXTRA;
   }
+
+  // La reducció per rendiments del treball no pot superar el rendiment net del treball (Art. 20.1 LIRPF)
+  reduction = Math.min(reduction, netIncome);
 
   return {
     netIncome,
@@ -194,7 +203,7 @@ function computeCapitalIncome(data: DeclaracionData): {
     imputedIncome: 0,
     realEstateWithholdings: 0,
   };
-  
+
   const foreignDividends = c.foreignDividends || 0;
   const foreignTaxWithheld = c.foreignTaxWithheld || 0;
 
@@ -202,13 +211,20 @@ function computeCapitalIncome(data: DeclaracionData): {
   // dels rendiments íntegres del capital mobiliari.
   const securitiesExpenses = Math.max(0, c.securitiesManagementExpenses || 0);
   const grossMobiliary =
-    (c.interests || 0) + (c.dividends || 0) + foreignDividends + (c.insuranceGains || 0) + (c.otherMobiliary || 0);
+    (c.interests || 0) +
+    (c.dividends || 0) +
+    foreignDividends +
+    (c.insuranceGains || 0) +
+    (c.otherMobiliary || 0);
   const mobiliary = Math.max(0, grossMobiliary - securitiesExpenses);
-  
+
   let rentalReduced = 0;
   let imputedFromProperties = 0;
   if (data.properties && data.properties.length > 0) {
-    const { totalNetReducedIncome, totalImputedIncome } = calculateAllProperties(data.properties, data.year || 2024);
+    const { totalNetReducedIncome, totalImputedIncome } = calculateAllProperties(
+      data.properties,
+      data.year || 2024,
+    );
     rentalReduced = totalNetReducedIncome;
     imputedFromProperties = totalImputedIncome;
   } else {
@@ -216,11 +232,7 @@ function computeCapitalIncome(data: DeclaracionData): {
     // aplicable. La reducció transitoria del 60% queda derogada per a contractes formalitzats
     // a partir del 26/05/2023 (Llei 12/2023), que passen al règim general del 50%.
     const rentalNet = Math.max(0, (c.rentalIncome || 0) - (c.rentalExpenses || 0));
-    const reductionRate = getRentalReductionRate(
-      c.rentalReductionType,
-      'habitual',
-      c.rentalContractDate,
-    );
+    const reductionRate = getRentalReductionRate(c.rentalReductionType, 'habitual', c.rentalContractDate);
     rentalReduced = rentalNet * (1 - reductionRate / 100);
   }
 
@@ -266,7 +278,12 @@ function computeGains(items: GainItem[] = []): number {
     }
 
     // 2. Exempció per reinversió en habitatge habitual (Art. 38.1 - Caselles 0361-0370)
-    if (item.isPrimaryResidenceReinvestment && rawGain > 0 && item.reinvestmentAmount && item.transferValue > 0) {
+    if (
+      item.isPrimaryResidenceReinvestment &&
+      rawGain > 0 &&
+      item.reinvestmentAmount &&
+      item.transferValue > 0
+    ) {
       const reinvestmentRatio = Math.min(1, item.reinvestmentAmount / item.transferValue);
       rawGain = rawGain * (1 - reinvestmentRatio);
     }
@@ -287,7 +304,7 @@ function computeGains(items: GainItem[] = []): number {
         return total;
       }
     }
-    
+
     return total + rawGain;
   }, 0);
 }
@@ -366,8 +383,7 @@ function computeMinimums(data: DeclaracionData): {
     ascendantsMinimum += prorateByCoexistence(min, asc.coexistenceMonths);
   });
 
-  const totalMinimum =
-    personalMinimum + descendantsMinimum + ascendantsMinimum;
+  const totalMinimum = personalMinimum + descendantsMinimum + ascendantsMinimum;
 
   return {
     personalMinimum,
@@ -377,19 +393,11 @@ function computeMinimums(data: DeclaracionData): {
   };
 }
 
-const irpfCache = new WeakMap<DeclaracionData, FiscalResult>();
-
 /**
  * Main calculation: computes the full FiscalResult from input data.
- * Memoized via WeakMap for sub-millisecond repeated lookups.
  */
-export function calculateIRPF(data: DeclaracionData, bypassCache = false): FiscalResult {
-  if (!bypassCache && irpfCache.has(data)) {
-    return irpfCache.get(data)!;
-  }
-  const result = computeIRPFInternal(data);
-  irpfCache.set(data, result);
-  return result;
+export function calculateIRPF(data: DeclaracionData, _bypassCache = false): FiscalResult {
+  return computeIRPFInternal(data);
 }
 
 function computeIRPFInternal(data: DeclaracionData): FiscalResult {
@@ -481,7 +489,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     const spanishTaxOnForeignIncome = round2(foreignDividends * effectiveSavingsRate);
     foreignTaxCredit = Math.min(foreignTaxWithheld, spanishTaxOnForeignIncome);
   }
-  
+
   const totalDeductions = exactAdd(
     deductionAmounts.housingDeductionAmount,
     deductionAmounts.donationsDeductionAmount,
@@ -489,7 +497,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     deductionAmounts.energyEfficiencyDeductionAmount,
     catalanDeductionsAmount,
     foreignTaxCredit,
-    data.deductions?.otherDeductions || 0
+    data.deductions?.otherDeductions || 0,
   );
 
   // 8. Quota líquida.
@@ -498,12 +506,12 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
   // deduccions són "lligades a quota" i no poden fer-la baixar per sota de zero.
   const refundableDeductions = deductionAmounts.maternityDeductionAmount;
   const quotaLinkedDeductions = exactSub(totalDeductions, refundableDeductions);
-  const netTax = exactSub(
-    Math.max(0, exactSub(grossTax, quotaLinkedDeductions)),
-    refundableDeductions,
-  );
+  const netTax = exactSub(Math.max(0, exactSub(grossTax, quotaLinkedDeductions)), refundableDeductions);
 
-  const totalWorkWithholdings = (data.workIncome?.employers || []).reduce((sum, emp) => exactAdd(sum, emp.withholdings || 0), 0);
+  const totalWorkWithholdings = (data.workIncome?.employers || []).reduce(
+    (sum, emp) => exactAdd(sum, emp.withholdings || 0),
+    0,
+  );
 
   // 9. Withholdings
   const totalWithholdings = exactAdd(
@@ -511,7 +519,7 @@ function computeIRPFInternal(data: DeclaracionData): FiscalResult {
     data.capitalIncome?.mobiliaryWithholdings || 0,
     data.capitalIncome?.realEstateWithholdings || 0,
     data.activities?.withholdings || 0,
-    data.gains?.totalWithholdings || 0
+    data.gains?.totalWithholdings || 0,
   );
 
   // 10. Result

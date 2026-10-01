@@ -9,11 +9,11 @@
 
 import JSZip from 'jszip';
 import type { IVAData } from '../types-iva.ts';
-import { 
-  exportIssuedInvoicesCSV, 
-  exportReceivedInvoicesCSV, 
-  exportInvestmentAssetsCSV, 
-  exportModel303SummaryCSV 
+import {
+  exportIssuedInvoicesCSV,
+  exportReceivedInvoicesCSV,
+  exportInvestmentAssetsCSV,
+  exportModel303SummaryCSV,
 } from './iva-books-generator.ts';
 import { getDocumentsForYear, type StoredDocument } from './document-vault.ts';
 import { calculateAllQuarters } from '../fiscal/iva-engine.ts';
@@ -34,13 +34,9 @@ function dataUrlToUint8Array(dataUrl: string): Uint8Array {
 /**
  * Construeix el CSV d'Índex / Manifest de Requeriment que vincula cada factura amb el seu PDF.
  */
-function generateInspectionManifestCSV(
-  ivaData: IVAData,
-  storedDocs: StoredDocument[],
-  year: number
-): string {
+function generateInspectionManifestCSV(ivaData: IVAData, storedDocs: StoredDocument[], year: number): string {
   const docMap = new Map<string, StoredDocument>();
-  storedDocs.forEach(d => docMap.set(d.invoiceId, d));
+  storedDocs.forEach((d) => docMap.set(d.invoiceId, d));
 
   const headers = [
     'EXERCICI',
@@ -58,7 +54,7 @@ function generateInspectionManifestCSV(
     'ESTAT_DOCUMENT_PDF',
     'NOM_FITXER_ADJUNT_AEAT',
     'MIDA_KB',
-    'RUTA_DINS_DOSSIER'
+    'RUTA_DINS_DOSSIER',
   ];
 
   const rows: string[][] = [];
@@ -86,7 +82,7 @@ function generateInspectionManifestCSV(
       hasDoc ? 'DOCUMENTAT' : 'PENDENT_PDF',
       doc?.standardizedName || '',
       doc ? (doc.size / 1024).toFixed(1) : '0',
-      path
+      path,
     ]);
   }
 
@@ -112,11 +108,11 @@ function generateInspectionManifestCSV(
       hasDoc ? 'DOCUMENTAT' : 'PENDENT_PDF',
       doc?.standardizedName || '',
       doc ? (doc.size / 1024).toFixed(1) : '0',
-      path
+      path,
     ]);
   }
 
-  const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+  const csvContent = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
   return '\uFEFF' + csvContent; // BOM UTF-8
 }
 
@@ -127,9 +123,9 @@ export async function generateAndDownloadInspectionPackage(
   ivaData: IVAData,
   year: number,
   profileName: string,
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
 ): Promise<{ success: boolean; totalFiles: number; totalSizeMB: number }> {
-  if (onProgress) onProgress('Iniciant la preparació del Dossier d\'Inspecció...');
+  if (onProgress) onProgress("Iniciant la preparació del Dossier d'Inspecció...");
 
   const zip = new JSZip();
   const rootFolder = zip.folder(`Dossier_Inspeccio_AEAT_${year}_${profileName.replace(/\s+/g, '_')}`)!;
@@ -138,19 +134,23 @@ export async function generateAndDownloadInspectionPackage(
   if (onProgress) onProgress('Recuperant factures i PDFs originals del magatzem segur...');
   const storedDocs = await getDocumentsForYear(year);
   const docMap = new Map<string, StoredDocument>();
-  storedDocs.forEach(d => docMap.set(d.invoiceId, d));
+  storedDocs.forEach((d) => docMap.set(d.invoiceId, d));
 
   // 2. Generar Llibres Registre Oficials en CSV
   if (onProgress) onProgress('Generant Llibres Registre Oficials (Ordre HAC/773/2019)...');
   const csvFolder = rootFolder.folder('00_Llibres_Oficials_AEAT_CSV')!;
-  
+
   // CSVs oficials
   const { quarters } = calculateAllQuarters(ivaData, year);
-  
+
   // Create CSV contents directly
   const expCSV = generateCSVFromExportFunction(() => exportIssuedInvoicesCSV(ivaData.issuedInvoices, false));
-  const recCSV = generateCSVFromExportFunction(() => exportReceivedInvoicesCSV(ivaData.receivedInvoices, false));
-  const invCSV = generateCSVFromExportFunction(() => exportInvestmentAssetsCSV(ivaData.investmentAssets, false));
+  const recCSV = generateCSVFromExportFunction(() =>
+    exportReceivedInvoicesCSV(ivaData.receivedInvoices, false),
+  );
+  const invCSV = generateCSVFromExportFunction(() =>
+    exportInvestmentAssetsCSV(ivaData.investmentAssets, false),
+  );
   const m303CSV = generateCSVFromExportFunction(() => exportModel303SummaryCSV(quarters, year, false));
 
   csvFolder.file(`1_Llibre_Factures_Expedides_${year}.csv`, expCSV);
@@ -165,7 +165,7 @@ export async function generateAndDownloadInspectionPackage(
 
   // 4. Afegir els PDFs organitzats per carpetes de trimestre
   if (onProgress) onProgress('Organitzant PDFs en carpetes trimestrals amb nomenclatura oficial...');
-  
+
   let filesCount = 4; // 4 CSVs inicials
 
   // Factures Expedides
@@ -199,8 +199,12 @@ export async function generateAndDownloadInspectionPackage(
   }
 
   // 5. Generar i descarregar el fitxer ZIP
-  if (onProgress) onProgress('Comprimint el Dossier d\'Inspecció...');
-  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  if (onProgress) onProgress("Comprimint el Dossier d'Inspecció...");
+  const zipBlob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
 
   const url = URL.createObjectURL(zipBlob);
   const a = document.createElement('a');
@@ -211,12 +215,12 @@ export async function generateAndDownloadInspectionPackage(
   a.remove();
   URL.revokeObjectURL(url);
 
-  if (onProgress) onProgress('Dossier d\'Inspecció generat i descarregat amb èxit!');
+  if (onProgress) onProgress("Dossier d'Inspecció generat i descarregat amb èxit!");
 
   return {
     success: true,
     totalFiles: filesCount,
-    totalSizeMB: Math.round((zipBlob.size / (1024 * 1024)) * 10) / 10
+    totalSizeMB: Math.round((zipBlob.size / (1024 * 1024)) * 10) / 10,
   };
 }
 

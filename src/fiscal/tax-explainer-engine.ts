@@ -98,7 +98,10 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   const year = data.year || 2024;
 
   // 1. Desglossament d'ingressos bruts
-  const workGross = (data.workIncome?.employers || []).reduce((s, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+  const workGross = (data.workIncome?.employers || []).reduce(
+    (s, e) => s + (e.grossSalary || 0) + (e.inKind || 0),
+    0,
+  );
   const workSS = (data.workIncome?.employers || []).reduce((s, e) => s + (e.socialSecurity || 0), 0);
   const workWithholdings = (data.workIncome?.employers || []).reduce((s, e) => s + (e.withholdings || 0), 0);
 
@@ -115,15 +118,15 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   const activityExpenses = data.activities?.expenses || 0;
 
   const gainsPositive = (data.gains?.items || [])
-    .filter(i => (i.transferValue - i.acquisitionValue - i.expenses) > 0)
+    .filter((i) => i.transferValue - i.acquisitionValue - i.expenses > 0)
     .reduce((s, i) => s + (i.transferValue - i.acquisitionValue - i.expenses), 0);
   const gainsNegative = (data.gains?.items || [])
-    .filter(i => (i.transferValue - i.acquisitionValue - i.expenses) < 0)
+    .filter((i) => i.transferValue - i.acquisitionValue - i.expenses < 0)
     .reduce((s, i) => s + Math.abs(i.transferValue - i.acquisitionValue - i.expenses), 0);
 
   const totalGrossIncome = exactAdd(
     exactAdd(workGross, realEstateGross),
-    exactAdd(exactAdd(capitalInterests, capitalDividends), exactAdd(activityGross, gainsPositive))
+    exactAdd(exactAdd(capitalInterests, capitalDividends), exactAdd(activityGross, gainsPositive)),
   );
 
   // 2. Reduccions i Bases
@@ -162,7 +165,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       currentBracketIdx = i;
     }
 
-    const isCurrent = (res.liquidableGeneralBase >= b.min && (res.liquidableGeneralBase < b.max || b.max === Infinity));
+    const isCurrent =
+      res.liquidableGeneralBase >= b.min && (res.liquidableGeneralBase < b.max || b.max === Infinity);
     if (isCurrent) {
       eurosToNextBracket = b.max === Infinity ? 0 : Math.max(0, b.max - res.liquidableGeneralBase);
       nextBracketRate = i + 1 < combinedGeneralBrackets.length ? combinedGeneralBrackets[i + 1].rate : b.rate;
@@ -170,7 +174,10 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
 
     generalBracketBreakdown.push({
       bracketIndex: i + 1,
-      rangeLabel: b.max === Infinity ? `Més de ${b.min.toLocaleString('es-ES')} €` : `${b.min.toLocaleString('es-ES')} € - ${b.max.toLocaleString('es-ES')} €`,
+      rangeLabel:
+        b.max === Infinity
+          ? `Més de ${b.min.toLocaleString('es-ES')} €`
+          : `${b.min.toLocaleString('es-ES')} € - ${b.max.toLocaleString('es-ES')} €`,
       limitMin: b.min,
       limitMax: b.max,
       applicableRatePercent: b.rate,
@@ -202,10 +209,14 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       remainingSavings -= taxedInBracket;
       savingsMarginal = sb.rate;
     }
-    const isCurrent = (res.liquidableSavingsBase >= sb.min && (res.liquidableSavingsBase < sb.max || sb.max === Infinity));
+    const isCurrent =
+      res.liquidableSavingsBase >= sb.min && (res.liquidableSavingsBase < sb.max || sb.max === Infinity);
     savingsBracketBreakdown.push({
       bracketIndex: i + 1,
-      rangeLabel: sb.max === Infinity ? `Més de ${sb.min.toLocaleString('es-ES')} €` : `${sb.min.toLocaleString('es-ES')} € - ${sb.max.toLocaleString('es-ES')} €`,
+      rangeLabel:
+        sb.max === Infinity
+          ? `Més de ${sb.min.toLocaleString('es-ES')} €`
+          : `${sb.min.toLocaleString('es-ES')} € - ${sb.max.toLocaleString('es-ES')} €`,
       limitMin: sb.min,
       limitMax: sb.max,
       applicableRatePercent: sb.rate,
@@ -233,13 +244,17 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
     percentageOfGross: 100,
     aeatBoxes: ['0003', '0029', '0102', '0180', '0270'],
     lawArticle: 'Art. 17-39 LIRPF',
-    simpleExplanation: 'Tots els diners que has generat durant l\'any (salaris, lloguers, dividends, guanys d\'inversions o activitat).',
+    simpleExplanation:
+      "Tots els diners que has generat durant l'any (salaris, lloguers, dividends, guanys d'inversions o activitat).",
     technicalDetails: `Treball: ${workGross.toLocaleString('es-ES')}€ | Lloguers: ${realEstateGross.toLocaleString('es-ES')}€ | Capital: ${(capitalInterests + capitalDividends).toLocaleString('es-ES')}€ | Activitats: ${activityGross.toLocaleString('es-ES')}€ | Plusvàlues: ${gainsPositive.toLocaleString('es-ES')}€`,
     badgeType: 'neutral',
   });
 
   // Step 2: Despeses Deducibles i Amortitzacions
-  const totalDeductibleExpenses = exactAdd(exactAdd(workSS, realEstateExpenses), exactAdd(realEstateAmortization, activityExpenses));
+  const totalDeductibleExpenses = exactAdd(
+    exactAdd(workSS, realEstateExpenses),
+    exactAdd(realEstateAmortization, activityExpenses),
+  );
   if (totalDeductibleExpenses > 0) {
     running = exactSub(running, totalDeductibleExpenses);
     flowSteps.push({
@@ -250,10 +265,12 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       amount: totalDeductibleExpenses,
       deltaAmount: -totalDeductibleExpenses,
       runningTotal: running,
-      percentageOfGross: totalGrossIncome > 0 ? round2((totalDeductibleExpenses / totalGrossIncome) * 100, 1) : 0,
+      percentageOfGross:
+        totalGrossIncome > 0 ? round2((totalDeductibleExpenses / totalGrossIncome) * 100, 1) : 0,
       aeatBoxes: ['0013', '0105', '0109', '0115', '0191'],
       lawArticle: 'Art. 19, 23, 28 LIRPF',
-      simpleExplanation: 'Despeses necessàries per obtenir els teus ingressos que no tributen (Seguretat Social de nòmina, IBI, comunitat i amortització del 3% d\'immobles).',
+      simpleExplanation:
+        "Despeses necessàries per obtenir els teus ingressos que no tributen (Seguretat Social de nòmina, IBI, comunitat i amortització del 3% d'immobles).",
       technicalDetails: `Seguretat Social: -${workSS.toLocaleString('es-ES')}€ | Despeses Immobles: -${realEstateExpenses.toLocaleString('es-ES')}€ | Amortització 3%: -${realEstateAmortization.toLocaleString('es-ES')}€ | Despeses Activitat: -${activityExpenses.toLocaleString('es-ES')}€`,
       badgeType: 'success',
     });
@@ -274,7 +291,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       percentageOfGross: totalGrossIncome > 0 ? round2((combinedReductions / totalGrossIncome) * 100, 1) : 0,
       aeatBoxes: ['0022', '0465', '0500'],
       lawArticle: 'Art. 20, 51, 84 LIRPF',
-      simpleExplanation: 'Rebaixes especials que la llei aplica sobre els teus rendiments nets abans de calcular els impostos (per rendes baixes del treball o aportacions a plans de pensions).',
+      simpleExplanation:
+        'Rebaixes especials que la llei aplica sobre els teus rendiments nets abans de calcular els impostos (per rendes baixes del treball o aportacions a plans de pensions).',
       technicalDetails: `Reducció Rend. Treball: -${(res.workIncomeReduction || 0).toLocaleString('es-ES')}€ | Plans de Pensions: -${(res.pensionReduction || 0).toLocaleString('es-ES')}€ | Altres: -${(totalReductions - (res.pensionReduction || 0)).toLocaleString('es-ES')}€`,
       badgeType: 'success',
     });
@@ -285,7 +303,7 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   flowSteps.push({
     id: 'step-base-liquidable',
     stepNumber: stepCounter++,
-    title: '4. Base Liquidable (Sobre la que es calcula l\'IRPF)',
+    title: "4. Base Liquidable (Sobre la que es calcula l'IRPF)",
     category: 'base',
     amount: totalBaseLiquidable,
     deltaAmount: 0,
@@ -293,7 +311,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
     percentageOfGross: totalGrossIncome > 0 ? round2((totalBaseLiquidable / totalGrossIncome) * 100, 1) : 0,
     aeatBoxes: ['0500', '0510'],
     lawArticle: 'Art. 50-55 LIRPF',
-    simpleExplanation: 'La xifra definitiva sobre la qual s\'apliquen les taules de percentatges de l\'IRPF estatal i autonòmic.',
+    simpleExplanation:
+      "La xifra definitiva sobre la qual s'apliquen les taules de percentatges de l'IRPF estatal i autonòmic.",
     technicalDetails: `Base General (Salaris, Lloguers, Activitats): ${res.liquidableGeneralBase.toLocaleString('es-ES')}€ | Base Estalvi (Dividends, Borsa, Cripto): ${res.liquidableSavingsBase.toLocaleString('es-ES')}€`,
     badgeType: 'info',
   });
@@ -311,7 +330,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
     percentageOfGross: totalGrossIncome > 0 ? round2((theoreticalGrossTax / totalGrossIncome) * 100, 1) : 0,
     aeatBoxes: ['0545', '0546'],
     lawArticle: 'Art. 62-66 LIRPF',
-    simpleExplanation: 'L\'import total d\'impost teòric que correspondria pagar aplicant els trams de la renda estatal i catalana sense cap descompte.',
+    simpleExplanation:
+      "L'import total d'impost teòric que correspondria pagar aplicant els trams de la renda estatal i catalana sense cap descompte.",
     technicalDetails: `Quota Escala General: ${(res.generalTax || 0).toLocaleString('es-ES')}€ | Quota Escala Estalvi: ${(res.savingsTax || 0).toLocaleString('es-ES')}€`,
     badgeType: 'warning',
   });
@@ -330,7 +350,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       percentageOfGross: totalGrossIncome > 0 ? round2((minCredit / totalGrossIncome) * 100, 1) : 0,
       aeatBoxes: ['0511', '0512', '0513', '0514'],
       lawArticle: 'Art. 56-61 LIRPF',
-      simpleExplanation: 'Els primers diners que necessites per viure (mínim del declarant de 5.550 € més fills/ascendents) no paguen impostos i et rebaixen directament la quota.',
+      simpleExplanation:
+        'Els primers diners que necessites per viure (mínim del declarant de 5.550 € més fills/ascendents) no paguen impostos i et rebaixen directament la quota.',
       technicalDetails: `Mínim Personal Total Computat: ${(res.totalMinimum || 5550).toLocaleString('es-ES')}€ | Rebaixa de Quota generada: -${minCredit.toLocaleString('es-ES')}€`,
       badgeType: 'success',
     });
@@ -350,14 +371,24 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       percentageOfGross: totalGrossIncome > 0 ? round2((totalDeductions / totalGrossIncome) * 100, 1) : 0,
       aeatBoxes: ['0588', '0595', '0600'],
       lawArticle: 'Art. 67-68 LIRPF i Llei CCAA',
-      simpleExplanation: 'Descomptes directes euro a euro que es resten del teu impost per donacions, lloguer d\'habitatge habitual, maternitat o quotes sindicals.',
+      simpleExplanation:
+        "Descomptes directes euro a euro que es resten del teu impost per donacions, lloguer d'habitatge habitual, maternitat o quotes sindicals.",
       technicalDetails: `Deduccions Autonòmiques Catalunya: -${(res.catalanDeductionsAmount || 0).toLocaleString('es-ES')}€ | Donatius i Altres Estatals: -${(totalDeductions - (res.catalanDeductionsAmount || 0)).toLocaleString('es-ES')}€`,
       badgeType: 'success',
     });
   }
 
-  const stateTax = Math.max(0, (res.stateGeneralTax || 0) + (res.stateSavingsTax || 0) - (res.stateMinimumTaxCredit || 0));
-  const regionalTax = Math.max(0, (res.autonomicGeneralTax || 0) + (res.autonomicSavingsTax || 0) - (res.autonomicMinimumTaxCredit || 0) - (res.catalanDeductionsAmount || 0));
+  const stateTax = Math.max(
+    0,
+    (res.stateGeneralTax || 0) + (res.stateSavingsTax || 0) - (res.stateMinimumTaxCredit || 0),
+  );
+  const regionalTax = Math.max(
+    0,
+    (res.autonomicGeneralTax || 0) +
+      (res.autonomicSavingsTax || 0) -
+      (res.autonomicMinimumTaxCredit || 0) -
+      (res.catalanDeductionsAmount || 0),
+  );
 
   // Step 8: Quota Líquida Total (El que realment has de pagar d'impostos de l'any)
   flowSteps.push({
@@ -371,7 +402,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
     percentageOfGross: totalGrossIncome > 0 ? round2((netTax / totalGrossIncome) * 100, 1) : 0,
     aeatBoxes: ['0595', '0599'],
     lawArticle: 'Art. 69 LIRPF',
-    simpleExplanation: 'L\'import total i definitiu que et pertoca contribuir a Hisenda per tot l\'any després d\'aplicar totes les deduccions i mínims.',
+    simpleExplanation:
+      "L'import total i definitiu que et pertoca contribuir a Hisenda per tot l'any després d'aplicar totes les deduccions i mínims.",
     technicalDetails: `Quota Estatal Neta: ${stateTax.toLocaleString('es-ES')}€ | Quota Autonòmica Neta: ${regionalTax.toLocaleString('es-ES')}€ | Tipus Efectiu Global: ${overallEffectiveRate}%`,
     badgeType: 'neutral',
   });
@@ -380,7 +412,7 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   flowSteps.push({
     id: 'step-withholdings',
     stepNumber: stepCounter++,
-    title: '9. Retencions i Pagaments Ja Fets Durant l\'Any',
+    title: "9. Retencions i Pagaments Ja Fets Durant l'Any",
     category: 'withholding',
     amount: totalWithholdings,
     deltaAmount: -totalWithholdings,
@@ -388,7 +420,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
     percentageOfGross: totalGrossIncome > 0 ? round2((totalWithholdings / totalGrossIncome) * 100, 1) : 0,
     aeatBoxes: ['0597', '0606', '0607', '0609'],
     lawArticle: 'Art. 99-101 LIRPF',
-    simpleExplanation: 'Els diners que la teva empresa, el teu banc o els teus llogaters ja van enviar a Hisenda cada mes al teu nom per avançat.',
+    simpleExplanation:
+      'Els diners que la teva empresa, el teu banc o els teus llogaters ja van enviar a Hisenda cada mes al teu nom per avançat.',
     technicalDetails: `Retencions Nòmines: ${workWithholdings.toLocaleString('es-ES')}€ | Bancs / Dividends: ${capitalWithholdings.toLocaleString('es-ES')}€ | Lloguers / Models Trimestrals: ${(totalWithholdings - workWithholdings - capitalWithholdings).toLocaleString('es-ES')}€`,
     badgeType: 'info',
   });
@@ -397,7 +430,9 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   flowSteps.push({
     id: 'step-final-result',
     stepNumber: stepCounter++,
-    title: isRefund ? '10. 🎉 RESULTAT FINAL: A DEVOLVER (Hacienda et torna)' : '10. ↗ RESULTAT FINAL: A INGRESAR (Pendent de pagar)',
+    title: isRefund
+      ? '10. 🎉 RESULTAT FINAL: A DEVOLVER (Hacienda et torna)'
+      : '10. ↗ RESULTAT FINAL: A INGRESAR (Pendent de pagar)',
     category: 'final',
     amount: Math.abs(finalResult),
     deltaAmount: finalResult,
@@ -416,32 +451,36 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   const plainLanguageSummary: string[] = [];
 
   plainLanguageSummary.push(
-    `Has ingressat un total brut de **${totalGrossIncome.toLocaleString('es-ES')} €** provinents de ${[
-      workGross > 0 ? `${(data.workIncome?.employers || []).length} pagadors de feina` : null,
-      realEstateGross > 0 ? `${(data.properties || []).length} immobles llogats` : null,
-      (capitalInterests + capitalDividends) > 0 ? 'inversions/dividends' : null,
-      gainsPositive > 0 ? 'venda d\'actius o fons' : null,
-      activityGross > 0 ? 'activitat econòmica d\'autònom' : null,
-    ].filter(Boolean).join(', ') || 'les teves rendes'}.`
+    `Has ingressat un total brut de **${totalGrossIncome.toLocaleString('es-ES')} €** provinents de ${
+      [
+        workGross > 0 ? `${(data.workIncome?.employers || []).length} pagadors de feina` : null,
+        realEstateGross > 0 ? `${(data.properties || []).length} immobles llogats` : null,
+        capitalInterests + capitalDividends > 0 ? 'inversions/dividends' : null,
+        gainsPositive > 0 ? "venda d'actius o fons" : null,
+        activityGross > 0 ? "activitat econòmica d'autònom" : null,
+      ]
+        .filter(Boolean)
+        .join(', ') || 'les teves rendes'
+    }.`,
   );
 
   plainLanguageSummary.push(
-    `La teva factura fiscal total (quota líquida real) és de **${netTax.toLocaleString('es-ES')} €**, el que representa un **tipus impositiu real del ${overallEffectiveRate}%** sobre els teus ingressos bruts.`
+    `La teva factura fiscal total (quota líquida real) és de **${netTax.toLocaleString('es-ES')} €**, el que representa un **tipus impositiu real del ${overallEffectiveRate}%** sobre els teus ingressos bruts.`,
   );
 
   if (totalWithholdings > 0) {
     plainLanguageSummary.push(
-      `Al llarg de l'any, ja havies avançat a Hisenda **${totalWithholdings.toLocaleString('es-ES')} €** en retencions mensuals de nòmina i pagaments a compte.`
+      `Al llarg de l'any, ja havies avançat a Hisenda **${totalWithholdings.toLocaleString('es-ES')} €** en retencions mensuals de nòmina i pagaments a compte.`,
     );
   }
 
   if (isRefund) {
     plainLanguageSummary.push(
-      `**Per què et surt a tornar?** Com que les teves retencions avançades (${totalWithholdings.toLocaleString('es-ES')} €) superen la teva obligació tributària definitiva (${netTax.toLocaleString('es-ES')} €), **Hisenda té l'obligació de transferir-te ${Math.abs(finalResult).toLocaleString('es-ES')} €** al teu compte bancari.`
+      `**Per què et surt a tornar?** Com que les teves retencions avançades (${totalWithholdings.toLocaleString('es-ES')} €) superen la teva obligació tributària definitiva (${netTax.toLocaleString('es-ES')} €), **Hisenda té l'obligació de transferir-te ${Math.abs(finalResult).toLocaleString('es-ES')} €** al teu compte bancari.`,
     );
   } else {
     plainLanguageSummary.push(
-      `**Per què et surt a pagar?** Com que les retencions que et van aplicar durant l'any (${totalWithholdings.toLocaleString('es-ES')} €) van ser inferiors al teu impost definitiu calculat (${netTax.toLocaleString('es-ES')} €), **has de liquidar la diferència de ${finalResult.toLocaleString('es-ES')} €**.`
+      `**Per què et surt a pagar?** Com que les retencions que et van aplicar durant l'any (${totalWithholdings.toLocaleString('es-ES')} €) van ser inferiors al teu impost definitiu calculat (${netTax.toLocaleString('es-ES')} €), **has de liquidar la diferència de ${finalResult.toLocaleString('es-ES')} €**.`,
     );
   }
 
@@ -452,12 +491,14 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
   if ((data.workIncome?.employers || []).length > 1) {
     keyDrivers.push({
       title: 'Pluralitat de Pagadors (2 o més empreses)',
-      description: 'Tenir diversos pagadors sol provocar que cada empresa retingui a un tram inferior, generant un desajust que augmenta el resultat a pagar a la Renda.',
+      description:
+        'Tenir diversos pagadors sol provocar que cada empresa retingui a un tram inferior, generant un desajust que augmenta el resultat a pagar a la Renda.',
       impactAmount: workWithholdings,
       impactType: 'increase_tax',
       importance: 'high',
       icon: '👥',
-      recommendation: 'Sol·licita a la teva empresa principal un tipus voluntari de retenció IRPF més alt (Model 145) per evitar sorpreses.',
+      recommendation:
+        'Sol·licita a la teva empresa principal un tipus voluntari de retenció IRPF més alt (Model 145) per evitar sorpreses.',
     });
   }
 
@@ -471,7 +512,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       impactType: 'increase_refund',
       importance: 'high',
       icon: '🏠',
-      recommendation: 'Assegura\'t de conservar les escriptures de compra i els rebuts de l\'IBI per justificar el valor cadastral de construcció.',
+      recommendation:
+        "Assegura't de conservar les escriptures de compra i els rebuts de l'IBI per justificar el valor cadastral de construcció.",
     });
   }
 
@@ -530,7 +572,8 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       title: 'Deducció del 80% per Donatius (Fins a 250 €)',
       estimatedSavings: 200,
       actionLink: '#/deduccions',
-      reason: 'Els primers 250 € donats a ONGs tenen una deducció directa del 80% a la quota (recuperes 200 € a la teva Renda).',
+      reason:
+        'Els primers 250 € donats a ONGs tenen una deducció directa del 80% a la quota (recuperes 200 € a la teva Renda).',
     });
   }
 
@@ -540,7 +583,10 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
       label: 'Diners que et queden lliures (Net)',
       amount: Math.max(0, exactSub(totalGrossIncome, netTax)),
       color: '#10b981',
-      percentage: totalGrossIncome > 0 ? round2((Math.max(0, totalGrossIncome - netTax) / totalGrossIncome) * 100, 1) : 100,
+      percentage:
+        totalGrossIncome > 0
+          ? round2((Math.max(0, totalGrossIncome - netTax) / totalGrossIncome) * 100, 1)
+          : 100,
     },
     {
       label: 'IRPF Estatal',
@@ -558,7 +604,7 @@ export function explainTaxReturn(data: DeclaracionData, result?: FiscalResult): 
 
   // 9. Eficiència Fiscal (0 - 100)
   let efficiencyScore = 100;
-  if (unclaimedSavingsOpportunities.length > 0) efficiencyScore -= (unclaimedSavingsOpportunities.length * 10);
+  if (unclaimedSavingsOpportunities.length > 0) efficiencyScore -= unclaimedSavingsOpportunities.length * 10;
   if (totalGrossIncome > 30000 && (res.totalDeductions || 0) === 0) efficiencyScore -= 15;
   if ((data.properties || []).length > 0 && realEstateAmortization === 0) efficiencyScore -= 20;
   efficiencyScore = Math.max(30, Math.min(100, efficiencyScore));

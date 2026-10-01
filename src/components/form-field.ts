@@ -135,10 +135,7 @@ export function createToggle(opts: {
 /**
  * Create a form section with title and content.
  */
-export function createFormSection(
-  title: string,
-  ...children: HTMLElement[]
-): HTMLElement {
+export function createFormSection(title: string, ...children: HTMLElement[]): HTMLElement {
   const section = document.createElement('div');
   section.className = 'form-section';
 

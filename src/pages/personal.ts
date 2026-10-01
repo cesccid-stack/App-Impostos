@@ -96,7 +96,7 @@ export function renderPersonal(): HTMLElement {
   descCard.className = 'card';
   descCard.style.marginTop = 'var(--space-lg)';
   const descSection = createFormSection('Descendents a càrrec (< 25 anys o amb discapacitat)');
-  
+
   const addDescBtn = document.createElement('button');
   addDescBtn.className = 'btn btn--secondary btn--sm';
   addDescBtn.innerHTML = '＋ Afegir descendent';
@@ -121,8 +121,10 @@ export function renderPersonal(): HTMLElement {
   const ascCard = document.createElement('div');
   ascCard.className = 'card';
   ascCard.style.marginTop = 'var(--space-lg)';
-  const ascSection = createFormSection('Ascendents a càrrec (> 65 anys o amb discapacitat >= 33% que convisquin)');
-  
+  const ascSection = createFormSection(
+    'Ascendents a càrrec (> 65 anys o amb discapacitat >= 33% que convisquin)',
+  );
+
   const addAscBtn = document.createElement('button');
   addAscBtn.className = 'btn btn--secondary btn--sm';
   addAscBtn.innerHTML = '＋ Afegir ascendent';
@@ -180,8 +182,8 @@ function renderDescendantsList(container: HTMLElement) {
           const arr = [...store.getData().personal.descendants];
           arr[idx].age = parseInt(val) || 0;
           store.update('personal', { descendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     row.appendChild(
@@ -194,8 +196,8 @@ function renderDescendantsList(container: HTMLElement) {
           const arr = [...store.getData().personal.descendants];
           arr[idx].disability = parseInt(val) || 0;
           store.update('personal', { descendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     row.appendChild(
@@ -206,13 +208,13 @@ function renderDescendantsList(container: HTMLElement) {
         type: 'number',
         min: 0,
         max: 12,
-        hint: 'Mesos de l\'any amb convivència (per prorratejar el mínim)',
+        hint: "Mesos de l'any amb convivència (per prorratejar el mínim)",
         onChange: (val) => {
           const arr = [...store.getData().personal.descendants];
           arr[idx].coexistenceMonths = Math.min(12, Math.max(0, parseInt(val) || 0));
           store.update('personal', { descendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     const delBtn = document.createElement('button');
@@ -220,11 +222,11 @@ function renderDescendantsList(container: HTMLElement) {
     delBtn.innerHTML = '🗑';
     delBtn.title = 'Eliminar';
     delBtn.addEventListener('click', () => {
-      const arr = store.getData().personal.descendants.filter(d => d.id !== desc.id);
+      const arr = store.getData().personal.descendants.filter((d) => d.id !== desc.id);
       store.update('personal', { descendants: arr });
       renderDescendantsList(container);
     });
-    
+
     // Wrap button to align with inputs
     const btnWrap = document.createElement('div');
     btnWrap.style.paddingBottom = '8px';
@@ -271,8 +273,8 @@ function renderAscendantsList(container: HTMLElement) {
           const arr = [...(store.getData().personal.ascendants || [])];
           arr[idx].age = parseInt(val) || 0;
           store.update('personal', { ascendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     row.appendChild(
@@ -285,8 +287,8 @@ function renderAscendantsList(container: HTMLElement) {
           const arr = [...(store.getData().personal.ascendants || [])];
           arr[idx].disability = parseInt(val) || 0;
           store.update('personal', { ascendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     row.appendChild(
@@ -297,13 +299,13 @@ function renderAscendantsList(container: HTMLElement) {
         type: 'number',
         min: 0,
         max: 12,
-        hint: 'Mesos de l\'any amb convivència (per prorratejar el mínim)',
+        hint: "Mesos de l'any amb convivència (per prorratejar el mínim)",
         onChange: (val) => {
           const arr = [...(store.getData().personal.ascendants || [])];
           arr[idx].coexistenceMonths = Math.min(12, Math.max(0, parseInt(val) || 0));
           store.update('personal', { ascendants: arr });
-        }
-      })
+        },
+      }),
     );
 
     const delBtn = document.createElement('button');
@@ -311,11 +313,11 @@ function renderAscendantsList(container: HTMLElement) {
     delBtn.innerHTML = '🗑';
     delBtn.title = 'Eliminar';
     delBtn.addEventListener('click', () => {
-      const arr = (store.getData().personal.ascendants || []).filter(a => a.id !== asc.id);
+      const arr = (store.getData().personal.ascendants || []).filter((a) => a.id !== asc.id);
       store.update('personal', { ascendants: arr });
       renderAscendantsList(container);
     });
-    
+
     const btnWrap = document.createElement('div');
     btnWrap.style.paddingBottom = '8px';
     btnWrap.appendChild(delBtn);

@@ -6,24 +6,24 @@
 export interface AutonomoVsSLData {
   expectedRevenue: number;
   expectedExpenses: number; // Deduïbles
-  
+
   // Variables Autònom
   irpfMarginalRate: number; // o podem calcular-lo estimadament
-  autonomoQuota: number;    // Quota anual SS autònoms (ex. 350 * 12 = 4200)
-  
+  autonomoQuota: number; // Quota anual SS autònoms (ex. 350 * 12 = 4200)
+
   // Variables S.L.
   corporateTaxRate: number; // Generalment 25%, o 15% primeres entitats
-  dividendTaxRate: number;  // ~19%-26%
+  dividendTaxRate: number; // ~19%-26%
   slMaintenanceCost: number; // Cost extra assessoria S.L.
-  societalSalary: number;   // Sou del soci administrador
-  
+  societalSalary: number; // Sou del soci administrador
+
   // Resultats
   netIncomeAutonomo: number;
   totalTaxesAutonomo: number;
-  
+
   netIncomeSL: number; // Incloent sou + dividend
   totalTaxesSL: number;
-  
+
   recommendation: 'autonomo' | 'sl';
   savings: number;
 }
@@ -32,9 +32,10 @@ export interface PensionRescueData {
   pensionFundValue: number;
   pre2007Contributions: number; // Aportacions anteriors a 31/12/2006 (Dret a reducció 40%)
   yearsSinceRetirement: number; // Pels límits temporals del rescat en forma de capital
-  
+  retirementYear?: number; // Any efectiu de la jubilació segons DT 12a LIRPF
+
   otherYearlyIncome: number; // Per calcular el marginal
-  
+
   // Escenaris d'anàlisi
   scenarios: {
     name: string;
@@ -45,7 +46,7 @@ export interface PensionRescueData {
     taxCost: number;
     netReceivedFirstYear: number;
   }[];
-  
+
   bestScenarioName: string;
 }
 

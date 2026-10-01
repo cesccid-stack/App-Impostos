@@ -22,7 +22,7 @@ export function escapeHtml(str: string | undefined | null): string {
 export function createElement<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
-  attrs: Record<string, string> = {}
+  attrs: Record<string, string> = {},
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   if (className) el.className = className;

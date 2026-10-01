@@ -60,7 +60,7 @@ export function validatePensionContributions(individual: number, company = 0): V
  */
 export function validateForeignWorkExemption(amount: number): ValidationFeedback {
   if (amount < 0) {
-    return { isValid: false, status: 'error', message: 'L\'import de l\'exempció no pot ser negatiu.' };
+    return { isValid: false, status: 'error', message: "L'import de l'exempció no pot ser negatiu." };
   }
 
   if (amount > 60100) {
@@ -81,7 +81,7 @@ export function validateForeignWorkExemption(amount: number): ValidationFeedback
  */
 export function validateIrregularIncome(amount: number): ValidationFeedback {
   if (amount < 0) {
-    return { isValid: false, status: 'error', message: 'L\'import no pot ser negatiu.' };
+    return { isValid: false, status: 'error', message: "L'import no pot ser negatiu." };
   }
 
   if (amount > 300000) {
@@ -99,7 +99,10 @@ export function validateIrregularIncome(amount: number): ValidationFeedback {
 /**
  * Mileage expense legal exemption (RD 436/2023: 0,26 € / km).
  */
-export function validateMileageRate(income: number, km: number): {
+export function validateMileageRate(
+  income: number,
+  km: number,
+): {
   isFullyExempt: boolean;
   exemptAmount: number;
   taxableAmount: number;

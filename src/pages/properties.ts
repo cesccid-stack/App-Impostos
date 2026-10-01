@@ -2,7 +2,7 @@
  * @module pages/properties
  * Pàgina d'Explotació d'Immobles en Lloguer, Extracontable d'Actius, Gestió d'Altes/Baixes, Consulta al Cadastre i Amortitzacions AEAT.
  * Conforme amb l'Art. 23 LIRPF, Taula Simplificada AEAT, Criteris DGT i Llei 12/2023 pel Dret a l'Habitatge.
- * 
+ *
  * Funcionalitats d'Automatització Total:
  * - Escàner & Categoritzador intel·ligent de factures, despeses i extractes bancaris (NLP/Regles).
  * - Motor de gestió de contractes i actualització legal de renda (Límit 3% IPC / IRAV / Llei 12/2023).
@@ -13,31 +13,40 @@
 
 import { store } from '../store.ts';
 import { calculatePropertyFiscalResult, calculateAllProperties } from '../fiscal/real-estate-engine.ts';
-import { 
-  AEAT_SIMPLIFIED_TABLE, 
-  getAEATAssetGroup, 
-  suggestAEATCategory, 
-  calculateItemAnnualAmortization, 
-  type AEATAssetGroupId 
+import {
+  AEAT_SIMPLIFIED_TABLE,
+  getAEATAssetGroup,
+  suggestAEATCategory,
+  calculateItemAnnualAmortization,
+  type AEATAssetGroupId,
 } from '../fiscal/amortization-tables.ts';
-import { 
-  parsePropertyExpenses, 
-  applyParsedExpensesToProperty, 
-  calculateRentAdjustment, 
+import {
+  parsePropertyExpenses,
+  applyParsedExpensesToProperty,
+  calculateRentAdjustment,
   calculateFourYearCarryoverPlan,
   getRealEstatePortfolioPresets,
   auditAndOptimizeProperties,
-  type ParsedExpenseItem
+  type ParsedExpenseItem,
 } from '../fiscal/real-estate-automator.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { showToast } from '../components/toast.ts';
-import { generateAEATAnnexA, generateAEATAmortizationBook, exportPropertiesInventoryCSV } from '../utils/aeat-export.ts';
+import {
+  generateAEATAnnexA,
+  generateAEATAmortizationBook,
+  exportPropertiesInventoryCSV,
+} from '../utils/aeat-export.ts';
 import { lookupCadastreReference } from '../utils/cadastre-service.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
 import { createRealEstateDashboard } from '../components/real-estate-dashboard.ts';
 import { Model115And180Engine } from '../fiscal/model115-180-engine.ts';
-import type { RentalProperty, PropertyInventoryItem, RentalReductionType, AssetDisposalReason } from '../types-properties.ts';
+import type {
+  RentalProperty,
+  PropertyInventoryItem,
+  RentalReductionType,
+  AssetDisposalReason,
+} from '../types-properties.ts';
 import type { Model115LeaseInput } from '../types-quarterly.ts';
 
 export function renderProperties(): HTMLElement {
@@ -50,12 +59,21 @@ export function renderProperties(): HTMLElement {
   const compliance = runAutomatedComplianceChecks(data);
 
   // Càlcul de rendibilitats agregades de la cartera
-  const totalCostPortfolio = properties.reduce((s, p) => s + (p.acquisitionCost || p.totalCadastralValue || 0), 0);
+  const totalCostPortfolio = properties.reduce(
+    (s, p) => s + (p.acquisitionCost || p.totalCadastralValue || 0),
+    0,
+  );
   const avgGrossYield = totalCostPortfolio > 0 ? (aggregate.totalGrossIncome / totalCostPortfolio) * 100 : 0;
-  const totalOperatingExp = aggregate.results.reduce((s, r) => s + r.totalCurrentExpenses + r.repairExpenses + r.mortgageInterests, 0);
+  const totalOperatingExp = aggregate.results.reduce(
+    (s, r) => s + r.totalCurrentExpenses + r.repairExpenses + r.mortgageInterests,
+    0,
+  );
   const totalNOI = aggregate.totalGrossIncome - totalOperatingExp;
   const avgNetYield = totalCostPortfolio > 0 ? (totalNOI / totalCostPortfolio) * 100 : 0;
-  const totalTaxShieldPortfolio = aggregate.results.reduce((s, r) => s + (r.metrics?.estimatedSavingsAEAT || 0), 0);
+  const totalTaxShieldPortfolio = aggregate.results.reduce(
+    (s, r) => s + (r.metrics?.estimatedSavingsAEAT || 0),
+    0,
+  );
 
   // Header
   const header = document.createElement('div');
@@ -93,13 +111,15 @@ export function renderProperties(): HTMLElement {
     const audit = auditAndOptimizeProperties(properties);
     store.setSection('properties', audit.optimizedProperties);
     page.replaceWith(renderProperties());
-    
+
     if (audit.improvementsApplied.length > 0) {
       const msg = `S'han aplicat ${audit.improvementsApplied.length} millores fiscals. Estalvi estimat: ~${formatCurrency(audit.estimatedTotalTaxSaved)}`;
       showToast(msg, 'success');
-      alert(`🎉 AUDITORIA I OPTIMITZACIÓ FISCAL COMPLETADA:\n\n${audit.improvementsApplied.join('\n\n')}\n\n💰 Estalvi fiscal estimat en IRPF: +${formatCurrency(audit.estimatedTotalTaxSaved)}`);
+      alert(
+        `🎉 AUDITORIA I OPTIMITZACIÓ FISCAL COMPLETADA:\n\n${audit.improvementsApplied.join('\n\n')}\n\n💰 Estalvi fiscal estimat en IRPF: +${formatCurrency(audit.estimatedTotalTaxSaved)}`,
+      );
     } else {
-      showToast('La teva cartera d\'immobles ja està optimitzada al 100%!', 'success');
+      showToast("La teva cartera d'immobles ja està optimitzada al 100%!", 'success');
     }
   });
 
@@ -112,7 +132,7 @@ export function renderProperties(): HTMLElement {
   // 3. Botó Presets de Cartera
   const presetsBtn = document.createElement('button');
   presetsBtn.className = 'btn btn--secondary';
-  presetsBtn.innerHTML = '🎯 Presets d\'Immobles';
+  presetsBtn.innerHTML = "🎯 Presets d'Immobles";
   presetsBtn.addEventListener('click', () => openPresetsModal(page));
 
   // 4. Botó Llibre Registre AEAT
@@ -126,7 +146,7 @@ export function renderProperties(): HTMLElement {
     }
     const txt = generateAEATAmortizationBook(properties, data.year || 2024);
     downloadFile(txt, `llibre_registre_amortitzacions_${data.year}.txt`, 'text/plain;charset=utf-8');
-    showToast('Llibre Registre d\'Amortitzacions descarregat', 'success');
+    showToast("Llibre Registre d'Amortitzacions descarregat", 'success');
   });
 
   // 5. Botó CSV Inventari
@@ -140,7 +160,7 @@ export function renderProperties(): HTMLElement {
     }
     const csv = exportPropertiesInventoryCSV(properties, data.year || 2024);
     downloadFile(csv, `inventari_actius_immobles_${data.year}.csv`, 'text/csv;charset=utf-8');
-    showToast('Fitxer CSV d\'inventari descarregat', 'success');
+    showToast("Fitxer CSV d'inventari descarregat", 'success');
   });
 
   // 6. Botó Annex A AEAT
@@ -160,15 +180,18 @@ export function renderProperties(): HTMLElement {
   // 7. Botó Sincronització IVA (Locals i Lloguers)
   const ivaBtn = document.createElement('button');
   ivaBtn.className = 'btn btn--secondary';
-  ivaBtn.innerHTML = '🧾 Sincronitzar amb l\'IVA';
-  ivaBtn.title = 'Generar factures d\'arrendament de locals i càlcul de prorrata per habitatges';
+  ivaBtn.innerHTML = "🧾 Sincronitzar amb l'IVA";
+  ivaBtn.title = "Generar factures d'arrendament de locals i càlcul de prorrata per habitatges";
   ivaBtn.addEventListener('click', () => {
     if (properties.length === 0) {
       showToast('No hi ha immobles a la cartera per sincronitzar', 'warning');
       return;
     }
     const res = store.syncIVAFromProperties();
-    showToast(`Immobles sincronitzats amb l'IVA: +${res.addedCommercialRentals} locals (21%), +${res.addedTouristRentals} turístics, +${res.addedExemptRentals} habitatges`, 'success');
+    showToast(
+      `Immobles sincronitzats amb l'IVA: +${res.addedCommercialRentals} locals (21%), +${res.addedTouristRentals} turístics, +${res.addedExemptRentals} habitatges`,
+      'success',
+    );
   });
 
   // 8. Botó Diagnòstic de Conformitat
@@ -202,7 +225,7 @@ export function renderProperties(): HTMLElement {
   const statsRow = document.createElement('div');
   statsRow.className = 'dashboard-stats';
   statsRow.style.marginBottom = 'var(--space-xl)';
-  
+
   const totalInventoryCount = properties.reduce((s, p) => s + (p.inventory?.length || 0), 0);
 
   statsRow.innerHTML = `
@@ -255,7 +278,8 @@ export function renderProperties(): HTMLElement {
             </tr>
           </thead>
           <tbody>
-            ${AEAT_SIMPLIFIED_TABLE.map(g => `
+            ${AEAT_SIMPLIFIED_TABLE.map(
+              (g) => `
               <tr style="border-bottom: 1px solid var(--border-default);">
                 <td style="padding: 6px; font-weight: 700;">Grup ${g.groupNumber}</td>
                 <td style="padding: 6px; font-weight: 600;">${g.name}</td>
@@ -263,7 +287,8 @@ export function renderProperties(): HTMLElement {
                 <td style="padding: 6px; text-align: center; font-weight: 600;">~${g.minYears} anys</td>
                 <td style="padding: 6px; color: var(--text-muted);">${g.examples.join(', ')}</td>
               </tr>
-            `).join('')}
+            `,
+            ).join('')}
           </tbody>
         </table>
       </div>
@@ -272,7 +297,7 @@ export function renderProperties(): HTMLElement {
   page.appendChild(coefBanner);
 
   // Secció de Vinculació amb Models 115 i 180 (Retencions Arrendaments Comercials)
-  const commercialProps = properties.filter(p => p.usageType === 'commercial');
+  const commercialProps = properties.filter((p) => p.usageType === 'commercial');
   const totalCommercialRent = commercialProps.reduce((s, p) => s + (p.grossRentalIncome || 0), 0);
   const expectedWithholdings19 = totalCommercialRent * 0.19;
   const currentDeclaredWithholding = data.capitalIncome?.realEstateWithholdings || 0;
@@ -338,8 +363,15 @@ export function renderProperties(): HTMLElement {
       isExempt: false,
     }));
 
-    const mod115_quarters = Model115And180Engine.calculateModel115AllQuarters(updatedData.year || 2024, leaseInputs);
-    const mod180_annual = Model115And180Engine.generateModel180Annual(updatedData.year || 2024, leaseInputs, mod115_quarters);
+    const mod115_quarters = Model115And180Engine.calculateModel115AllQuarters(
+      updatedData.year || 2024,
+      leaseInputs,
+    );
+    const mod180_annual = Model115And180Engine.generateModel180Annual(
+      updatedData.year || 2024,
+      leaseInputs,
+      mod115_quarters,
+    );
 
     store.update('quarterlyTaxes', {
       ...(updatedData.quarterlyTaxes || { mod130: [], mod111: [] }),
@@ -347,8 +379,11 @@ export function renderProperties(): HTMLElement {
       mod180: mod180_annual,
     });
 
-    showToast(`S'han sincronitzat ${formatCurrency(expectedWithholdings19)} de retencions a la Casella 0598 i generat el Model 180`, 'success');
-    
+    showToast(
+      `S'han sincronitzat ${formatCurrency(expectedWithholdings19)} de retencions a la Casella 0598 i generat el Model 180`,
+      'success',
+    );
+
     // Re-render
     const newPage = renderProperties();
     page.replaceWith(newPage);
@@ -377,7 +412,9 @@ export function renderProperties(): HTMLElement {
         </div>
       </div>
     `;
-    listContainer.querySelector('#empty-add-btn')?.addEventListener('click', () => openPropertyModal(null, page));
+    listContainer
+      .querySelector('#empty-add-btn')
+      ?.addEventListener('click', () => openPropertyModal(null, page));
     listContainer.querySelector('#empty-preset-btn')?.addEventListener('click', () => openPresetsModal(page));
   } else {
     aggregate.results.forEach((res, idx) => {
@@ -389,7 +426,11 @@ export function renderProperties(): HTMLElement {
   return page;
 }
 
-function createPropertyCard(res: ReturnType<typeof calculatePropertyFiscalResult>, idx: number, page: HTMLElement): HTMLElement {
+function createPropertyCard(
+  res: ReturnType<typeof calculatePropertyFiscalResult>,
+  idx: number,
+  page: HTMLElement,
+): HTMLElement {
   const p = res.property;
   const m = res.metrics || {
     grossYield: 0,
@@ -581,12 +622,16 @@ function createPropertyCard(res: ReturnType<typeof calculatePropertyFiscalResult
       <div style="background: var(--bg-surface); padding: var(--space-md); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); border: 1px solid var(--border-default);">
         <div>
           <div><strong>Rendiment Net Previ:</strong> ${formatCurrency(res.netIncome)} (Casella 0090)</div>
-          ${res.reductionRate > 0 ? `
+          ${
+            res.reductionRate > 0
+              ? `
             <div style="color: var(--color-success); font-size: var(--text-sm); margin-top: 4px;">
               <strong>Reducció aplicada (${res.reductionRate}%):</strong> -${formatCurrency(res.reductionAmount)} <br>
               <span style="color:var(--text-muted); font-size:0.75rem;">(${reductionLabels[p.reductionType]})</span>
             </div>
-          ` : '<div style="color:var(--text-muted); font-size:0.75rem;">Sense reducció d\'habitatge habitual aplicable</div>'}
+          `
+              : '<div style="color:var(--text-muted); font-size:0.75rem;">Sense reducció d\'habitatge habitual aplicable</div>'
+          }
         </div>
         <div style="text-align: right;">
           <div style="font-size: var(--text-xs); color: var(--text-muted);">Rendiment Net Reduït (A Base General)</div>
@@ -598,15 +643,23 @@ function createPropertyCard(res: ReturnType<typeof calculatePropertyFiscalResult
   `;
 
   // Listeners
-  card.querySelector(`#scan-exp-btn-${p.id}`)?.addEventListener('click', () => openExpenseScannerModal(p, page));
-  card.querySelector(`#manage-contract-btn-${p.id}`)?.addEventListener('click', () => openContractModal(p, page));
-  card.querySelector(`#manage-carryover-btn-${p.id}`)?.addEventListener('click', () => openCarryoverModal(p, page));
+  card
+    .querySelector(`#scan-exp-btn-${p.id}`)
+    ?.addEventListener('click', () => openExpenseScannerModal(p, page));
+  card
+    .querySelector(`#manage-contract-btn-${p.id}`)
+    ?.addEventListener('click', () => openContractModal(p, page));
+  card
+    .querySelector(`#manage-carryover-btn-${p.id}`)
+    ?.addEventListener('click', () => openCarryoverModal(p, page));
   card.querySelector(`#manage-inv-btn-${p.id}`)?.addEventListener('click', () => openInventoryModal(p, page));
-  card.querySelector(`#add-quick-inv-${p.id}`)?.addEventListener('click', () => openInvoiceBreakdownModal(p, page));
+  card
+    .querySelector(`#add-quick-inv-${p.id}`)
+    ?.addEventListener('click', () => openInvoiceBreakdownModal(p, page));
   card.querySelector(`#edit-btn-${p.id}`)?.addEventListener('click', () => openPropertyModal(p, page));
   card.querySelector(`#delete-btn-${p.id}`)?.addEventListener('click', () => {
     if (confirm(`Segur que vols eliminar l'immoble "${p.name || p.address}"?`)) {
-      const arr = (store.getData().properties || []).filter(item => item.id !== p.id);
+      const arr = (store.getData().properties || []).filter((item) => item.id !== p.id);
       store.setSection('properties', arr);
       page.replaceWith(renderProperties());
       showToast('Immoble eliminat', 'success');
@@ -649,11 +702,15 @@ function openExpenseScannerModal(selectedProperty: RentalProperty | null, page: 
         <div>
           <label class="form-label">Immoble de destinació</label>
           <select class="form-input" id="scan-target-prop">
-            ${properties.map(prop => `
+            ${properties
+              .map(
+                (prop) => `
               <option value="${prop.id}" ${selectedProperty && selectedProperty.id === prop.id ? 'selected' : ''}>
                 ${prop.name || prop.address} (${prop.cadastralReference || 'Sense Ref'})
               </option>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </select>
         </div>
         <div>
@@ -743,7 +800,7 @@ function openExpenseScannerModal(selectedProperty: RentalProperty | null, page: 
 
     parsedItems = parsePropertyExpenses(text);
     if (parsedItems.length === 0) {
-      showToast('No s\'ha pogut identificar cap import monetari en el text', 'warning');
+      showToast("No s'ha pogut identificar cap import monetari en el text", 'warning');
       return;
     }
 
@@ -751,21 +808,27 @@ function openExpenseScannerModal(selectedProperty: RentalProperty | null, page: 
     modal.querySelector('#scan-count')!.textContent = String(parsedItems.length);
     modal.querySelector('#scan-total')!.textContent = formatCurrency(total);
 
-    tableBody.innerHTML = parsedItems.map(item => `
+    tableBody.innerHTML = parsedItems
+      .map(
+        (item) => `
       <tr style="border-bottom:1px solid var(--border-default);">
         <td style="padding:6px 8px; color:var(--text-muted);">${item.date}</td>
         <td style="padding:6px 8px; font-weight:600;">${item.concept}</td>
         <td style="padding:6px 8px; font-weight:700; color:var(--color-primary);">${formatCurrency(item.amount)}</td>
         <td style="padding:6px 8px;">
-          ${item.type === 'inventory' 
-            ? `<span class="badge badge--success">${item.notes || 'Inventari'}</span>` 
-            : `<span class="badge badge--neutral">${item.notes || item.operatingTarget}</span>`}
+          ${
+            item.type === 'inventory'
+              ? `<span class="badge badge--success">${item.notes || 'Inventari'}</span>`
+              : `<span class="badge badge--neutral">${item.notes || item.operatingTarget}</span>`
+          }
         </td>
         <td style="padding:6px 8px; text-align:center;">
           ${item.type === 'inventory' ? '📦 Actiu' : '🧾 Despesa'}
         </td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
     resultsContainer.style.display = 'block';
     applyBtn.disabled = false;
@@ -774,19 +837,24 @@ function openExpenseScannerModal(selectedProperty: RentalProperty | null, page: 
 
   applyBtn?.addEventListener('click', () => {
     const targetPropId = (modal.querySelector('#scan-target-prop') as HTMLSelectElement).value;
-    const targetProp = properties.find(p => p.id === targetPropId);
+    const targetProp = properties.find((p) => p.id === targetPropId);
     if (!targetProp) {
       showToast('Selecciona un immoble vàlid', 'warning');
       return;
     }
 
     const res = applyParsedExpensesToProperty(targetProp, parsedItems, store.getData().year || 2024);
-    const updatedProperties = properties.map(p => p.id === res.updatedProperty.id ? res.updatedProperty : p);
+    const updatedProperties = properties.map((p) =>
+      p.id === res.updatedProperty.id ? res.updatedProperty : p,
+    );
     store.setSection('properties', updatedProperties);
 
     closeModal();
     page.replaceWith(renderProperties());
-    showToast(`✅ Aplicades ${res.operatingExpensesAdded} despeses operatives i ${res.inventoryItemsAdded} actius a l'inventari (${formatCurrency(res.totalAmountApplied)})`, 'success');
+    showToast(
+      `✅ Aplicades ${res.operatingExpensesAdded} despeses operatives i ${res.inventoryItemsAdded} actius a l'inventari (${formatCurrency(res.totalAmountApplied)})`,
+      'success',
+    );
   });
 }
 
@@ -801,7 +869,8 @@ function openContractModal(property: RentalProperty, page: HTMLElement): void {
   modal.className = 'modal-dialog';
   modal.style.maxWidth = '700px';
 
-  const currentMonthlyRent = property.monthlyRent || (property.grossRentalIncome ? Math.round(property.grossRentalIncome / 12) : 900);
+  const currentMonthlyRent =
+    property.monthlyRent || (property.grossRentalIncome ? Math.round(property.grossRentalIncome / 12) : 900);
   const adj = calculateRentAdjustment(currentMonthlyRent, 'ipc', 3.0, store.getData().year || 2024);
 
   modal.innerHTML = `
@@ -916,7 +985,12 @@ function openContractModal(property: RentalProperty, page: HTMLElement): void {
   modal.querySelector('#modal-save-contract-btn')?.addEventListener('click', () => {
     const curRent = parseFloat(rentInput.value) || 0;
     const customRate = parseFloat(rateInput.value) || 0;
-    const result = calculateRentAdjustment(curRent, (indexTypeSelect.value as 'ipc' | 'irav' | 'custom') || 'ipc', customRate, store.getData().year || 2024);
+    const result = calculateRentAdjustment(
+      curRent,
+      (indexTypeSelect.value as 'ipc' | 'irav' | 'custom') || 'ipc',
+      customRate,
+      store.getData().year || 2024,
+    );
 
     property.monthlyRent = result.newMonthlyRent;
     property.grossRentalIncome = Math.round(result.newMonthlyRent * 12);
@@ -927,7 +1001,10 @@ function openContractModal(property: RentalProperty, page: HTMLElement): void {
     saveProperty(property);
     closeModal();
     page.replaceWith(renderProperties());
-    showToast(`Renda actualitzada a ${formatCurrency(result.newMonthlyRent)}/mes (+${formatCurrency(result.annualExtraGrossIncome)}/any)`, 'success');
+    showToast(
+      `Renda actualitzada a ${formatCurrency(result.newMonthlyRent)}/mes (+${formatCurrency(result.annualExtraGrossIncome)}/any)`,
+      'success',
+    );
   });
 }
 
@@ -1034,16 +1111,16 @@ function openCarryoverModal(property: RentalProperty, page: HTMLElement): void {
       yearMinus2: parseFloat((modal.querySelector('#co-n2') as HTMLInputElement).value) || 0,
       yearMinus1: parseFloat((modal.querySelector('#co-n1') as HTMLInputElement).value) || 0,
     };
-    property.pendingRepairsPreviousYears = 
-      property.carryoverHistory.yearMinus4 + 
-      property.carryoverHistory.yearMinus3 + 
-      property.carryoverHistory.yearMinus2 + 
+    property.pendingRepairsPreviousYears =
+      property.carryoverHistory.yearMinus4 +
+      property.carryoverHistory.yearMinus3 +
+      property.carryoverHistory.yearMinus2 +
       property.carryoverHistory.yearMinus1;
 
     saveProperty(property);
     closeModal();
     page.replaceWith(renderProperties());
-    showToast('Historial d\'excedents a 4 anys desat correctament', 'success');
+    showToast("Historial d'excedents a 4 anys desat correctament", 'success');
   });
 }
 
@@ -1074,7 +1151,9 @@ function openPresetsModal(page: HTMLElement): void {
       </p>
 
       <div style="display:flex; flex-direction:column; gap:var(--space-sm);">
-        ${presets.map((preset, idx) => `
+        ${presets
+          .map(
+            (preset, idx) => `
           <div style="background:var(--bg-surface-elevated); padding:var(--space-md); border-radius:var(--radius-md); border:1px solid var(--border-default); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
             <div style="max-width:550px;">
               <div style="font-weight:700; font-size:var(--text-md);">${preset.name}</div>
@@ -1087,7 +1166,9 @@ function openPresetsModal(page: HTMLElement): void {
               📥 Carregar Aquest
             </button>
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </div>
     </div>
     <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--border-default);">
@@ -1117,7 +1198,7 @@ function openPresetsModal(page: HTMLElement): void {
   });
 
   modal.querySelector('#btn-load-all-presets')?.addEventListener('click', () => {
-    const all = presets.map(p => {
+    const all = presets.map((p) => {
       const clone = JSON.parse(JSON.stringify(p.property));
       clone.id = crypto.randomUUID();
       return clone;
@@ -1125,7 +1206,7 @@ function openPresetsModal(page: HTMLElement): void {
     store.setSection('properties', all);
     closeModal();
     page.replaceWith(renderProperties());
-    showToast('S\'ha carregat la cartera completa amb els 4 immobles', 'success');
+    showToast("S'ha carregat la cartera completa amb els 4 immobles", 'success');
   });
 }
 
@@ -1134,36 +1215,38 @@ function openPresetsModal(page: HTMLElement): void {
  */
 function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLElement): void {
   const isEdit = !!existingProperty;
-  const p: RentalProperty = existingProperty ? JSON.parse(JSON.stringify(existingProperty)) : {
-    id: crypto.randomUUID(),
-    name: '',
-    cadastralReference: '',
-    address: '',
-    ownershipPercentage: 100,
-    usageType: 'habitual',
-    contractDate: new Date().toISOString().split('T')[0],
-    tenantNIFs: [],
-    monthlyRent: 0,
-    grossRentalIncome: 0,
-    otherIncomes: 0,
-    mortgageInterests: 0,
-    repairExpenses: 0,
-    pendingRepairsPreviousYears: 0,
-    ibi: 0,
-    wasteTax: 0,
-    communityFees: 0,
-    insurance: 0,
-    managementFees: 0,
-    badDebts: 0,
-    totalCadastralValue: 0,
-    constructionCadastralValue: 0,
-    acquisitionCost: 0,
-    acquisitionExpenses: 0,
-    inventory: [],
-    improvements: [],
-    furniture: [],
-    reductionType: 'general_50',
-  };
+  const p: RentalProperty = existingProperty
+    ? JSON.parse(JSON.stringify(existingProperty))
+    : {
+        id: crypto.randomUUID(),
+        name: '',
+        cadastralReference: '',
+        address: '',
+        ownershipPercentage: 100,
+        usageType: 'habitual',
+        contractDate: new Date().toISOString().split('T')[0],
+        tenantNIFs: [],
+        monthlyRent: 0,
+        grossRentalIncome: 0,
+        otherIncomes: 0,
+        mortgageInterests: 0,
+        repairExpenses: 0,
+        pendingRepairsPreviousYears: 0,
+        ibi: 0,
+        wasteTax: 0,
+        communityFees: 0,
+        insurance: 0,
+        managementFees: 0,
+        badDebts: 0,
+        totalCadastralValue: 0,
+        constructionCadastralValue: 0,
+        acquisitionCost: 0,
+        acquisitionExpenses: 0,
+        inventory: [],
+        improvements: [],
+        furniture: [],
+        reductionType: 'general_50',
+      };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -1176,7 +1259,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
 
   modal.innerHTML = `
     <div class="modal-header">
-      <h2 class="modal-title">${isEdit ? '✏️ Editar Immoble en Lloguer' : '🏠 Donar d\'Alta Nou Immoble en Lloguer'}</h2>
+      <h2 class="modal-title">${isEdit ? '✏️ Editar Immoble en Lloguer' : "🏠 Donar d'Alta Nou Immoble en Lloguer"}</h2>
       <button class="modal-close" id="modal-close-btn">&times;</button>
     </div>
     <div class="modal-body" style="display:flex; flex-direction:column; gap: var(--space-lg);">
@@ -1396,7 +1479,8 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
           (modal.querySelector('#prop-address') as HTMLInputElement).value = res.address;
         }
         if (!(modal.querySelector('#prop-name') as HTMLInputElement).value) {
-          (modal.querySelector('#prop-name') as HTMLInputElement).value = res.address || `Immoble ${ref.substring(0, 7)}`;
+          (modal.querySelector('#prop-name') as HTMLInputElement).value =
+            res.address || `Immoble ${ref.substring(0, 7)}`;
         }
         showToast('Dades cadastrals validades amb èxit', 'success');
       } else {
@@ -1423,9 +1507,13 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     p.ownershipPercentage = parseFloat((modal.querySelector('#prop-own') as HTMLInputElement).value) || 100;
     p.cadastralReference = (modal.querySelector('#prop-cadastre') as HTMLInputElement).value.trim();
     p.address = (modal.querySelector('#prop-address') as HTMLInputElement).value.trim();
-    p.usageType = (modal.querySelector('#prop-usage') as HTMLSelectElement).value as RentalProperty['usageType'];
-    p.tenantNIFs = (modal.querySelector('#prop-tenants') as HTMLInputElement).value.split(',').map(s => s.trim()).filter(Boolean);
-    
+    p.usageType = (modal.querySelector('#prop-usage') as HTMLSelectElement)
+      .value as RentalProperty['usageType'];
+    p.tenantNIFs = (modal.querySelector('#prop-tenants') as HTMLInputElement).value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     p.isMixedUsage = (modal.querySelector('#prop-is-mixed') as HTMLInputElement)?.checked || false;
     p.rentalDays = parseFloat((modal.querySelector('#prop-rental-days') as HTMLInputElement)?.value) || 0;
     p.ownUseDays = parseFloat((modal.querySelector('#prop-own-days') as HTMLInputElement)?.value) || 0;
@@ -1433,11 +1521,13 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
 
     p.grossRentalIncome = parseFloat((modal.querySelector('#prop-gross') as HTMLInputElement).value) || 0;
     p.otherIncomes = parseFloat((modal.querySelector('#prop-other-inc') as HTMLInputElement).value) || 0;
-    p.reductionType = (modal.querySelector('#prop-reduction') as HTMLSelectElement).value as RentalProperty['reductionType'];
+    p.reductionType = (modal.querySelector('#prop-reduction') as HTMLSelectElement)
+      .value as RentalProperty['reductionType'];
 
     p.mortgageInterests = parseFloat((modal.querySelector('#prop-mortgage') as HTMLInputElement).value) || 0;
     p.repairExpenses = parseFloat((modal.querySelector('#prop-repairs') as HTMLInputElement).value) || 0;
-    p.pendingRepairsPreviousYears = parseFloat((modal.querySelector('#prop-pending-repairs') as HTMLInputElement).value) || 0;
+    p.pendingRepairsPreviousYears =
+      parseFloat((modal.querySelector('#prop-pending-repairs') as HTMLInputElement).value) || 0;
 
     p.ibi = parseFloat((modal.querySelector('#prop-ibi') as HTMLInputElement).value) || 0;
     p.wasteTax = parseFloat((modal.querySelector('#prop-waste') as HTMLInputElement).value) || 0;
@@ -1448,14 +1538,17 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     p.badDebts = parseFloat((modal.querySelector('#prop-debts') as HTMLInputElement).value) || 0;
 
     p.acquisitionCost = parseFloat((modal.querySelector('#prop-acq-cost') as HTMLInputElement).value) || 0;
-    p.acquisitionExpenses = parseFloat((modal.querySelector('#prop-acq-expenses') as HTMLInputElement)?.value) || 0;
-    p.totalCadastralValue = parseFloat((modal.querySelector('#prop-cad-total') as HTMLInputElement).value) || 0;
-    p.constructionCadastralValue = parseFloat((modal.querySelector('#prop-cad-const') as HTMLInputElement).value) || 0;
+    p.acquisitionExpenses =
+      parseFloat((modal.querySelector('#prop-acq-expenses') as HTMLInputElement)?.value) || 0;
+    p.totalCadastralValue =
+      parseFloat((modal.querySelector('#prop-cad-total') as HTMLInputElement).value) || 0;
+    p.constructionCadastralValue =
+      parseFloat((modal.querySelector('#prop-cad-const') as HTMLInputElement).value) || 0;
 
     // Actualitzar store
     const currentProps = [...(store.getData().properties || [])];
     if (isEdit) {
-      const editIdx = currentProps.findIndex(item => item.id === p.id);
+      const editIdx = currentProps.findIndex((item) => item.id === p.id);
       if (editIdx !== -1) currentProps[editIdx] = p;
     } else {
       currentProps.push(p);
@@ -1464,7 +1557,7 @@ function openPropertyModal(existingProperty: RentalProperty | null, page: HTMLEl
     store.setSection('properties', currentProps);
     closeModal();
     page.replaceWith(renderProperties());
-    showToast(isEdit ? 'Immoble actualitzat' : 'Immoble donat d\'alta correctament', 'success');
+    showToast(isEdit ? 'Immoble actualitzat' : "Immoble donat d'alta correctament", 'success');
   });
 }
 
@@ -1492,7 +1585,7 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
     let totalActiveCount = 0;
     let totalDisposedCount = 0;
 
-    p.inventory.forEach(item => {
+    p.inventory.forEach((item) => {
       const calc = calculateItemAnnualAmortization(
         item.amount,
         item.amortizationRate,
@@ -1500,7 +1593,7 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
         fiscalYear,
         item.acquisitionDate,
         item.disposalDate,
-        item.status
+        item.status,
       );
 
       totalCost += item.amount;
@@ -1574,28 +1667,32 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
               </tr>
             </thead>
             <tbody>
-              ${p.inventory.length === 0 ? `
+              ${
+                p.inventory.length === 0
+                  ? `
                 <tr>
                   <td colspan="10" style="padding: var(--space-xl); text-align: center; color: var(--text-muted);">
                     Cap element o factura registrada en aquest immoble. Fes clic a "Donar d'Alta Actiu" o "Desglossar Factura".
                   </td>
                 </tr>
-              ` : p.inventory.map(item => {
-                const grp = getAEATAssetGroup(item.category);
-                const calc = calculateItemAnnualAmortization(
-                  item.amount,
-                  item.amortizationRate,
-                  item.previousAmortization,
-                  fiscalYear,
-                  item.acquisitionDate,
-                  item.disposalDate,
-                  item.status
-                );
+              `
+                  : p.inventory
+                      .map((item) => {
+                        const grp = getAEATAssetGroup(item.category);
+                        const calc = calculateItemAnnualAmortization(
+                          item.amount,
+                          item.amortizationRate,
+                          item.previousAmortization,
+                          fiscalYear,
+                          item.acquisitionDate,
+                          item.disposalDate,
+                          item.status,
+                        );
 
-                const isFullyAmortized = calc.isFullyAmortized;
-                const isDisposed = item.status === 'disposed';
+                        const isFullyAmortized = calc.isFullyAmortized;
+                        const isDisposed = item.status === 'disposed';
 
-                return `
+                        return `
                   <tr style="border-bottom: 1px solid var(--border-default); ${isDisposed ? 'opacity: 0.6; background: rgba(0,0,0,0.02);' : ''}">
                     <td style="padding: 8px;">
                       <strong>${item.invoiceNumber || '—'}</strong><br>
@@ -1614,11 +1711,12 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
                     <td style="padding: 8px; text-align: right; font-weight: 700; color: var(--color-primary);">${formatCurrency(calc.annualAmount)}</td>
                     <td style="padding: 8px; text-align: right;">${formatCurrency(calc.accumulatedTotal)}</td>
                     <td style="padding: 8px; text-align: center;">
-                      ${isDisposed 
-                        ? `<span class="badge badge--danger" style="font-size: 0.65rem;">Baixa ${item.disposalDate || ''}</span>`
-                        : isFullyAmortized 
-                          ? `<span class="badge badge--neutral" style="font-size: 0.65rem;">Amortitzat 100%</span>`
-                          : `<span class="badge badge--success" style="font-size: 0.65rem;">${calc.statusText || 'Actiu'}</span>`
+                      ${
+                        isDisposed
+                          ? `<span class="badge badge--danger" style="font-size: 0.65rem;">Baixa ${item.disposalDate || ''}</span>`
+                          : isFullyAmortized
+                            ? `<span class="badge badge--neutral" style="font-size: 0.65rem;">Amortitzat 100%</span>`
+                            : `<span class="badge badge--success" style="font-size: 0.65rem;">${calc.statusText || 'Actiu'}</span>`
                       }
                     </td>
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
@@ -1628,7 +1726,9 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
                     </td>
                   </tr>
                 `;
-              }).join('')}
+                      })
+                      .join('')
+              }
             </tbody>
           </table>
         </div>
@@ -1674,7 +1774,7 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
     });
 
     // Listeners per fila
-    p.inventory.forEach(item => {
+    p.inventory.forEach((item) => {
       modal.querySelector(`#edit-item-${item.id}`)?.addEventListener('click', () => {
         openItemModal(p, item, fiscalYear, () => renderModalContent());
       });
@@ -1697,7 +1797,7 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
 
       modal.querySelector(`#del-item-${item.id}`)?.addEventListener('click', () => {
         if (confirm(`Eliminar l'element "${item.concept}" de l'inventari?`)) {
-          p.inventory = p.inventory.filter(it => it.id !== item.id);
+          p.inventory = p.inventory.filter((it) => it.id !== item.id);
           saveProperty(p);
           renderModalContent();
           showToast('Element eliminat', 'success');
@@ -1715,27 +1815,29 @@ function openInventoryModal(p: RentalProperty, page: HTMLElement): void {
  * Modal d'Alta / Edició d'un Element Individual d'Inventari
  */
 function openItemModal(
-  p: RentalProperty, 
-  existingItem: PropertyInventoryItem | null, 
-  fiscalYear: number, 
-  onSave: () => void
+  p: RentalProperty,
+  existingItem: PropertyInventoryItem | null,
+  fiscalYear: number,
+  onSave: () => void,
 ): void {
   const isEdit = !!existingItem;
-  const item: PropertyInventoryItem = existingItem ? JSON.parse(JSON.stringify(existingItem)) : {
-    id: crypto.randomUUID(),
-    invoiceNumber: '',
-    supplierName: '',
-    supplierNif: '',
-    concept: '',
-    category: 'group_2_furniture_10',
-    acquisitionDate: `${fiscalYear}-01-15`,
-    amount: 0,
-    amortizationRate: 10,
-    maxYears: 20,
-    minYears: 10,
-    previousAmortization: 0,
-    status: 'active',
-  };
+  const item: PropertyInventoryItem = existingItem
+    ? JSON.parse(JSON.stringify(existingItem))
+    : {
+        id: crypto.randomUUID(),
+        invoiceNumber: '',
+        supplierName: '',
+        supplierNif: '',
+        concept: '',
+        category: 'group_2_furniture_10',
+        acquisitionDate: `${fiscalYear}-01-15`,
+        amount: 0,
+        amortizationRate: 10,
+        maxYears: 20,
+        minYears: 10,
+        previousAmortization: 0,
+        status: 'active',
+      };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -1747,7 +1849,7 @@ function openItemModal(
 
   modal.innerHTML = `
     <div class="modal-header">
-      <h3 class="modal-title">${isEdit ? '✏️ Editar Actiu / Línia de Factura' : '＋ Donar d\'Alta Actiu / Factura'}</h3>
+      <h3 class="modal-title">${isEdit ? '✏️ Editar Actiu / Línia de Factura' : "＋ Donar d'Alta Actiu / Factura"}</h3>
       <button class="modal-close" id="submodal-close-btn">&times;</button>
     </div>
     <div class="modal-body" style="display: flex; flex-direction: column; gap: var(--space-md);">
@@ -1776,11 +1878,13 @@ function openItemModal(
         <div>
           <label class="form-label">Categoria d'Amortització AEAT</label>
           <select class="form-input" id="item-category">
-            ${AEAT_SIMPLIFIED_TABLE.map(g => `
+            ${AEAT_SIMPLIFIED_TABLE.map(
+              (g) => `
               <option value="${g.id}" ${item.category === g.id ? 'selected' : ''}>
                 Grup ${g.groupNumber}: ${g.name} (Màx. ${g.maxLinearRate}%)
               </option>
-            `).join('')}
+            `,
+            ).join('')}
           </select>
         </div>
         <div>
@@ -1837,12 +1941,14 @@ function openItemModal(
     item.invoiceNumber = (modal.querySelector('#item-inv-no') as HTMLInputElement).value.trim();
     item.supplierName = (modal.querySelector('#item-supplier-name') as HTMLInputElement).value.trim();
     item.supplierNif = (modal.querySelector('#item-supplier-nif') as HTMLInputElement).value.trim();
-    item.concept = (modal.querySelector('#item-concept') as HTMLInputElement).value.trim() || 'Element sense nom';
+    item.concept =
+      (modal.querySelector('#item-concept') as HTMLInputElement).value.trim() || 'Element sense nom';
     item.category = catSelect.value as AEATAssetGroupId;
     item.acquisitionDate = (modal.querySelector('#item-date') as HTMLInputElement).value;
     item.amount = parseFloat((modal.querySelector('#item-amount') as HTMLInputElement).value) || 0;
     item.amortizationRate = parseFloat(rateInput.value) || 10;
-    item.previousAmortization = parseFloat((modal.querySelector('#item-prev') as HTMLInputElement).value) || 0;
+    item.previousAmortization =
+      parseFloat((modal.querySelector('#item-prev') as HTMLInputElement).value) || 0;
     item.notes = (modal.querySelector('#item-notes') as HTMLInputElement).value.trim();
 
     const grp = getAEATAssetGroup(item.category);
@@ -1851,7 +1957,7 @@ function openItemModal(
 
     p.inventory = p.inventory || [];
     if (isEdit) {
-      const idx = p.inventory.findIndex(it => it.id === item.id);
+      const idx = p.inventory.findIndex((it) => it.id === item.id);
       if (idx !== -1) p.inventory[idx] = item;
     } else {
       p.inventory.push(item);
@@ -1860,7 +1966,7 @@ function openItemModal(
     saveProperty(p);
     close();
     onSave();
-    showToast(isEdit ? 'Element actualitzat' : 'Element afegit a l\'inventari', 'success');
+    showToast(isEdit ? 'Element actualitzat' : "Element afegit a l'inventari", 'success');
   });
 }
 
@@ -1941,18 +2047,22 @@ function openInvoiceBreakdownModal(p: RentalProperty, page: HTMLElement, onSave?
               </tr>
             </thead>
             <tbody>
-              ${invoiceLines.map((line, idx) => `
+              ${invoiceLines
+                .map(
+                  (line, idx) => `
                 <tr style="border-bottom: 1px solid var(--border-default);">
                   <td style="padding: 6px 8px;">
                     <input type="text" class="form-input" style="padding: 4px;" value="${line.concept}" id="line-concept-${idx}">
                   </td>
                   <td style="padding: 6px 8px;">
                     <select class="form-input" style="padding: 4px;" id="line-cat-${idx}">
-                      ${AEAT_SIMPLIFIED_TABLE.map(g => `
+                      ${AEAT_SIMPLIFIED_TABLE.map(
+                        (g) => `
                         <option value="${g.id}" ${line.category === g.id ? 'selected' : ''}>
                           Grup ${g.groupNumber}: ${g.name} (${g.maxLinearRate}%)
                         </option>
-                      `).join('')}
+                      `,
+                      ).join('')}
                     </select>
                   </td>
                   <td style="padding: 6px 8px; text-align: center;">
@@ -1965,7 +2075,9 @@ function openInvoiceBreakdownModal(p: RentalProperty, page: HTMLElement, onSave?
                     <button class="btn btn--ghost btn--sm text-error" id="del-line-${idx}" style="padding: 2px 6px;">🗑</button>
                   </td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </tbody>
             <tfoot>
               <tr style="background: var(--bg-surface-elevated); font-weight: 700;">
@@ -2025,7 +2137,7 @@ function openInvoiceBreakdownModal(p: RentalProperty, page: HTMLElement, onSave?
 
       p.inventory = p.inventory || [];
 
-      invoiceLines.forEach(l => {
+      invoiceLines.forEach((l) => {
         const grp = getAEATAssetGroup(l.category);
         p.inventory.push({
           id: crypto.randomUUID(),
@@ -2131,18 +2243,19 @@ function openDisposalModal(item: PropertyInventoryItem, onSave: () => void): voi
   modal.querySelector('#disp-confirm-btn')?.addEventListener('click', () => {
     item.status = 'disposed';
     item.disposalDate = (modal.querySelector('#disp-date') as HTMLInputElement).value;
-    item.disposalReason = (modal.querySelector('#disp-reason') as HTMLSelectElement).value as AssetDisposalReason;
+    item.disposalReason = (modal.querySelector('#disp-reason') as HTMLSelectElement)
+      .value as AssetDisposalReason;
     item.disposalValue = parseFloat((modal.querySelector('#disp-val') as HTMLInputElement).value) || 0;
 
     close();
     onSave();
-    showToast('Element donat de baixa. S\'ha prorratejat l\'amortització fins a la data de baixa.', 'success');
+    showToast("Element donat de baixa. S'ha prorratejat l'amortització fins a la data de baixa.", 'success');
   });
 }
 
 function saveProperty(p: RentalProperty): void {
   const currentProps = [...(store.getData().properties || [])];
-  const idx = currentProps.findIndex(item => item.id === p.id);
+  const idx = currentProps.findIndex((item) => item.id === p.id);
   if (idx !== -1) {
     currentProps[idx] = p;
   } else {
@@ -2152,13 +2265,13 @@ function saveProperty(p: RentalProperty): void {
 }
 
 function importInventoryFromCSV(p: RentalProperty, csvContent: string): void {
-  const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
+  const lines = csvContent.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length <= 1) return;
 
   p.inventory = p.inventory || [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(';').map(c => c.replace(/^"|"$/g, '').trim());
+    const cols = lines[i].split(';').map((c) => c.replace(/^"|"$/g, '').trim());
     if (cols.length < 5) continue;
 
     const invNo = cols[2] || '';

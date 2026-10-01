@@ -1,3 +1,9 @@
+/**
+ * @module fiscal/ocr-ingestion-engine
+ * @experimental Motor de simulació per a ingesta de documents fiscals mitjançant OCR.
+ * Actualment opera en mode demostració sense connexió a APIs d'OCR externes.
+ */
+
 import type { OCRDocument, IngestionBatch } from '../types-ocr.ts';
 import type { IVAInvoiceIssued, IVAInvoiceReceived } from '../types-iva.ts';
 
@@ -14,15 +20,20 @@ export class OCRIngestionEngine {
       // Simulació d'extracció
       const confidence = Math.random() * (0.99 - 0.75) + 0.75;
       const isInvoice = doc.type.includes('invoice') || doc.filename.toLowerCase().includes('factura');
-      
+
       let extractedData = null;
       let docType: OCRDocument['documentType'] = 'other';
 
       if (isInvoice) {
-        docType = doc.filename.includes('rebut') || doc.filename.includes('received') || doc.type === 'invoice_received' ? 'invoice_received' : 'invoice_issued';
-        
+        docType =
+          doc.filename.includes('rebut') ||
+          doc.filename.includes('received') ||
+          doc.type === 'invoice_received'
+            ? 'invoice_received'
+            : 'invoice_issued';
+
         const isExpense = docType === 'invoice_received';
-        
+
         if (isExpense) {
           const mockInvoice: IVAInvoiceReceived = {
             id: `inv-${crypto.randomUUID()}`,
@@ -41,7 +52,7 @@ export class OCRIngestionEngine {
             withholdingAmount: 150,
             totalInvoice: 1060, // 1000 + 210 - 150
             category: 'professional_services',
-            notes: 'Extret via OCR automàtic'
+            notes: 'Extret via OCR automàtic',
           };
           extractedData = mockInvoice;
         } else {
@@ -58,17 +69,20 @@ export class OCRIngestionEngine {
             vatAmount: 210,
             totalInvoice: 1210,
             category: 'activity_goods',
-            notes: 'Extret via OCR automàtic'
+            notes: 'Extret via OCR automàtic',
           };
           extractedData = mockInvoiceIssued;
         }
-      } else if (doc.filename.toLowerCase().includes('nomina') || doc.filename.toLowerCase().includes('payroll')) {
+      } else if (
+        doc.filename.toLowerCase().includes('nomina') ||
+        doc.filename.toLowerCase().includes('payroll')
+      ) {
         docType = 'payroll';
         extractedData = {
           grossSalary: 2500,
           socialSecurity: 150,
           irpfWithholding: 350,
-          netSalary: 2000
+          netSalary: 2000,
         };
       }
 
@@ -79,14 +93,14 @@ export class OCRIngestionEngine {
         status: confidence > 0.8 ? 'processed' : 'pending', // Requerirà revisió si la confiança és baixa
         documentType: docType,
         extractedData,
-        confidenceScore: confidence
+        confidenceScore: confidence,
       });
     }
 
     return {
       batchId,
       date: new Date().toISOString(),
-      documents: processedDocs
+      documents: processedDocs,
     };
   }
 }

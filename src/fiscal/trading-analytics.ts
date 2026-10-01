@@ -49,48 +49,54 @@ export interface TradePerformanceMetrics {
   winningTrades: number;
   losingTrades: number;
   breakevenTrades: number;
-  winRate: number;                   // % (ex: 65.4%)
-  lossRate: number;                  // % (ex: 34.6%)
-  
-  totalProfit: number;               // Suma guanys bruts (€)
-  totalLoss: number;                 // Suma pèrdues brutes (€)
-  netPnL: number;                    // P&L Net total (€)
-  totalVolumeTraded: number;         // Volum total transaccionat (€)
-  profitFactor: number;              // Total Profit / Total Loss
-  
-  avgTrade: number;                  // P&L mitjà per trade (€)
-  avgWin: number;                    // Guany mitjà en trades positius (€)
-  avgLoss: number;                   // Pèrdua mitjana en trades negatius (€)
-  payoffRatio: number;               // avgWin / avgLoss (Risk to Reward ratio)
-  expectancyEUR: number;             // Esperança matemàtica per operació (€)
-  
-  maxWin: number;                    // Guany màxim en 1 trade (€)
-  maxLoss: number;                   // Pèrdua màxima en 1 trade (€)
-  
-  maxConsecutiveWins: number;        // Ratxa màxima de victòries
-  maxConsecutiveLosses: number;      // Ratxa màxima de derrotes
-  
-  maxDrawdownEUR: number;            // Màxima caiguda en euros (€)
-  maxDrawdownPercent: number;        // Màxima caiguda en % des del pic
-  
-  avgHoldingDaysWins: number;        // Dies mitjans que s'aguanten les guanyadores
-  avgHoldingDaysLosses: number;      // Dies mitjans que s'aguanten les perdedores
-  
-  estimatedTaxesSavings: number;     // Estimació impost IRPF (escala de l'estalvi)
-  netPnLAfterTax: number;            // P&L net lliure d'impostos (€)
-  
-  sharpeRatio: number;               // Ràtio de Sharpe aproximat
-  disciplineScore: number;           // Puntuació de disciplina (0-100)
+  winRate: number; // % (ex: 65.4%)
+  lossRate: number; // % (ex: 34.6%)
+
+  totalProfit: number; // Suma guanys bruts (€)
+  totalLoss: number; // Suma pèrdues brutes (€)
+  netPnL: number; // P&L Net total (€)
+  totalVolumeTraded: number; // Volum total transaccionat (€)
+  profitFactor: number; // Total Profit / Total Loss
+
+  avgTrade: number; // P&L mitjà per trade (€)
+  avgWin: number; // Guany mitjà en trades positius (€)
+  avgLoss: number; // Pèrdua mitjana en trades negatius (€)
+  payoffRatio: number; // avgWin / avgLoss (Risk to Reward ratio)
+  expectancyEUR: number; // Esperança matemàtica per operació (€)
+
+  maxWin: number; // Guany màxim en 1 trade (€)
+  maxLoss: number; // Pèrdua màxima en 1 trade (€)
+
+  maxConsecutiveWins: number; // Ratxa màxima de victòries
+  maxConsecutiveLosses: number; // Ratxa màxima de derrotes
+
+  maxDrawdownEUR: number; // Màxima caiguda en euros (€)
+  maxDrawdownPercent: number; // Màxima caiguda en % des del pic
+
+  avgHoldingDaysWins: number; // Dies mitjans que s'aguanten les guanyadores
+  avgHoldingDaysLosses: number; // Dies mitjans que s'aguanten les perdedores
+
+  estimatedTaxesSavings: number; // Estimació impost IRPF (escala de l'estalvi)
+  netPnLAfterTax: number; // P&L net lliure d'impostos (€)
+
+  sharpeRatio: number; // Ràtio de Sharpe aproximat
+  disciplineScore: number; // Puntuació de disciplina (0-100)
   psychologicalBiases: {
-    dispositionEffect: boolean;      // Aguanta més les pèrdues que els guanys?
-    revengeTradingRisk: boolean;     // Pèrdues grans concentrades?
-    outlierRisk: boolean;            // El 80% dels guanys depèn d'1 sol trade?
+    dispositionEffect: boolean; // Aguanta més les pèrdues que els guanys?
+    revengeTradingRisk: boolean; // Pèrdues grans concentrades?
+    outlierRisk: boolean; // El 80% dels guanys depèn d'1 sol trade?
     warnings: string[];
     strengths: string[];
   };
 
-  equityCurve: { tradeIndex: number; date: string; cumulativePnL: number; peakPnL: number; drawdown: number }[];
-  
+  equityCurve: {
+    tradeIndex: number;
+    date: string;
+    cumulativePnL: number;
+    peakPnL: number;
+    drawdown: number;
+  }[];
+
   // Informació històrica i comparativa
   yearlyPerformance: YearPerformance[];
   monthlyBreakdown: { yearMonth: string; pnl: number; trades: number; winRate: number }[];
@@ -144,19 +150,33 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
   let maxDrawdownPercent = 0;
 
   const equityCurve: TradePerformanceMetrics['equityCurve'] = [
-    { tradeIndex: 0, date: 'Inici', cumulativePnL: 0, peakPnL: 0, drawdown: 0 }
+    { tradeIndex: 0, date: 'Inici', cumulativePnL: 0, peakPnL: 0, drawdown: 0 },
   ];
 
   const returns: number[] = [];
 
   // Mapeig històric
-  const yearlyMap = new Map<number, { trades: number; pnl: number; wins: number; losses: number; winProfit: number; lossProfit: number; volume: number }>();
+  const yearlyMap = new Map<
+    number,
+    {
+      trades: number;
+      pnl: number;
+      wins: number;
+      losses: number;
+      winProfit: number;
+      lossProfit: number;
+      volume: number;
+    }
+  >();
   const monthlyMap = new Map<string, { trades: number; pnl: number; wins: number }>();
   const dayNames = ['Diumenge', 'Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte'];
   const dayMap = new Map<number, { trades: number; pnl: number; wins: number }>();
   for (let d = 1; d <= 5; d++) dayMap.set(d, { trades: 0, pnl: 0, wins: 0 }); // Dilluns a Divendres
 
-  const assetMap = new Map<string, { trades: number; profit: number; loss: number; pnl: number; wins: number; losses: number }>();
+  const assetMap = new Map<
+    string,
+    { trades: number; profit: number; loss: number; pnl: number; wins: number; losses: number }
+  >();
 
   // Histogram Buckets
   const bucketRanges = [
@@ -174,7 +194,7 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
     const pnl = (item.transferValue || 0) - (item.acquisitionValue || 0) - (item.expenses || 0);
     const volume = (item.acquisitionValue || 0) + (item.transferValue || 0);
     totalVolumeTraded += volume;
-    totalAcquisitionCapital += (item.acquisitionValue || 0);
+    totalAcquisitionCapital += item.acquisitionValue || 0;
 
     const holdingDays = calculateDaysBetween(item.acquisitionDate, item.transferDate);
     const itemDate = item.transferDate ? new Date(item.transferDate) : new Date('2024-01-01');
@@ -190,8 +210,13 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
     yData.trades++;
     yData.pnl += pnl;
     yData.volume += volume;
-    if (pnl > 0) { yData.wins++; yData.winProfit += pnl; }
-    else if (pnl < 0) { yData.losses++; yData.lossProfit += Math.abs(pnl); }
+    if (pnl > 0) {
+      yData.wins++;
+      yData.winProfit += pnl;
+    } else if (pnl < 0) {
+      yData.losses++;
+      yData.lossProfit += Math.abs(pnl);
+    }
 
     // 2. Acumulació per Mes
     if (!monthlyMap.has(monthKey)) {
@@ -203,7 +228,7 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
     if (pnl > 0) mData.wins++;
 
     // 3. Acumulació per Dia de la Setmana (1=Dilluns .. 5=Divendres)
-    const validDay = (dayOfWeek >= 1 && dayOfWeek <= 5) ? dayOfWeek : (dayOfWeek === 0 ? 1 : 5);
+    const validDay = dayOfWeek >= 1 && dayOfWeek <= 5 ? dayOfWeek : dayOfWeek === 0 ? 1 : 5;
     if (dayMap.has(validDay)) {
       const dData = dayMap.get(validDay)!;
       dData.trades++;
@@ -219,16 +244,34 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
     const aData = assetMap.get(assetType)!;
     aData.trades++;
     aData.pnl += pnl;
-    if (pnl > 0) { aData.wins++; aData.profit += pnl; }
-    else if (pnl < 0) { aData.losses++; aData.loss += Math.abs(pnl); }
+    if (pnl > 0) {
+      aData.wins++;
+      aData.profit += pnl;
+    } else if (pnl < 0) {
+      aData.losses++;
+      aData.loss += Math.abs(pnl);
+    }
 
     // 5. Histograma de distribució
-    if (pnl >= 1000) { bucketRanges[0].count++; bucketRanges[0].totalPnl += pnl; }
-    else if (pnl >= 250) { bucketRanges[1].count++; bucketRanges[1].totalPnl += pnl; }
-    else if (pnl > 0) { bucketRanges[2].count++; bucketRanges[2].totalPnl += pnl; }
-    else if (pnl > -250) { bucketRanges[3].count++; bucketRanges[3].totalPnl += pnl; }
-    else if (pnl > -1000) { bucketRanges[4].count++; bucketRanges[4].totalPnl += pnl; }
-    else { bucketRanges[5].count++; bucketRanges[5].totalPnl += pnl; }
+    if (pnl >= 1000) {
+      bucketRanges[0].count++;
+      bucketRanges[0].totalPnl += pnl;
+    } else if (pnl >= 250) {
+      bucketRanges[1].count++;
+      bucketRanges[1].totalPnl += pnl;
+    } else if (pnl > 0) {
+      bucketRanges[2].count++;
+      bucketRanges[2].totalPnl += pnl;
+    } else if (pnl > -250) {
+      bucketRanges[3].count++;
+      bucketRanges[3].totalPnl += pnl;
+    } else if (pnl > -1000) {
+      bucketRanges[4].count++;
+      bucketRanges[4].totalPnl += pnl;
+    } else {
+      bucketRanges[5].count++;
+      bucketRanges[5].totalPnl += pnl;
+    }
 
     // Equity Curve
     cumulativePnL += pnl;
@@ -247,7 +290,7 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
       drawdown: currentDrawdown,
     });
 
-    const cost = (item.acquisitionValue || 1);
+    const cost = item.acquisitionValue || 1;
     returns.push(pnl / cost);
 
     if (pnl > 0.01) {
@@ -278,16 +321,16 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
   const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
   const lossRate = totalTrades > 0 ? (losingTrades / totalTrades) * 100 : 0;
   const netPnL = totalProfit - totalLoss;
-  const profitFactor = totalLoss > 0 ? (totalProfit / totalLoss) : (totalProfit > 0 ? 99.9 : 0);
+  const profitFactor = totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? 99.9 : 0;
 
   const avgTrade = totalTrades > 0 ? netPnL / totalTrades : 0;
   const avgWin = winningTrades > 0 ? totalProfit / winningTrades : 0;
   const avgLoss = losingTrades > 0 ? totalLoss / losingTrades : 0;
-  const payoffRatio = avgLoss > 0 ? (avgWin / avgLoss) : (avgWin > 0 ? 99.9 : 0);
+  const payoffRatio = avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? 99.9 : 0;
 
   const winProb = winRate / 100;
   const lossProb = lossRate / 100;
-  const expectancyEUR = (winProb * avgWin) - (lossProb * avgLoss);
+  const expectancyEUR = winProb * avgWin - lossProb * avgLoss;
 
   const avgHoldingDaysWins = winningTrades > 0 ? Math.round((winDaysSum / winningTrades) * 10) / 10 : 0;
   const avgHoldingDaysLosses = losingTrades > 0 ? Math.round((lossDaysSum / losingTrades) * 10) / 10 : 0;
@@ -306,29 +349,41 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
   const warnings: string[] = [];
   const strengths: string[] = [];
 
-  const dispositionEffect = avgHoldingDaysLosses > (avgHoldingDaysWins * 1.5) && losingTrades > 0;
+  const dispositionEffect = avgHoldingDaysLosses > avgHoldingDaysWins * 1.5 && losingTrades > 0;
   if (dispositionEffect) {
-    warnings.push(`⚠️ Efecte Disposició detectat: Aguantes les posicions perdedores una mitjana de ${avgHoldingDaysLosses} dies davant de només ${avgHoldingDaysWins} dies per a les guanyadores. Revisa els teus Stop Loss.`);
+    warnings.push(
+      `⚠️ Efecte Disposició detectat: Aguantes les posicions perdedores una mitjana de ${avgHoldingDaysLosses} dies davant de només ${avgHoldingDaysWins} dies per a les guanyadores. Revisa els teus Stop Loss.`,
+    );
   } else if (winningTrades > 0) {
-    strengths.push(`✅ Bona disciplina temporal: Deixes córrer els guanys (${avgHoldingDaysWins} dies) i talles les pèrdues amb rapidesa (${avgHoldingDaysLosses} dies).`);
+    strengths.push(
+      `✅ Bona disciplina temporal: Deixes córrer els guanys (${avgHoldingDaysWins} dies) i talles les pèrdues amb rapidesa (${avgHoldingDaysLosses} dies).`,
+    );
   }
 
-  const outlierRisk = totalProfit > 0 && maxWin > (totalProfit * 0.6);
+  const outlierRisk = totalProfit > 0 && maxWin > totalProfit * 0.6;
   if (outlierRisk) {
-    warnings.push(`⚠️ Dependència excessiva d'1 sol trade: El teu trade més gran (+${maxWin.toFixed(2)}€) representa més del 60% de tots els teus guanys bruts.`);
+    warnings.push(
+      `⚠️ Dependència excessiva d'1 sol trade: El teu trade més gran (+${maxWin.toFixed(2)}€) representa més del 60% de tots els teus guanys bruts.`,
+    );
   }
 
-  const revengeTradingRisk = maxLoss > (avgLoss * 2.5) && maxLoss > 100;
+  const revengeTradingRisk = maxLoss > avgLoss * 2.5 && maxLoss > 100;
   if (revengeTradingRisk) {
-    warnings.push(`⚠️ Pèrdues descontrolades (Outlier Loss): Tens pèrdues individuals (${maxLoss.toFixed(2)}€) que superen amb escreix la teva pèrdua mitjana (${avgLoss.toFixed(2)}€).`);
+    warnings.push(
+      `⚠️ Pèrdues descontrolades (Outlier Loss): Tens pèrdues individuals (${maxLoss.toFixed(2)}€) que superen amb escreix la teva pèrdua mitjana (${avgLoss.toFixed(2)}€).`,
+    );
   }
 
   if (profitFactor >= 1.75) {
-    strengths.push(`✅ Profit Factor excel·lent (${profitFactor.toFixed(2)}): El teu sistema genera significativament més del que perd.`);
+    strengths.push(
+      `✅ Profit Factor excel·lent (${profitFactor.toFixed(2)}): El teu sistema genera significativament més del que perd.`,
+    );
   }
 
   if (payoffRatio >= 1.5) {
-    strengths.push(`✅ Risk/Reward positiu (${payoffRatio.toFixed(2)}): Guanyes de mitjana més del que arrisques quan perds.`);
+    strengths.push(
+      `✅ Risk/Reward positiu (${payoffRatio.toFixed(2)}): Guanyes de mitjana més del que arrisques quan perds.`,
+    );
   }
 
   // Puntuació de disciplina (0-100)
@@ -349,7 +404,8 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
       wins: d.wins,
       losses: d.losses,
       winRate: d.trades > 0 ? Math.round((d.wins / d.trades) * 1000) / 10 : 0,
-      profitFactor: d.lossProfit > 0 ? Math.round((d.winProfit / d.lossProfit) * 100) / 100 : (d.winProfit > 0 ? 99.9 : 0),
+      profitFactor:
+        d.lossProfit > 0 ? Math.round((d.winProfit / d.lossProfit) * 100) / 100 : d.winProfit > 0 ? 99.9 : 0,
       volume: d.volume,
     }))
     .sort((a, b) => a.year - b.year);
@@ -375,7 +431,7 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
 
   const assetLabels: Record<string, string> = {
     shares: '📈 Accions / ETF',
-    funds: '📊 Fons d\'Inversió',
+    funds: "📊 Fons d'Inversió",
     real_estate: '🏠 Immobles',
     crypto: '₿ Criptomonedes',
     other: '📋 Altres Actius',
@@ -390,7 +446,7 @@ export function analyzeTradingPerformance(items: GainItem[] = []): TradePerforma
       totalLoss: d.loss,
       netPnL: d.pnl,
       winRate: d.trades > 0 ? Math.round((d.wins / d.trades) * 1000) / 10 : 0,
-      profitFactor: d.loss > 0 ? Math.round((d.profit / d.loss) * 100) / 100 : (d.profit > 0 ? 99.9 : 0),
+      profitFactor: d.loss > 0 ? Math.round((d.profit / d.loss) * 100) / 100 : d.profit > 0 ? 99.9 : 0,
       avgTrade: d.trades > 0 ? Math.round(d.pnl / d.trades) : 0,
     }))
     .sort((a, b) => b.netPnL - a.netPnL);
@@ -496,7 +552,7 @@ function createEmptyMetrics(): TradePerformanceMetrics {
       dispositionEffect: false,
       revengeTradingRisk: false,
       outlierRisk: false,
-      warnings: ['No hi ha operacions de trading registrades per realitzar l\'auditoria quantitativa.'],
+      warnings: ["No hi ha operacions de trading registrades per realitzar l'auditoria quantitativa."],
       strengths: [],
     },
     equityCurve: [],

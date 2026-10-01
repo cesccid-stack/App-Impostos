@@ -8,11 +8,11 @@ export interface VerifactuRecord {
   invoiceId: string;
   invoiceNumber: string;
   issueDate: string;
-  hashSignature: string;      // Cadena de hash per garantir la inalterabilitat
-  qrCodeData: string;         // Dades per al QR de Veri*Factu
+  hashSignature: string; // Cadena de hash per garantir la inalterabilitat
+  qrCodeData: string; // Dades per al QR de Veri*Factu
   submissionStatus: 'pending' | 'submitted' | 'accepted' | 'rejected_by_aeat';
   submissionDate?: string;
-  aeatCvs?: string;           // Codi Segur de Verificació AEAT
+  aeatCvs?: string; // Codi Segur de Verificació AEAT
 }
 
 export interface OfficialBook {

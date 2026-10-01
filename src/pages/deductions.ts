@@ -4,17 +4,13 @@
  */
 
 import { store } from '../store.ts';
-import {
-  createField,
-  createFormRow,
-  createFormSection,
-  createToggle,
-} from '../components/form-field.ts';
+import { createField, createFormRow, createFormSection, createToggle } from '../components/form-field.ts';
 import { openModal } from '../components/modal.ts';
 import { showToast } from '../components/toast.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import { runAutomatedComplianceChecks } from '../fiscal/auto-validator.ts';
 import { openComplianceModal } from '../components/compliance-modal.ts';
+import { createInfoTooltip } from '../components/info-tooltip.ts';
 import type { DonationItem, DeductionsData } from '../types.ts';
 
 export function renderDeductions(): HTMLElement {
@@ -25,12 +21,12 @@ export function renderDeductions(): HTMLElement {
   const d = data.deductions;
   const personal = data.personal;
   const compliance = runAutomatedComplianceChecks(data);
-  const dedIssues = compliance.issues.filter(i => i.id.startsWith('ded'));
+  const dedIssues = compliance.issues.filter((i) => i.id.startsWith('ded'));
 
   const descendants = personal.descendants || [];
-  const childrenUnder3 = descendants.filter(desc => (desc.age || 0) < 3);
+  const childrenUnder3 = descendants.filter((desc) => (desc.age || 0) < 3);
   const ascendants = personal.ascendants || [];
-  const ascendantsOver75 = ascendants.filter(asc => (asc.age || 0) >= 75);
+  const ascendantsOver75 = ascendants.filter((asc) => (asc.age || 0) >= 75);
 
   page.innerHTML = `
     <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:var(--space-md);">
@@ -43,7 +39,48 @@ export function renderDeductions(): HTMLElement {
       </button>
     </div>
 
-    ${childrenUnder3.length > 0 || ascendantsOver75.length > 0 ? `
+    <!-- Targeta Didàctica: Reducció en Base vs Deducció en Quota -->
+    <div class="card" style="margin-bottom:var(--space-lg); background:linear-gradient(145deg, rgba(99, 102, 241, 0.04), var(--bg-surface-elevated)); border:1px solid var(--border-accent); padding:var(--space-md);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-xs); margin-bottom:var(--space-sm);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.2rem;">💡</span>
+          <strong style="font-size:var(--text-sm); color:var(--text-primary);">Diferència Clau: Reducció en Base vs Deducció en Quota</strong>
+          <span class="tax-info-tooltip-mount" data-concept="reduccio_vs_deduccio"></span>
+        </div>
+        <span class="badge badge--primary" style="font-size:0.75rem;">Guia Didàctica</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:var(--space-md); font-size:0.8rem;">
+        <div style="background:var(--bg-surface); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-default); border-left:3px solid var(--color-warning);">
+          <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; display:flex; align-items:center; gap:6px;">
+            <span>📉</span>
+            <span>Reducció en la Base Imposable</span>
+            <span class="tax-info-tooltip-mount" data-concept="plans_pensions"></span>
+          </div>
+          <div style="color:var(--text-secondary); line-height:1.4;">
+            Resta dels teus ingressos abans d'aplicar la tarifa. L'estalvi real és igual a la despesa multiplicada pel teu <strong>tipus marginal</strong> (fins al 47-50%).
+          </div>
+          <div style="font-size:0.7rem; color:var(--color-primary); margin-top:4px;">
+            Exemple: Plans de pensions (fins a 1.500 € individual / 8.500 € empresa).
+          </div>
+        </div>
+        <div style="background:var(--bg-surface); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-default); border-left:3px solid var(--color-success);">
+          <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; display:flex; align-items:center; gap:6px;">
+            <span>🛡️</span>
+            <span>Deducció Directa en Quota</span>
+          </div>
+          <div style="color:var(--text-secondary); line-height:1.4;">
+            Es resta directament de l'impost final líquid a pagar, <strong>euro a euro (estalvi 100%)</strong>.
+          </div>
+          <div style="font-size:0.7rem; color:var(--color-success); margin-top:4px;">
+            Exemple: Donatius (80% dels primers 250 €), lloguer jove Catalunya (10% fins a 300/600 €).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${
+      childrenUnder3.length > 0 || ascendantsOver75.length > 0
+        ? `
       <div class="card" style="margin-bottom:var(--space-lg); padding:12px 16px; border-left:4px solid var(--color-success); background:var(--bg-surface-elevated); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
         <div style="display:flex; align-items:center; gap:var(--space-sm);">
           <span style="font-size:1.4rem;">👶</span>
@@ -59,9 +96,13 @@ export function renderDeductions(): HTMLElement {
           👤 Veure Situació Familiar
         </button>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
 
-    ${dedIssues.length > 0 ? `
+    ${
+      dedIssues.length > 0
+        ? `
       <div class="card" style="margin-bottom:var(--space-lg); padding:10px 16px; border-left:4px solid var(--color-warning); background:var(--bg-surface-elevated); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
         <div style="display:flex; align-items:center; gap:var(--space-sm);">
           <span style="font-size:1.2rem;">⚠️</span>
@@ -74,7 +115,9 @@ export function renderDeductions(): HTMLElement {
           🔍 Veure Diagnòstic
         </button>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
   `;
 
   page.querySelector('#btn-goto-personal-from-ded')?.addEventListener('click', () => {
@@ -97,7 +140,7 @@ export function renderDeductions(): HTMLElement {
   catalanSection.appendChild(
     createToggle({
       id: 'catalan-rental-deduction',
-      label: 'Lloguer d\'habitatge habitual (com a llogater / arrendatari)',
+      label: "Lloguer d'habitatge habitual (com a llogater / arrendatari)",
       checked: d.catalanRentalDeduction,
       onChange: (checked) => {
         store.update('deductions', { catalanRentalDeduction: checked });
@@ -109,7 +152,7 @@ export function renderDeductions(): HTMLElement {
     createFormRow(
       createField({
         id: 'catalan-rental-amount',
-        label: 'Quantitats satisfetes de lloguer a l\'any',
+        label: "Quantitats satisfetes de lloguer a l'any",
         value: d.catalanRentalAmount,
         suffix: '€',
         placeholder: '0,00',
@@ -133,17 +176,19 @@ export function renderDeductions(): HTMLElement {
           { value: 'single_parent', label: 'Família monoparental (límit 600€)' },
         ],
         onChange: (val) => {
-          store.update('deductions', { catalanRentalSituation: val as DeductionsData['catalanRentalSituation'] });
+          store.update('deductions', {
+            catalanRentalSituation: val as DeductionsData['catalanRentalSituation'],
+          });
         },
       }),
-    )
+    ),
   );
 
   catalanSection.appendChild(
     createFormRow(
       createField({
         id: 'catalan-birth',
-        label: 'Fills nascuts o adoptats l\'any a Catalunya',
+        label: "Fills nascuts o adoptats l'any a Catalunya",
         value: d.catalanBirthAdoption,
         min: 0,
         step: 1,
@@ -163,7 +208,7 @@ export function renderDeductions(): HTMLElement {
           store.update('deductions', { catalanStartupInvestment: parseFloat(val) || 0 });
         },
       }),
-    )
+    ),
   );
 
   catalanSection.appendChild(
@@ -201,7 +246,7 @@ export function renderDeductions(): HTMLElement {
           store.update('deductions', { catalanLanguageDonations: parseFloat(val) || 0 });
         },
       }),
-    )
+    ),
   );
 
   catalanSection.appendChild(
@@ -219,23 +264,23 @@ export function renderDeductions(): HTMLElement {
       }),
       createField({
         id: 'catalan-home-rehab',
-        label: 'Rehabilitació de l\'habitatge habitual a Catalunya',
+        label: "Rehabilitació de l'habitatge habitual a Catalunya",
         value: d.catalanHomeRehabilitation || 0,
         suffix: '€',
         placeholder: '0,00',
-        hint: 'Deducció de l\'1,5% de les quantitats satisfetes (base màx. 9.040 €)',
+        hint: "Deducció de l'1,5% de les quantitats satisfetes (base màx. 9.040 €)",
         onChange: (val) => {
           store.update('deductions', { catalanHomeRehabilitation: parseFloat(val) || 0 });
         },
       }),
-    )
+    ),
   );
 
   catalanSection.appendChild(
     createFormRow(
       createToggle({
         id: 'catalan-widowhood',
-        label: 'Persona vídua en l\'exercici a Catalunya (150 € / 300 €)',
+        label: "Persona vídua en l'exercici a Catalunya (150 € / 300 €)",
         checked: !!d.catalanWidowhood,
         onChange: (checked) => {
           store.update('deductions', { catalanWidowhood: checked });
@@ -249,7 +294,7 @@ export function renderDeductions(): HTMLElement {
           store.update('deductions', { catalanWidowhoodWithDependents: checked });
         },
       }),
-    )
+    ),
   );
 
   catalanCard.appendChild(catalanSection);
@@ -316,7 +361,7 @@ export function renderDeductions(): HTMLElement {
           store.update('deductions', { maternityNurseryExpenses: parseFloat(val) || 0 });
         },
       }),
-    )
+    ),
   );
 
   maternityCard.appendChild(maternitySection);
@@ -325,20 +370,29 @@ export function renderDeductions(): HTMLElement {
   // 4. Eficiència Energètica
   const energyCard = document.createElement('div');
   energyCard.className = 'card';
-  const energySection = createFormSection('⚡ Obres d\'Eficiència Energètica en Habitatge (RD-Llei 19/2021)');
+  const energySection = createFormSection("⚡ Obres d'Eficiència Energètica en Habitatge (RD-Llei 19/2021)");
 
   energySection.appendChild(
     createFormRow(
       createField({
         id: 'energy-type',
-        label: 'Tipus d\'actuació energètica',
+        label: "Tipus d'actuació energètica",
         type: 'select',
         value: d.energyEfficiencyType || 'none',
         options: [
           { value: 'none', label: 'Cap actuació' },
-          { value: 'heating_cooling_20', label: '20% - Reducció demanda calefacció/refrigeració ≥ 7% (màx 5.000€)' },
-          { value: 'primary_energy_40', label: '40% - Reducció consum energia primària no renovable ≥ 30% (màx 7.500€)' },
-          { value: 'building_rehab_60', label: '60% - Obres de rehabilitació energètica d\'edifici residencial (màx 5.000€/any)' },
+          {
+            value: 'heating_cooling_20',
+            label: '20% - Reducció demanda calefacció/refrigeració ≥ 7% (màx 5.000€)',
+          },
+          {
+            value: 'primary_energy_40',
+            label: '40% - Reducció consum energia primària no renovable ≥ 30% (màx 7.500€)',
+          },
+          {
+            value: 'building_rehab_60',
+            label: "60% - Obres de rehabilitació energètica d'edifici residencial (màx 5.000€/any)",
+          },
         ],
         onChange: (val) => {
           store.update('deductions', { energyEfficiencyType: val as DeductionsData['energyEfficiencyType'] });
@@ -354,7 +408,7 @@ export function renderDeductions(): HTMLElement {
           store.update('deductions', { energyEfficiencyAmount: parseFloat(val) || 0 });
         },
       }),
-    )
+    ),
   );
 
   energyCard.appendChild(energySection);
@@ -382,7 +436,7 @@ export function renderDeductions(): HTMLElement {
       }),
       createField({
         id: 'company-pension-contributions',
-        label: 'Aportacions empresarials (plans d\'ocupació)',
+        label: "Aportacions empresarials (plans d'ocupació)",
         value: d.companyPensionContributions || 0,
         suffix: '€',
         placeholder: '0,00',
@@ -393,7 +447,7 @@ export function renderDeductions(): HTMLElement {
           });
         },
       }),
-    )
+    ),
   );
 
   pensionCard.appendChild(pensionSection);
@@ -407,7 +461,7 @@ export function renderDeductions(): HTMLElement {
   housingSection.appendChild(
     createToggle({
       id: 'housing-deduction',
-      label: 'Tinc dret a la deducció (adquisició d\'habitatge abans de l\'01/01/2013)',
+      label: "Tinc dret a la deducció (adquisició d'habitatge abans de l'01/01/2013)",
       checked: d.housingDeduction,
       onChange: (checked) => {
         store.update('deductions', { housingDeduction: checked });
@@ -418,7 +472,7 @@ export function renderDeductions(): HTMLElement {
   housingSection.appendChild(
     createField({
       id: 'housing-amounts',
-      label: 'Quantitats satisfetes a l\'any (hipoteca + assegurances vinculades)',
+      label: "Quantitats satisfetes a l'any (hipoteca + assegurances vinculades)",
       value: d.housingAmountsPaid,
       suffix: '€',
       placeholder: '0,00',
@@ -431,6 +485,14 @@ export function renderDeductions(): HTMLElement {
 
   housingCard.appendChild(housingSection);
   page.appendChild(housingCard);
+
+  // Mount tooltips
+  page.querySelectorAll<HTMLElement>('.tax-info-tooltip-mount').forEach((mount) => {
+    const concept = mount.dataset.concept;
+    if (concept) {
+      mount.appendChild(createInfoTooltip(concept));
+    }
+  });
 
   return page;
 }
@@ -514,7 +576,9 @@ function openDonationModal(listContainer: HTMLElement): void {
       label: 'Entitat beneficiària (ONG / Fundació / Associació)',
       type: 'text',
       placeholder: 'Ex: Creu Roja, Càritas, MSF, La Marató TV3...',
-      onChange: (val) => { form.entity = val; },
+      onChange: (val) => {
+        form.entity = val;
+      },
     }),
   );
 
@@ -524,20 +588,22 @@ function openDonationModal(listContainer: HTMLElement): void {
       label: 'Import donat',
       suffix: '€',
       placeholder: '0,00',
-      onChange: (val) => { form.amount = parseFloat(val) || 0; },
+      onChange: (val) => {
+        form.amount = parseFloat(val) || 0;
+      },
     }),
   );
 
   fields.appendChild(
     createField({
       id: 'donation-category',
-      label: 'Règim fiscal de l\'entitat (Art. 68.3 LIRPF)',
+      label: "Règim fiscal de l'entitat (Art. 68.3 LIRPF)",
       type: 'select',
       value: 'ley_49_2002',
       options: [
         { value: 'ley_49_2002', label: 'Mecenatge — Llei 49/2002 (80% / 40% / 45%)' },
-        { value: 'public_utility', label: 'Fundació o associació d\'utilitat pública no acollida (10%)' },
-        { value: 'political_party', label: 'Partit polític o agrupació d\'electors (20%, base màx. 600 €)' },
+        { value: 'public_utility', label: "Fundació o associació d'utilitat pública no acollida (10%)" },
+        { value: 'political_party', label: "Partit polític o agrupació d'electors (20%, base màx. 600 €)" },
       ],
       onChange: (val) => {
         form.category = val as DonationItem['category'];
@@ -551,10 +617,12 @@ function openDonationModal(listContainer: HTMLElement): void {
   fields.appendChild(
     createField({
       id: 'donation-prior-1',
-      label: 'Import donat a la mateixa entitat l\'any anterior (N-1)',
+      label: "Import donat a la mateixa entitat l'any anterior (N-1)",
       suffix: '€',
       placeholder: '0,00',
-      onChange: (val) => { form.priorYearAmount = parseFloat(val) || 0; },
+      onChange: (val) => {
+        form.priorYearAmount = parseFloat(val) || 0;
+      },
     }),
   );
 
@@ -564,7 +632,9 @@ function openDonationModal(listContainer: HTMLElement): void {
       label: 'Import donat a la mateixa entitat fa dos anys (N-2)',
       suffix: '€',
       placeholder: '0,00',
-      onChange: (val) => { form.priorYear2Amount = parseFloat(val) || 0; },
+      onChange: (val) => {
+        form.priorYear2Amount = parseFloat(val) || 0;
+      },
     }),
   );
 
@@ -573,7 +643,9 @@ function openDonationModal(listContainer: HTMLElement): void {
       id: 'donation-recurring',
       label: 'Confirmar manualment la recurrència del 45% (només si no informes els imports previs)',
       checked: false,
-      onChange: (checked) => { form.recurring = checked; },
+      onChange: (checked) => {
+        form.recurring = checked;
+      },
     }),
   );
 

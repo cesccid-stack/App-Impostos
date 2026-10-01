@@ -1,7 +1,7 @@
 /**
  * @module fiscal/audit-dossier-generator
  * Generador de Dossier de Defensa Tributària i Justificació davant Requeriments de l'AEAT.
- * 
+ *
  * Normativa aplicable:
  * - Llei 58/2003 General Tributària (Art. 34 - Drets i garanties dels obligats tributaris).
  * - Procediments de Comprovació Limitada i Inspecció (Art. 136 a 159 LGT).
@@ -57,7 +57,10 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
 
   const justifications: AuditBoxJustification[] = [];
 
-  const totalGrossWork = (data.workIncome?.employers || []).reduce((sum, emp) => sum + (emp.grossSalary || 0), 0);
+  const totalGrossWork = (data.workIncome?.employers || []).reduce(
+    (sum, emp) => sum + (emp.grossSalary || 0),
+    0,
+  );
   const totalSS = (data.workIncome?.employers || []).reduce((sum, emp) => sum + (emp.socialSecurity || 0), 0);
   const exempt7p = data.workIncome?.foreignWorkExemption7p || 0;
   const activitiesIncome = data.activities?.income || 0;
@@ -71,7 +74,10 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
       concept: 'Retribucions dineràries íntegres del treball',
       declaredAmount: totalGrossWork,
       legalBasis: 'Art. 17 LIRPF',
-      requiredDocuments: ['Certificat de retribucions i retencions de l’empresa pagadora', '12 nòmines de l’exercici'],
+      requiredDocuments: [
+        'Certificat de retribucions i retencions de l’empresa pagadora',
+        '12 nòmines de l’exercici',
+      ],
       riskLevel: 'low',
     });
   }
@@ -182,14 +188,17 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
   }
 
   // 9. Amortització d'Immobles amb Despeses d'Adquisició (Jurisprudència STS 1130/2021)
-  const propsWithAcqExp = (data.properties || []).filter(p => (p.acquisitionExpenses || 0) > 0 && p.grossRentalIncome > 0);
+  const propsWithAcqExp = (data.properties || []).filter(
+    (p) => (p.acquisitionExpenses || 0) > 0 && p.grossRentalIncome > 0,
+  );
   if (propsWithAcqExp.length > 0) {
     const totalAcqExp = propsWithAcqExp.reduce((s, p) => s + (p.acquisitionExpenses || 0), 0);
     justifications.push({
       boxNumber: '0081',
       concept: 'Còmput de tributs i despeses inherents en el cost d’adquisició amortitzable',
       declaredAmount: totalAcqExp,
-      legalBasis: 'Jurisprudència Vinculant del Tribunal Suprem STS 1130/2021 (Rec. 5664/2019) i Art. 23.1.b LIRPF',
+      legalBasis:
+        'Jurisprudència Vinculant del Tribunal Suprem STS 1130/2021 (Rec. 5664/2019) i Art. 23.1.b LIRPF',
       requiredDocuments: [
         'Escriptura pública de compravenda o títol d’adquisició',
         'Autoliquidació de l’ITP/AJD o factura amb IVA satisfet no deduïble',
@@ -231,7 +240,8 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
     },
     {
       documentType: 'Justificants de Desplaçament i Treballs a l’Estranger (7.p)',
-      description: 'Contractes, bitllets d’avió i factures d’allotjament per justificar la realitat del desplaçament.',
+      description:
+        'Contractes, bitllets d’avió i factures d’allotjament per justificar la realitat del desplaçament.',
       legalObligation: 'Art. 7.p LIRPF i doctrina DGT CV 1422-20',
       isMandatory: exempt7p > 0,
     },
@@ -243,7 +253,8 @@ export function generateTaxDefenseDossier(data: DeclaracionData): TaxDefenseDoss
     },
     {
       documentType: 'Factures de Despeses d’Adquisició d’Immobles (STS 1130/2021)',
-      description: 'Factures d’ITP, notaria, registre i gestoria que incrementen el cost d’adquisició amortitzable.',
+      description:
+        'Factures d’ITP, notaria, registre i gestoria que incrementen el cost d’adquisició amortitzable.',
       legalObligation: 'STS 1130/2021 i Art. 23.1.b LIRPF',
       isMandatory: propsWithAcqExp.length > 0,
     },

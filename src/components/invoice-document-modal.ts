@@ -4,11 +4,11 @@
  * d'una factura amb la nomenclatura oficial normalitzada per a la inspecció de l'AEAT.
  */
 
-import { 
-  getInvoiceDocument, 
-  saveInvoiceDocument, 
-  deleteInvoiceDocument, 
-  downloadStoredDocument 
+import {
+  getInvoiceDocument,
+  saveInvoiceDocument,
+  deleteInvoiceDocument,
+  downloadStoredDocument,
 } from '../utils/document-vault.ts';
 import { store } from '../store.ts';
 import { showToast } from './toast.ts';
@@ -18,7 +18,7 @@ export async function openInvoiceDocumentModal(
   invoice: IVAInvoiceIssued | IVAInvoiceReceived,
   type: 'issued' | 'received',
   year: number,
-  onUpdated?: () => void
+  onUpdated?: () => void,
 ): Promise<void> {
   const existing = document.getElementById('invoice-doc-modal');
   if (existing) existing.remove();
@@ -28,12 +28,17 @@ export async function openInvoiceDocumentModal(
   const modal = document.createElement('div');
   modal.id = 'invoice-doc-modal';
   modal.className = 'modal-backdrop';
-  modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md); backdrop-filter:blur(4px);';
+  modal.style.cssText =
+    'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:10000; padding:var(--space-md); backdrop-filter:blur(4px);';
 
   function render() {
     const isIssued = type === 'issued';
-    const contrapartyName = isIssued ? (invoice as IVAInvoiceIssued).clientName : (invoice as IVAInvoiceReceived).supplierName;
-    const contrapartyNif = isIssued ? (invoice as IVAInvoiceIssued).clientNif : (invoice as IVAInvoiceReceived).supplierNif;
+    const contrapartyName = isIssued
+      ? (invoice as IVAInvoiceIssued).clientName
+      : (invoice as IVAInvoiceReceived).supplierName;
+    const contrapartyNif = isIssued
+      ? (invoice as IVAInvoiceIssued).clientNif
+      : (invoice as IVAInvoiceReceived).supplierNif;
 
     modal.innerHTML = `
       <div class="modal-content card" style="max-width:800px; width:100%; max-height:92vh; display:flex; flex-direction:column; background:var(--modal-bg); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:var(--space-lg); box-shadow:var(--shadow-lg);">
@@ -56,7 +61,9 @@ export async function openInvoiceDocumentModal(
 
         <!-- Cos del Modal: Visor o Zona de Càrrega -->
         <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:var(--space-md); min-height:360px;">
-          ${currentDoc ? `
+          ${
+            currentDoc
+              ? `
             <!-- Informació del fitxer normalitzat AEAT -->
             <div style="background:var(--bg-surface-elevated); padding:10px 14px; border-radius:var(--radius-md); border:1px solid var(--border-default); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-sm);">
               <div>
@@ -80,13 +87,18 @@ export async function openInvoiceDocumentModal(
 
             <!-- Visor Integrat -->
             <div style="flex:1; min-height:320px; border:1px solid var(--border-default); border-radius:var(--radius-md); overflow:hidden; background:#222; display:flex; justify-content:center; align-items:center;">
-              ${currentDoc.mimeType.includes('pdf') ? `
+              ${
+                currentDoc.mimeType.includes('pdf')
+                  ? `
                 <iframe src="${currentDoc.dataUrl}" style="width:100%; height:100%; min-height:340px; border:none;"></iframe>
-              ` : `
+              `
+                  : `
                 <img src="${currentDoc.dataUrl}" alt="Factura" style="max-width:100%; max-height:340px; object-fit:contain;" />
-              `}
+              `
+              }
             </div>
-          ` : `
+          `
+              : `
             <!-- Dropzone per pujar el PDF -->
             <div id="dropzone-doc" style="border:2px dashed var(--color-primary); border-radius:var(--radius-lg); padding:var(--space-xl); text-align:center; background:var(--bg-surface-elevated); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-sm); min-height:280px;">
               <div style="font-size:3rem;">📄</div>
@@ -99,7 +111,8 @@ export async function openInvoiceDocumentModal(
                 📂 Seleccionar Fitxer PDF
               </button>
             </div>
-          `}
+          `
+          }
         </div>
 
         <!-- Footer -->
@@ -130,7 +143,7 @@ export async function openInvoiceDocumentModal(
     modal.querySelector('#btn-delete-doc')?.addEventListener('click', async () => {
       if (confirm('Segur que vols eliminar aquest PDF adjunt?')) {
         await deleteInvoiceDocument(invoice.id);
-        
+
         // Update invoice metadata in store
         invoice.hasAttachment = false;
         invoice.attachmentFileName = undefined;
@@ -193,8 +206,12 @@ export async function openInvoiceDocumentModal(
   async function handleFileUpload(file: File) {
     try {
       const isIssued = type === 'issued';
-      const contrapartyName = isIssued ? (invoice as IVAInvoiceIssued).clientName : (invoice as IVAInvoiceReceived).supplierName;
-      const contrapartyNif = isIssued ? (invoice as IVAInvoiceIssued).clientNif : (invoice as IVAInvoiceReceived).supplierNif;
+      const contrapartyName = isIssued
+        ? (invoice as IVAInvoiceIssued).clientName
+        : (invoice as IVAInvoiceReceived).supplierName;
+      const contrapartyNif = isIssued
+        ? (invoice as IVAInvoiceIssued).clientNif
+        : (invoice as IVAInvoiceReceived).supplierNif;
 
       const doc = await saveInvoiceDocument(invoice.id, file, {
         type,

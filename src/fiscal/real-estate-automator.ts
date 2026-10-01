@@ -8,11 +8,11 @@
  * - Presets d'immobles i auditoria/correcció automàtica de la cartera immobiliària.
  */
 
-import type { 
-  RentalProperty, 
-  PropertyInventoryItem, 
-  PropertyFiscalResult, 
-  PropertyFinancialMetrics
+import type {
+  RentalProperty,
+  PropertyInventoryItem,
+  PropertyFiscalResult,
+  PropertyFinancialMetrics,
 } from '../types-properties.ts';
 import { getAEATAssetGroup, type AEATAssetGroupId } from './amortization-tables.ts';
 
@@ -25,7 +25,16 @@ export interface ParsedExpenseItem {
   invoiceNumber?: string;
   amount: number;
   type: 'operating' | 'inventory';
-  operatingTarget?: 'ibi' | 'wasteTax' | 'otherTaxes' | 'communityFees' | 'insurance' | 'mortgageInterests' | 'repairExpenses' | 'managementFees' | 'badDebts';
+  operatingTarget?:
+    | 'ibi'
+    | 'wasteTax'
+    | 'otherTaxes'
+    | 'communityFees'
+    | 'insurance'
+    | 'mortgageInterests'
+    | 'repairExpenses'
+    | 'managementFees'
+    | 'badDebts';
   inventoryCategory?: AEATAssetGroupId;
   amortizationRate?: number;
   confidence: number; // 0 a 100
@@ -37,19 +46,28 @@ export interface ParsedExpenseItem {
  * i classifica automàticament cada concepte en despesa operativa IRPF o actiu d'inventari AEAT (3%-30%).
  */
 export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
-  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   const items: ParsedExpenseItem[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Ignorar capçaleres típiques
-    if (line.toLowerCase().includes('data') && line.toLowerCase().includes('import') && line.toLowerCase().includes('concepte')) {
+    if (
+      line.toLowerCase().includes('data') &&
+      line.toLowerCase().includes('import') &&
+      line.toLowerCase().includes('concepte')
+    ) {
       continue;
     }
 
     // Extreure import monetari (ex: 1.250,50 €, 450.00, -120,00 EUR)
-    const amountMatch = line.match(/(-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|-?\d+(?:[.,]\d{1,2})?)\s*(?:€|EUR|eur)?/);
+    const amountMatch = line.match(
+      /(-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})|-?\d+(?:[.,]\d{1,2})?)\s*(?:€|EUR|eur)?/,
+    );
     if (!amountMatch) continue;
 
     // Normalitzar import
@@ -64,7 +82,9 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
 
     // Extreure data si existeix (AAAA-MM-DD o DD/MM/AAAA o DD-MM-AAAA)
     let dateStr = new Date().toISOString().split('T')[0];
-    const dateMatch = line.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/) || line.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    const dateMatch =
+      line.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/) ||
+      line.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
     if (dateMatch) {
       if (dateMatch[1].length === 4) {
         dateStr = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
@@ -80,7 +100,9 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
 
     // Extreure número de factura si existeix (ex: F-2024-012, FAC/1234, Factura 987)
     const invoiceMatch = line.match(/(?:factura|fac|fra|f-)\s*[:#]?\s*([a-z0-9\-\/]+)/i);
-    const invoiceNumber = invoiceMatch ? invoiceMatch[1].toUpperCase() : `REC-${dateStr.replace(/-/g, '')}-${i + 1}`;
+    const invoiceNumber = invoiceMatch
+      ? invoiceMatch[1].toUpperCase()
+      : `REC-${dateStr.replace(/-/g, '')}-${i + 1}`;
 
     // Netejar concepte
     let concept = line
@@ -100,9 +122,15 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
 
     // 1. Inventari / Immobilitzat (Amortitzable AEAT)
     if (
-      lower.includes('smart tv') || lower.includes('televisio') || lower.includes('televisor') ||
-      lower.includes('router') || lower.includes('wifi') || lower.includes('domotica') ||
-      lower.includes('alarma') || lower.includes('pany electronic') || lower.includes('termostat')
+      lower.includes('smart tv') ||
+      lower.includes('televisio') ||
+      lower.includes('televisor') ||
+      lower.includes('router') ||
+      lower.includes('wifi') ||
+      lower.includes('domotica') ||
+      lower.includes('alarma') ||
+      lower.includes('pany electronic') ||
+      lower.includes('termostat')
     ) {
       const g = getAEATAssetGroup('group_5_computer_26');
       items.push({
@@ -120,11 +148,25 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         notes: 'Classificat com Grup 5 AEAT (TI/Domòtica/TV - 26%)',
       });
     } else if (
-      lower.includes('nevera') || lower.includes('frigorific') || lower.includes('frigo') ||
-      lower.includes('rentadora') || lower.includes('lavadora') || lower.includes('rentaplats') || lower.includes('lavavajillas') ||
-      lower.includes('forn') || lower.includes('microones') || lower.includes('sofa') || lower.includes('llit') ||
-      lower.includes('matalas') || lower.includes('colcho') || lower.includes('taula') || lower.includes('cadires') ||
-      lower.includes('armari') || lower.includes('moble') || lower.includes('ikea') || lower.includes('conforama')
+      lower.includes('nevera') ||
+      lower.includes('frigorific') ||
+      lower.includes('frigo') ||
+      lower.includes('rentadora') ||
+      lower.includes('lavadora') ||
+      lower.includes('rentaplats') ||
+      lower.includes('lavavajillas') ||
+      lower.includes('forn') ||
+      lower.includes('microones') ||
+      lower.includes('sofa') ||
+      lower.includes('llit') ||
+      lower.includes('matalas') ||
+      lower.includes('colcho') ||
+      lower.includes('taula') ||
+      lower.includes('cadires') ||
+      lower.includes('armari') ||
+      lower.includes('moble') ||
+      lower.includes('ikea') ||
+      lower.includes('conforama')
     ) {
       const g = getAEATAssetGroup('group_2_furniture_10');
       items.push({
@@ -142,8 +184,13 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         notes: 'Classificat com Grup 2 AEAT (Mobiliari i electrodomèstics - 10%)',
       });
     } else if (
-      lower.includes('aire condicionat') || lower.includes('clima') || lower.includes('aerotermia') ||
-      lower.includes('bomba calor') || lower.includes('caldera') || lower.includes('escalfador') || lower.includes('splits')
+      lower.includes('aire condicionat') ||
+      lower.includes('clima') ||
+      lower.includes('aerotermia') ||
+      lower.includes('bomba calor') ||
+      lower.includes('caldera') ||
+      lower.includes('escalfador') ||
+      lower.includes('splits')
     ) {
       const g = getAEATAssetGroup('group_3_machinery_12');
       items.push({
@@ -161,8 +208,12 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         notes: 'Classificat com Grup 3 AEAT (Climatització / Maquinària - 12%)',
       });
     } else if (
-      lower.includes('reforma integral') || lower.includes('rehabilitacio') || lower.includes('tancaments alumini') ||
-      lower.includes('finestres climalit') || lower.includes('façana') || lower.includes('derrama ascensor')
+      lower.includes('reforma integral') ||
+      lower.includes('rehabilitacio') ||
+      lower.includes('tancaments alumini') ||
+      lower.includes('finestres climalit') ||
+      lower.includes('façana') ||
+      lower.includes('derrama ascensor')
     ) {
       const g = getAEATAssetGroup('group_1_improvements_3');
       items.push({
@@ -179,7 +230,12 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 90,
         notes: 'Classificat com Grup 1 AEAT (Obres de millora / Reforma - 3%)',
       });
-    } else if (lower.includes('eina') || lower.includes('trepant') || lower.includes('utillatge') || lower.includes('brico')) {
+    } else if (
+      lower.includes('eina') ||
+      lower.includes('trepant') ||
+      lower.includes('utillatge') ||
+      lower.includes('brico')
+    ) {
       const g = getAEATAssetGroup('group_6_tools_30');
       items.push({
         id: `parsed-${i}-${Date.now()}`,
@@ -197,7 +253,18 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
       });
     }
     // 2. Despeses Operatives Corrents
-    else if (lower.includes('ibi') || lower.includes('contribucio') || lower.includes('contribucion') || lower.includes('impost bens immobles') || lower.includes('impuesto bienes inmuebles') || (lower.includes('ajuntament') && !lower.includes('escombraries') && !lower.includes('bross') && !lower.includes('residus') && !lower.includes('gual'))) {
+    else if (
+      lower.includes('ibi') ||
+      lower.includes('contribucio') ||
+      lower.includes('contribucion') ||
+      lower.includes('impost bens immobles') ||
+      lower.includes('impuesto bienes inmuebles') ||
+      (lower.includes('ajuntament') &&
+        !lower.includes('escombraries') &&
+        !lower.includes('bross') &&
+        !lower.includes('residus') &&
+        !lower.includes('gual'))
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -211,7 +278,15 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 98,
         notes: 'Casella 0073 AEAT (IBI - Impost sobre Béns Immobles)',
       });
-    } else if (lower.includes('escombraries') || lower.includes('basuras') || lower.includes('basura') || lower.includes('brossa') || lower.includes('brosses') || lower.includes('taxa residus') || lower.includes('residus')) {
+    } else if (
+      lower.includes('escombraries') ||
+      lower.includes('basuras') ||
+      lower.includes('basura') ||
+      lower.includes('brossa') ||
+      lower.includes('brosses') ||
+      lower.includes('taxa residus') ||
+      lower.includes('residus')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -223,9 +298,17 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         type: 'operating',
         operatingTarget: 'wasteTax',
         confidence: 98,
-        notes: 'Casella 0073 AEAT (Taxa d\'escombraries i brosses)',
+        notes: "Casella 0073 AEAT (Taxa d'escombraries i brosses)",
       });
-    } else if (lower.includes('gual') || lower.includes('vado') || lower.includes('clavegueram') || lower.includes('alcantarillado') || lower.includes('taxa municipal') || lower.includes('tribut local') || lower.includes('taxa pas')) {
+    } else if (
+      lower.includes('gual') ||
+      lower.includes('vado') ||
+      lower.includes('clavegueram') ||
+      lower.includes('alcantarillado') ||
+      lower.includes('taxa municipal') ||
+      lower.includes('tribut local') ||
+      lower.includes('taxa pas')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -239,7 +322,12 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 95,
         notes: 'Casella 0073 AEAT (Altres taxes i tributs no estatals)',
       });
-    } else if (lower.includes('comunitat') || lower.includes('comunidad') || lower.includes('administrador finques') || lower.includes('quota escala')) {
+    } else if (
+      lower.includes('comunitat') ||
+      lower.includes('comunidad') ||
+      lower.includes('administrador finques') ||
+      lower.includes('quota escala')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -253,7 +341,22 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 95,
         notes: 'Casella 0074 AEAT (Despeses de comunitat de propietaris)',
       });
-    } else if (lower.includes('assegurança') || lower.includes('asseguranca') || lower.includes('seguro') || lower.includes('polissa') || lower.includes('mapfre') || lower.includes('mutua') || lower.includes('axa') || lower.includes('allianz') || lower.includes('arrenta') || lower.includes('segurcaixa') || lower.includes('ocaso') || lower.includes('generali') || lower.includes('zurich') || lower.includes('catalana occidente')) {
+    } else if (
+      lower.includes('assegurança') ||
+      lower.includes('asseguranca') ||
+      lower.includes('seguro') ||
+      lower.includes('polissa') ||
+      lower.includes('mapfre') ||
+      lower.includes('mutua') ||
+      lower.includes('axa') ||
+      lower.includes('allianz') ||
+      lower.includes('arrenta') ||
+      lower.includes('segurcaixa') ||
+      lower.includes('ocaso') ||
+      lower.includes('generali') ||
+      lower.includes('zurich') ||
+      lower.includes('catalana occidente')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -267,7 +370,15 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 95,
         notes: 'Casella 0075 AEAT (Assegurança llar, RC i impagament de lloguer)',
       });
-    } else if (lower.includes('hipoteca') || lower.includes('prestec') || lower.includes('interessos') || lower.includes('comissio bancaria') || lower.includes('caixabank') || lower.includes('bbva') || lower.includes('santander')) {
+    } else if (
+      lower.includes('hipoteca') ||
+      lower.includes('prestec') ||
+      lower.includes('interessos') ||
+      lower.includes('comissio bancaria') ||
+      lower.includes('caixabank') ||
+      lower.includes('bbva') ||
+      lower.includes('santander')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -281,7 +392,15 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         confidence: 90,
         notes: 'Casella 0069 AEAT (Interessos i despeses financeres)',
       });
-    } else if (lower.includes('gestoria') || lower.includes('agencia') || lower.includes('immobiliaria') || lower.includes('inmobiliaria') || lower.includes('advocat') || lower.includes('notari') || lower.includes('contracte')) {
+    } else if (
+      lower.includes('gestoria') ||
+      lower.includes('agencia') ||
+      lower.includes('immobiliaria') ||
+      lower.includes('inmobiliaria') ||
+      lower.includes('advocat') ||
+      lower.includes('notari') ||
+      lower.includes('contracte')
+    ) {
       items.push({
         id: `parsed-${i}-${Date.now()}`,
         date: dateStr,
@@ -293,7 +412,7 @@ export function parsePropertyExpenses(rawText: string): ParsedExpenseItem[] {
         type: 'operating',
         operatingTarget: 'managementFees',
         confidence: 90,
-        notes: 'Casella 0076 AEAT (Despeses d\'administració i jurídiques)',
+        notes: "Casella 0076 AEAT (Despeses d'administració i jurídiques)",
       });
     } else {
       // Per defecte reparació / conservació (lampista, pintor, manteniment, reparacions diverses)
@@ -329,9 +448,9 @@ function extractSupplierName(concept: string, fallback: string): string {
  * actualitzant tant els camps de despeses operatives com creant els registres d'inventari AEAT.
  */
 export function applyParsedExpensesToProperty(
-  property: RentalProperty, 
+  property: RentalProperty,
   items: ParsedExpenseItem[],
-  _fiscalYear: number = 2024
+  _fiscalYear: number = 2024,
 ): {
   updatedProperty: RentalProperty;
   operatingExpensesAdded: number;
@@ -392,7 +511,7 @@ export function calculateRentAdjustment(
   currentRent: number,
   indexationType: 'ipc' | 'irav' | 'custom' = 'ipc',
   customRate?: number,
-  fiscalYear: number = 2024
+  fiscalYear: number = 2024,
 ): {
   previousMonthlyRent: number;
   newMonthlyRent: number;
@@ -436,7 +555,7 @@ export function calculateRentAdjustment(
  */
 export function calculateFourYearCarryoverPlan(
   property: RentalProperty,
-  _fiscalYear: number = 2024
+  _fiscalYear: number = 2024,
 ): {
   yearMinus4Available: number;
   yearMinus3Available: number;
@@ -457,13 +576,17 @@ export function calculateFourYearCarryoverPlan(
     yearMinus1: 0,
   };
 
-  const totalPriorCarryover = (history.yearMinus4 || 0) + (history.yearMinus3 || 0) + (history.yearMinus2 || 0) + (history.yearMinus1 || 0);
+  const totalPriorCarryover =
+    (history.yearMinus4 || 0) +
+    (history.yearMinus3 || 0) +
+    (history.yearMinus2 || 0) +
+    (history.yearMinus1 || 0);
   const currentGross = (property.grossRentalIncome || 0) + (property.otherIncomes || 0);
   const currentRepairMortgage = (property.mortgageInterests || 0) + (property.repairExpenses || 0);
 
   // Límit màxim deduïble = ingressos íntegres
   let remainingCapacity = Math.max(0, currentGross - currentRepairMortgage);
-  
+
   // Ordre de deducció FIFO: primer s'absorbeix el més antic (N-4) per evitar que caduqui
   const n4Absorbed = Math.min(remainingCapacity, history.yearMinus4 || 0);
   remainingCapacity -= n4Absorbed;
@@ -481,8 +604,9 @@ export function calculateFourYearCarryoverPlan(
   const totalPriorAbsorbed = n4Absorbed + n3Absorbed + n2Absorbed + n1Absorbed;
   const currentYearExcess = Math.max(0, currentRepairMortgage - currentGross);
 
-  const remainingCarryoverForNextYears = 
-    ((history.yearMinus3 || 0) - n3Absorbed) +
+  const remainingCarryoverForNextYears =
+    (history.yearMinus3 || 0) -
+    n3Absorbed +
     ((history.yearMinus2 || 0) - n2Absorbed) +
     ((history.yearMinus1 || 0) - n1Absorbed) +
     currentYearExcess;
@@ -510,11 +634,11 @@ export function calculateFourYearCarryoverPlan(
  */
 export function calculatePropertyFinancialMetrics(
   property: RentalProperty,
-  res: PropertyFiscalResult
+  res: PropertyFiscalResult,
 ): PropertyFinancialMetrics {
   const acquisitionCost = property.acquisitionCost || property.totalCadastralValue || 1;
   const grossIncome = res.grossIncome || 0;
-  
+
   // 1. Gross Yield (%)
   const grossYield = acquisitionCost > 0 ? (grossIncome / acquisitionCost) * 100 : 0;
 
@@ -559,7 +683,8 @@ export function getRealEstatePortfolioPresets(): {
   return [
     {
       name: '🏠 Pis Habitatge Habitual (Barcelona - Eixample)',
-      description: 'Lloguer habitual en zona tensionada amb reducció del 50% de la Llei 12/2023, moblat i amb despeses de comunitat i IBI.',
+      description:
+        'Lloguer habitual en zona tensionada amb reducció del 50% de la Llei 12/2023, moblat i amb despeses de comunitat i IBI.',
       property: {
         id: 'preset-bcn-habitual',
         name: 'Pis Carrer Aragó (Barcelona)',
@@ -640,12 +765,13 @@ export function getRealEstatePortfolioPresets(): {
     },
     {
       name: '🏖️ Apartament Turístic & Ús Mixt (Costa Brava)',
-      description: 'Apartament a Platja d\'Aro llogat durant 90 dies d\'estiu i amb 275 dies a disposició pròpia (Art. 85 LIRPF).',
+      description:
+        "Apartament a Platja d'Aro llogat durant 90 dies d'estiu i amb 275 dies a disposició pròpia (Art. 85 LIRPF).",
       property: {
         id: 'preset-costa-brava',
-        name: 'Apartament Platja d\'Aro (Ús Mixt)',
+        name: "Apartament Platja d'Aro (Ús Mixt)",
         cadastralReference: '1234501EG0813S0001KL',
-        address: 'Av. Cavall Bernat 88, 1r 1a, 17250 Platja d\'Aro',
+        address: "Av. Cavall Bernat 88, 1r 1a, 17250 Platja d'Aro",
         ownershipPercentage: 100,
         usageType: 'tourist',
         contractDate: '2024-06-01',
@@ -693,7 +819,8 @@ export function getRealEstatePortfolioPresets(): {
     },
     {
       name: '🛠️ Pis Totalment Reformat amb Excedent a 4 Anys',
-      description: 'Pis amb reforma integral recent i despeses de reparació superiors als ingressos, generant escut fiscal per als propers 4 exercicis.',
+      description:
+        'Pis amb reforma integral recent i despeses de reparació superiors als ingressos, generant escut fiscal per als propers 4 exercicis.',
       property: {
         id: 'preset-reformat-4anys',
         name: 'Pis Reformat (Girona Centre)',
@@ -749,12 +876,13 @@ export function getRealEstatePortfolioPresets(): {
     },
     {
       name: '🏢 Local Comercial Arrendat',
-      description: 'Local comercial en planta baixa arrendat a negoci, sense dret a reducció d\'habitatge habitual i amb retenció de lloguer.',
+      description:
+        "Local comercial en planta baixa arrendat a negoci, sense dret a reducció d'habitatge habitual i amb retenció de lloguer.",
       property: {
         id: 'preset-local-comercial',
         name: 'Local Comercial (Terrassa)',
         cadastralReference: '5432167DF8912S0001MN',
-        address: 'Rambla d\'Ègara 110, Baixos, 08221 Terrassa',
+        address: "Rambla d'Ègara 110, Baixos, 08221 Terrassa",
         ownershipPercentage: 100,
         usageType: 'commercial',
         contractDate: '2022-01-01',
@@ -804,32 +932,40 @@ export function auditAndOptimizeProperties(properties: RentalProperty[]): {
 
     // 1. Optimització valor de construcció cadastral si està buit
     if ((!p.constructionCadastralValue || p.constructionCadastralValue <= 0) && p.totalCadastralValue > 0) {
-      p.constructionCadastralValue = Math.round(p.totalCadastralValue * 0.70);
-      improvementsApplied.push(`[${label}] S'ha establert el % de construcció cadastral al 70% per maximitzar la base del 3% d'amortització.`);
-      estimatedTotalTaxSaved += (p.acquisitionCost * 0.70 * 0.03) * 0.35;
+      p.constructionCadastralValue = Math.round(p.totalCadastralValue * 0.7);
+      improvementsApplied.push(
+        `[${label}] S'ha establert el % de construcció cadastral al 70% per maximitzar la base del 3% d'amortització.`,
+      );
+      estimatedTotalTaxSaved += p.acquisitionCost * 0.7 * 0.03 * 0.35;
     }
 
     // 2. Verificació de la reducció de la Llei 12/2023 si és habitatge habitual
     if (p.usageType === 'habitual' && p.reductionType === 'none') {
       p.reductionType = 'general_50';
-      improvementsApplied.push(`[${label}] S'ha activat la reducció del 50% de la Llei 12/2023 per a habitatge habitual.`);
-      estimatedTotalTaxSaved += (p.grossRentalIncome * 0.50) * 0.35;
+      improvementsApplied.push(
+        `[${label}] S'ha activat la reducció del 50% de la Llei 12/2023 per a habitatge habitual.`,
+      );
+      estimatedTotalTaxSaved += p.grossRentalIncome * 0.5 * 0.35;
     }
 
     // 3. Verificació de despeses de comunitat i IBI
     if (p.ibi <= 0 && p.totalCadastralValue > 0) {
-      improvementsApplied.push(`[${label}] ⚠️ Alerta: No s'ha indicat la despesa d'IBI de l'immoble. Recorda introduir el rebut pagat.`);
+      improvementsApplied.push(
+        `[${label}] ⚠️ Alerta: No s'ha indicat la despesa d'IBI de l'immoble. Recorda introduir el rebut pagat.`,
+      );
     }
 
     // 4. Verificació d'inventari d'actius i coeficients màxims
     if (p.inventory && p.inventory.length > 0) {
-      p.inventory.forEach(inv => {
+      p.inventory.forEach((inv) => {
         const g = getAEATAssetGroup(inv.category);
         if (g && inv.amortizationRate < g.maxLinearRate) {
           const oldRate = inv.amortizationRate;
           inv.amortizationRate = g.maxLinearRate;
-          improvementsApplied.push(`[${label} - ${inv.concept}] Coeficient d'amortització accelerat del ${oldRate}% al màxim legal del ${g.maxLinearRate}% (${g.name}).`);
-          estimatedTotalTaxSaved += (inv.amount * ((g.maxLinearRate - oldRate) / 100)) * 0.35;
+          improvementsApplied.push(
+            `[${label} - ${inv.concept}] Coeficient d'amortització accelerat del ${oldRate}% al màxim legal del ${g.maxLinearRate}% (${g.name}).`,
+          );
+          estimatedTotalTaxSaved += inv.amount * ((g.maxLinearRate - oldRate) / 100) * 0.35;
         }
       });
     }

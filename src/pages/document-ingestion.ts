@@ -25,6 +25,18 @@ export function renderDocumentIngestion(): HTMLElement {
   `;
   container.appendChild(header);
 
+  const disclaimerBanner = document.createElement('div');
+  disclaimerBanner.className =
+    'mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm flex items-start gap-3';
+  disclaimerBanner.innerHTML = `
+    <span class="text-xl">⚠️</span>
+    <div>
+      <h3 class="font-bold">Mòdul d'Ingesta OCR en Demostració / Prova de Concepte</h3>
+      <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">Aquest mòdul utilitza un motor de simulació local per il·lustrar el flux d'ingesta de documents i conversió a factures d'IVA. No s'envien documents a servidors de tercers ni APIs externes de visió artificial.</p>
+    </div>
+  `;
+  container.appendChild(disclaimerBanner);
+
   const contentGrid = document.createElement('div');
   contentGrid.className = 'grid grid-cols-1 gap-6';
 
@@ -37,9 +49,9 @@ export function renderDocumentIngestion(): HTMLElement {
   function renderData() {
     const data = store.getData();
     const batches = data.ocrBatches || [];
-    
+
     let html = `<h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400 mb-4 border-b pb-2">Llots Processats</h2>`;
-    
+
     if (batches.length === 0) {
       html += `<p class="text-gray-500 text-sm">No s'ha pujat cap document encara.</p>`;
     } else {
@@ -52,7 +64,7 @@ export function renderDocumentIngestion(): HTMLElement {
             </div>
             <ul class="space-y-3">
         `;
-        
+
         batch.documents.forEach((doc: OCRDocument) => {
           let statusColor = 'text-emerald-500 bg-emerald-50';
           let icon = '✅';
@@ -77,34 +89,31 @@ export function renderDocumentIngestion(): HTMLElement {
               </li>
           `;
         });
-        
+
         html += `
             </ul>
           </div>
         `;
       });
     }
-    
+
     batchesContainer.innerHTML = html;
   }
 
   setTimeout(() => {
     document.getElementById('upload-docs-btn')?.addEventListener('click', () => {
       const data = store.getData();
-      
+
       const mockDocsToUpload = [
         { filename: 'factura_amazon_agost.pdf', type: 'invoice_received' },
         { filename: 'nomina_juliol.pdf', type: 'payroll' },
-        { filename: 'ticket_taxi.jpg', type: 'ticket' }
+        { filename: 'ticket_taxi.jpg', type: 'ticket' },
       ];
 
       const batch = OCRIngestionEngine.processBatch(mockDocsToUpload);
 
-      store.update('ocrBatches', [
-        batch,
-        ...(data.ocrBatches || [])
-      ]);
-      
+      store.update('ocrBatches', [batch, ...(data.ocrBatches || [])]);
+
       renderData();
     });
 

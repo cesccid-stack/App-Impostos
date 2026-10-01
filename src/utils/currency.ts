@@ -73,10 +73,7 @@ export function formatCompact(value: number): string {
  */
 export function parseCurrencyInput(input: string): number {
   if (!input || typeof input !== 'string') return 0;
-  const cleaned = input
-    .replace(/[€\s]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
+  const cleaned = input.replace(/[€\s]/g, '').replace(/\./g, '').replace(',', '.');
   const value = parseFloat(cleaned);
   return Number.isFinite(value) && !Number.isNaN(value) ? value : 0;
 }

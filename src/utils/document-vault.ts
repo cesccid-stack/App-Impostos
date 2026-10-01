@@ -8,14 +8,14 @@
 import type { FiscalQuarter } from '../types-iva.ts';
 
 export interface StoredDocument {
-  id: string;                    // Sol ser l'invoiceId
+  id: string; // Sol ser l'invoiceId
   invoiceId: string;
   originalFileName: string;
-  standardizedName: string;      // Nom preestablert oficial AEAT
+  standardizedName: string; // Nom preestablert oficial AEAT
   mimeType: string;
-  size: number;                  // Mida en bytes
-  uploadedAt: string;            // ISO Date
-  dataUrl: string;               // Base64 Data URL (Blob convertible)
+  size: number; // Mida en bytes
+  uploadedAt: string; // ISO Date
+  dataUrl: string; // Base64 Data URL (Blob convertible)
   meta: {
     type: 'issued' | 'received' | 'asset';
     year: number;
@@ -70,8 +70,8 @@ export function sanitizeForFilename(text: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Elimina accents
     .replace(/[^a-zA-Z0-9_-]/g, '_') // Substitueix caràcters especials per _
-    .replace(/_+/g, '_')             // Evita múltiples guions baixos
-    .substring(0, 35);               // Limita longitud màxima
+    .replace(/_+/g, '_') // Evita múltiples guions baixos
+    .substring(0, 35); // Limita longitud màxima
 }
 
 /**
@@ -88,7 +88,7 @@ export function generateStandardizedAeatPdfName(meta: {
   entityName: string;
   originalExtension?: string;
 }): string {
-  const typeCode = meta.type === 'issued' ? 'EXP' : (meta.type === 'received' ? 'REC' : 'INV');
+  const typeCode = meta.type === 'issued' ? 'EXP' : meta.type === 'received' ? 'REC' : 'INV';
   const quarterPart = meta.quarter || 'ANUAL';
   const cleanNum = sanitizeForFilename(meta.invoiceNumber || 'SENSE_NUM');
   const cleanNif = sanitizeForFilename(meta.nif || 'SENSE_NIF');
@@ -123,7 +123,7 @@ export async function saveInvoiceDocument(
     invoiceNumber: string;
     nif: string;
     entityName: string;
-  }
+  },
 ): Promise<StoredDocument> {
   const db = await getDB();
   const dataUrl = await fileToDataUrl(file);
@@ -201,7 +201,7 @@ export async function getDocumentsForYear(year: number): Promise<StoredDocument[
 
     req.onsuccess = () => {
       const all = (req.result as StoredDocument[]) || [];
-      resolve(all.filter(d => d.meta.year === year));
+      resolve(all.filter((d) => d.meta.year === year));
     };
     req.onerror = () => reject(req.error);
   });

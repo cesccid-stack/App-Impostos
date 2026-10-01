@@ -42,7 +42,6 @@ export function renderCasellesPage(): HTMLElement {
 
     const allCaselles = buildCasellesList(data, result, ivaSummary);
 
-
     const filteredCaselles = allCaselles.filter((c) => {
       const matchModel = selectedModelFilter === 'all' || c.model === selectedModelFilter;
       const matchCat = selectedCategoryFilter === 'all' || c.category === selectedCategoryFilter;
@@ -135,9 +134,13 @@ export function renderCasellesPage(): HTMLElement {
           <div>
             <select class="form-select" id="caselles-category-select" style="font-size:var(--text-xs); padding:6px 10px;">
               <option value="all" ${selectedCategoryFilter === 'all' ? 'selected' : ''}>Totes les Seccions (${allCaselles.length})</option>
-              ${categories.map((cat) => `
+              ${categories
+                .map(
+                  (cat) => `
                 <option value="${cat}" ${selectedCategoryFilter === cat ? 'selected' : ''}>${cat}</option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </div>
         </div>
@@ -158,9 +161,12 @@ export function renderCasellesPage(): HTMLElement {
               </tr>
             </thead>
             <tbody>
-              ${filteredCaselles.length > 0 ? filteredCaselles.map((c) => {
-                const isNonZero = Math.abs(c.computedValue) > 0.001;
-                return `
+              ${
+                filteredCaselles.length > 0
+                  ? filteredCaselles
+                      .map((c) => {
+                        const isNonZero = Math.abs(c.computedValue) > 0.001;
+                        return `
                   <tr style="${isNonZero ? 'background:rgba(99,102,241,0.03);' : ''}">
                     <td>
                       <span class="badge ${isNonZero ? 'badge--primary' : 'badge--secondary'}" style="font-family:var(--font-mono); font-weight:700; font-size:0.8rem;">
@@ -203,13 +209,16 @@ export function renderCasellesPage(): HTMLElement {
                     </td>
                   </tr>
                 `;
-              }).join('') : `
+                      })
+                      .join('')
+                  : `
                 <tr>
                   <td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">
                     No s'han trobat caselles amb aquest filtre.
                   </td>
                 </tr>
-              `}
+              `
+              }
             </tbody>
           </table>
         </div>
@@ -262,7 +271,9 @@ export function renderCasellesPage(): HTMLElement {
     page.querySelector('#btn-export-caselles-copy-all')?.addEventListener('click', () => {
       const summaryText = allCaselles
         .filter((c) => Math.abs(c.computedValue) > 0.001)
-        .map((c) => `[Casella ${c.boxNumber}] ${c.title}: ${formatCurrency(c.computedValue)} (${c.legalBasis})`)
+        .map(
+          (c) => `[Casella ${c.boxNumber}] ${c.title}: ${formatCurrency(c.computedValue)} (${c.legalBasis})`,
+        )
         .join('\n');
 
       navigator.clipboard?.writeText(summaryText);
@@ -274,18 +285,33 @@ export function renderCasellesPage(): HTMLElement {
   return page;
 }
 
-function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSummary: Model390AnnualSummary): CasellaItem[] {
-  const workGross = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.grossSalary || 0) + (e.inKind || 0), 0);
+function buildCasellesList(
+  data: DeclaracionData,
+  result: FiscalResult,
+  ivaSummary: Model390AnnualSummary,
+): CasellaItem[] {
+  const workGross = (data.workIncome?.employers || []).reduce(
+    (s: number, e) => s + (e.grossSalary || 0) + (e.inKind || 0),
+    0,
+  );
   const workSS = (data.workIncome?.employers || []).reduce((s: number, e) => s + (e.socialSecurity || 0), 0);
   const workUnion = data.workIncome?.unionFees || 0;
   const workProf = result.professionalCollegeDeduction || 0;
   const workLegal = result.legalDefenseDeduction || 0;
-  const workExpenses = workSS + workUnion + workProf + workLegal + (data.workIncome?.otherDeductible || 0) + 2000;
+  const workExpenses =
+    workSS + workUnion + workProf + workLegal + (data.workIncome?.otherDeductible || 0) + 2000;
   const workNet = Math.max(0, workGross - workExpenses);
 
   const propGross = (data.properties || []).reduce((s: number, p) => s + (p.grossRentalIncome || 0), 0);
-  const propExp = (data.properties || []).reduce((s: number, p) => s + (p.mortgageInterests || 0) + (p.repairExpenses || 0) + (p.ibi || 0) + (p.communityFees || 0), 0);
-  const propEffectiveAcq = (data.properties || []).reduce((s: number, p) => s + (p.acquisitionCost || 0) + (p.acquisitionExpenses || 0), 0);
+  const propExp = (data.properties || []).reduce(
+    (s: number, p) =>
+      s + (p.mortgageInterests || 0) + (p.repairExpenses || 0) + (p.ibi || 0) + (p.communityFees || 0),
+    0,
+  );
+  const propEffectiveAcq = (data.properties || []).reduce(
+    (s: number, p) => s + (p.acquisitionCost || 0) + (p.acquisitionExpenses || 0),
+    0,
+  );
   const propNet = Math.max(0, propGross - propExp);
 
   const actGross = data.activities?.income || 0;
@@ -297,72 +323,468 @@ function buildCasellesList(data: DeclaracionData, result: FiscalResult, ivaSumma
 
   return [
     // ── Model 100: Rendiments del Treball ────────────────────────
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0001', title: 'Retribucions dineràries íntegres', legalBasis: 'Art. 17 LIRPF', computedValue: workGross, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0011', title: 'Cotitzacions a la Seguretat Social', legalBasis: 'Art. 19.2.a LIRPF', computedValue: workSS, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0013', title: 'Quotes satisfetes a sindicats', legalBasis: 'Art. 19.2.d LIRPF', computedValue: workUnion, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0015', title: 'Quotes satisfetes a col·legis professionals', legalBasis: 'Art. 19.2.d LIRPF', computedValue: workProf, routePath: '/treball', notes: 'Obligatòria per a la feina, límit 500 €' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0016', title: 'Despeses de defensa jurídica laboral', legalBasis: 'Art. 19.2.e LIRPF', computedValue: workLegal, routePath: '/treball', notes: 'Litigis contra l\'ocupador, límit 300 €' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0019', title: 'Rendiment net del treball abans de reduccions', legalBasis: 'Art. 19 LIRPF', computedValue: workNet, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0020', title: 'Reducció per rendiments del treball', legalBasis: 'Art. 20 LIRPF', computedValue: result.workIncomeReduction || 0, routePath: '/treball' },
-    { model: '100', category: 'Rendiments del Treball', boxNumber: '0022', title: 'Rendiment net reduït del treball', legalBasis: 'Art. 20 LIRPF', computedValue: Math.max(0, workNet - (result.workIncomeReduction || 0)), routePath: '/treball' },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0001',
+      title: 'Retribucions dineràries íntegres',
+      legalBasis: 'Art. 17 LIRPF',
+      computedValue: workGross,
+      routePath: '/treball',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0011',
+      title: 'Cotitzacions a la Seguretat Social',
+      legalBasis: 'Art. 19.2.a LIRPF',
+      computedValue: workSS,
+      routePath: '/treball',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0013',
+      title: 'Quotes satisfetes a sindicats',
+      legalBasis: 'Art. 19.2.d LIRPF',
+      computedValue: workUnion,
+      routePath: '/treball',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0015',
+      title: 'Quotes satisfetes a col·legis professionals',
+      legalBasis: 'Art. 19.2.d LIRPF',
+      computedValue: workProf,
+      routePath: '/treball',
+      notes: 'Obligatòria per a la feina, límit 500 €',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0016',
+      title: 'Despeses de defensa jurídica laboral',
+      legalBasis: 'Art. 19.2.e LIRPF',
+      computedValue: workLegal,
+      routePath: '/treball',
+      notes: "Litigis contra l'ocupador, límit 300 €",
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0019',
+      title: 'Rendiment net del treball abans de reduccions',
+      legalBasis: 'Art. 19 LIRPF',
+      computedValue: workNet,
+      routePath: '/treball',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0020',
+      title: 'Reducció per rendiments del treball',
+      legalBasis: 'Art. 20 LIRPF',
+      computedValue: result.workIncomeReduction || 0,
+      routePath: '/treball',
+    },
+    {
+      model: '100',
+      category: 'Rendiments del Treball',
+      boxNumber: '0022',
+      title: 'Rendiment net reduït del treball',
+      legalBasis: 'Art. 20 LIRPF',
+      computedValue: Math.max(0, workNet - (result.workIncomeReduction || 0)),
+      routePath: '/treball',
+    },
 
     // ── Model 100: Capital Mobiliari ────────────────────────────
-    { model: '100', category: 'Capital Mobiliari', boxNumber: '0027', title: 'Interessos de comptes i dipòsits', legalBasis: 'Art. 25.2 LIRPF', computedValue: mobInt, routePath: '/capital' },
-    { model: '100', category: 'Capital Mobiliari', boxNumber: '0029', title: 'Dividends i participació en beneficis', legalBasis: 'Art. 25.1 LIRPF', computedValue: mobDiv, routePath: '/capital' },
-    { model: '100', category: 'Capital Mobiliari', boxNumber: '0037', title: 'Rendiment net del capital mobiliari a integrar a l\'estalvi', legalBasis: 'Art. 25 LIRPF', computedValue: mobInt + mobDiv, routePath: '/capital' },
+    {
+      model: '100',
+      category: 'Capital Mobiliari',
+      boxNumber: '0027',
+      title: 'Interessos de comptes i dipòsits',
+      legalBasis: 'Art. 25.2 LIRPF',
+      computedValue: mobInt,
+      routePath: '/capital',
+    },
+    {
+      model: '100',
+      category: 'Capital Mobiliari',
+      boxNumber: '0029',
+      title: 'Dividends i participació en beneficis',
+      legalBasis: 'Art. 25.1 LIRPF',
+      computedValue: mobDiv,
+      routePath: '/capital',
+    },
+    {
+      model: '100',
+      category: 'Capital Mobiliari',
+      boxNumber: '0037',
+      title: "Rendiment net del capital mobiliari a integrar a l'estalvi",
+      legalBasis: 'Art. 25 LIRPF',
+      computedValue: mobInt + mobDiv,
+      routePath: '/capital',
+    },
 
     // ── Model 100: Capital Immobiliari ──────────────────────────
-    { model: '100', category: 'Capital Immobiliari', boxNumber: '0081', title: 'Cost d\'adquisició satisfet amortitzable', legalBasis: 'Art. 23.1.b LIRPF & STS 1130/2021', computedValue: propEffectiveAcq, routePath: '/immobles', notes: 'Inclou preu + ITP/IVA + notaria + registre' },
-    { model: '100', category: 'Capital Immobiliari', boxNumber: '0102', title: 'Ingressos íntegres per arrendament d\'immobles', legalBasis: 'Art. 22 LIRPF', computedValue: propGross, routePath: '/immobles' },
-    { model: '100', category: 'Capital Immobiliari', boxNumber: '0115', title: 'Despeses deduïbles (interessos, IBI, comunitat)', legalBasis: 'Art. 23.1 LIRPF', computedValue: propExp, routePath: '/immobles' },
-    { model: '100', category: 'Capital Immobiliari', boxNumber: '0156', title: 'Rendiment net del capital immobiliari', legalBasis: 'Art. 24 LIRPF', computedValue: propNet, routePath: '/immobles' },
+    {
+      model: '100',
+      category: 'Capital Immobiliari',
+      boxNumber: '0081',
+      title: "Cost d'adquisició satisfet amortitzable",
+      legalBasis: 'Art. 23.1.b LIRPF & STS 1130/2021',
+      computedValue: propEffectiveAcq,
+      routePath: '/immobles',
+      notes: 'Inclou preu + ITP/IVA + notaria + registre',
+    },
+    {
+      model: '100',
+      category: 'Capital Immobiliari',
+      boxNumber: '0102',
+      title: "Ingressos íntegres per arrendament d'immobles",
+      legalBasis: 'Art. 22 LIRPF',
+      computedValue: propGross,
+      routePath: '/immobles',
+    },
+    {
+      model: '100',
+      category: 'Capital Immobiliari',
+      boxNumber: '0115',
+      title: 'Despeses deduïbles (interessos, IBI, comunitat)',
+      legalBasis: 'Art. 23.1 LIRPF',
+      computedValue: propExp,
+      routePath: '/immobles',
+    },
+    {
+      model: '100',
+      category: 'Capital Immobiliari',
+      boxNumber: '0156',
+      title: 'Rendiment net del capital immobiliari',
+      legalBasis: 'Art. 24 LIRPF',
+      computedValue: propNet,
+      routePath: '/immobles',
+    },
 
     // ── Model 100: Activitats Econòmiques ───────────────────────
-    { model: '100', category: 'Activitats Econòmiques', boxNumber: '0181', title: 'Ingressos d\'explotació d\'activitats econòmiques', legalBasis: 'Art. 28 LIRPF', computedValue: actGross, routePath: '/activitats' },
-    { model: '100', category: 'Activitats Econòmiques', boxNumber: '0220', title: 'Total despeses deduïbles d\'activitats', legalBasis: 'Art. 30 LIRPF', computedValue: actExp, routePath: '/activitats' },
-    { model: '100', category: 'Activitats Econòmiques', boxNumber: '0235', title: 'Rendiment net d\'activitats econòmiques (estimació directa)', legalBasis: 'Art. 30 LIRPF', computedValue: actNet, routePath: '/activitats' },
+    {
+      model: '100',
+      category: 'Activitats Econòmiques',
+      boxNumber: '0181',
+      title: "Ingressos d'explotació d'activitats econòmiques",
+      legalBasis: 'Art. 28 LIRPF',
+      computedValue: actGross,
+      routePath: '/activitats',
+    },
+    {
+      model: '100',
+      category: 'Activitats Econòmiques',
+      boxNumber: '0220',
+      title: "Total despeses deduïbles d'activitats",
+      legalBasis: 'Art. 30 LIRPF',
+      computedValue: actExp,
+      routePath: '/activitats',
+    },
+    {
+      model: '100',
+      category: 'Activitats Econòmiques',
+      boxNumber: '0235',
+      title: "Rendiment net d'activitats econòmiques (estimació directa)",
+      legalBasis: 'Art. 30 LIRPF',
+      computedValue: actNet,
+      routePath: '/activitats',
+    },
 
     // ── Model 100: Bases Imposables i Liquidables ───────────────
-    { model: '100', category: 'Bases Imposables', boxNumber: '0435', title: 'Base imposable general', legalBasis: 'Art. 48 LIRPF', computedValue: result.generalBase, routePath: '/resultat' },
-    { model: '100', category: 'Bases Imposables', boxNumber: '0460', title: 'Base imposable de l\'estalvi', legalBasis: 'Art. 49 LIRPF', computedValue: result.savingsBase, routePath: '/resultat' },
-    { model: '100', category: 'Bases Liquidables', boxNumber: '0495', title: 'Reducció per tributació conjunta', legalBasis: 'Art. 84 LIRPF', computedValue: result.jointTaxationReduction || 0, routePath: '/comparador' },
-    { model: '100', category: 'Bases Liquidables', boxNumber: '0500', title: 'Base liquidable general', legalBasis: 'Art. 50 LIRPF', computedValue: result.liquidableGeneralBase, routePath: '/resultat' },
-    { model: '100', category: 'Bases Liquidables', boxNumber: '0510', title: 'Base liquidable de l\'estalvi', legalBasis: 'Art. 51 LIRPF', computedValue: result.liquidableSavingsBase, routePath: '/resultat' },
+    {
+      model: '100',
+      category: 'Bases Imposables',
+      boxNumber: '0435',
+      title: 'Base imposable general',
+      legalBasis: 'Art. 48 LIRPF',
+      computedValue: result.generalBase,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Bases Imposables',
+      boxNumber: '0460',
+      title: "Base imposable de l'estalvi",
+      legalBasis: 'Art. 49 LIRPF',
+      computedValue: result.savingsBase,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Bases Liquidables',
+      boxNumber: '0495',
+      title: 'Reducció per tributació conjunta',
+      legalBasis: 'Art. 84 LIRPF',
+      computedValue: result.jointTaxationReduction || 0,
+      routePath: '/comparador',
+    },
+    {
+      model: '100',
+      category: 'Bases Liquidables',
+      boxNumber: '0500',
+      title: 'Base liquidable general',
+      legalBasis: 'Art. 50 LIRPF',
+      computedValue: result.liquidableGeneralBase,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Bases Liquidables',
+      boxNumber: '0510',
+      title: "Base liquidable de l'estalvi",
+      legalBasis: 'Art. 51 LIRPF',
+      computedValue: result.liquidableSavingsBase,
+      routePath: '/resultat',
+    },
 
     // ── Model 100: Mínim Personal i Familiar ────────────────────
-    { model: '100', category: 'Mínims Familiars', boxNumber: '0511', title: 'Mínim del contribuent', legalBasis: 'Art. 57 LIRPF', computedValue: 5550, routePath: '/personal' },
-    { model: '100', category: 'Mínims Familiars', boxNumber: '0513', title: 'Mínim per descendents', legalBasis: 'Art. 58 LIRPF', computedValue: Math.max(0, result.totalMinimum - 5550), routePath: '/personal' },
-    { model: '100', category: 'Mínims Familiars', boxNumber: '0520', title: 'Total mínim personal i familiar', legalBasis: 'Art. 56 LIRPF', computedValue: result.totalMinimum, routePath: '/personal' },
+    {
+      model: '100',
+      category: 'Mínims Familiars',
+      boxNumber: '0511',
+      title: 'Mínim del contribuent',
+      legalBasis: 'Art. 57 LIRPF',
+      computedValue: 5550,
+      routePath: '/personal',
+    },
+    {
+      model: '100',
+      category: 'Mínims Familiars',
+      boxNumber: '0513',
+      title: 'Mínim per descendents',
+      legalBasis: 'Art. 58 LIRPF',
+      computedValue: Math.max(0, result.totalMinimum - 5550),
+      routePath: '/personal',
+    },
+    {
+      model: '100',
+      category: 'Mínims Familiars',
+      boxNumber: '0520',
+      title: 'Total mínim personal i familiar',
+      legalBasis: 'Art. 56 LIRPF',
+      computedValue: result.totalMinimum,
+      routePath: '/personal',
+    },
 
     // ── Model 100: Quotes Íntegres i Deduccions ─────────────────
-    { model: '100', category: 'Quotes Íntegres', boxNumber: '0545', title: 'Quota íntegra estatal', legalBasis: 'Art. 63 LIRPF', computedValue: result.generalTax / 2, routePath: '/resultat' },
-    { model: '100', category: 'Quotes Íntegres', boxNumber: '0546', title: 'Quota íntegra autonòmica', legalBasis: 'Art. 74 LIRPF', computedValue: result.generalTax / 2, routePath: '/resultat' },
-    { model: '100', category: 'Quotes Íntegres', boxNumber: '0552', title: 'Suma de quotes íntegres', legalBasis: 'Art. 62 LIRPF', computedValue: result.generalTax + result.savingsTax, routePath: '/resultat' },
-    { model: '100', category: 'Deduccions', boxNumber: '0588', title: 'Doble imposició internacional', legalBasis: 'Art. 80 LIRPF', computedValue: result.foreignTaxCredit || 0, routePath: '/capital' },
-    { model: '100', category: 'Deduccions', boxNumber: '0595', title: 'Total deduccions generals i autonòmiques', legalBasis: 'Art. 68/77 LIRPF', computedValue: result.totalDeductions, routePath: '/deduccions' },
-    { model: '100', category: 'Liquidació Final', boxNumber: '0599', title: 'Quota líquida total', legalBasis: 'Art. 79 LIRPF', computedValue: result.netTax, routePath: '/resultat' },
-    { model: '100', category: 'Liquidació Final', boxNumber: '0609', title: 'Pagaments a compte i retencions deduïdes', legalBasis: 'Art. 99 LIRPF', computedValue: result.totalWithholdings, routePath: '/resultat' },
-    { model: '100', category: 'Liquidació Final', boxNumber: '0610', title: 'Resultat de la declaració (A ingressar / A tornar)', legalBasis: 'Art. 97 LIRPF', computedValue: result.result, routePath: '/resultat', notes: 'Casella clau de liquidació final' },
-    ...(data.complementary?.isComplementary ? [
-      { model: '100' as const, category: 'Declaració Complementària', boxNumber: '0120', title: 'Justificant declaració originària', legalBasis: 'Art. 122 LGT', computedValue: 1, routePath: '/resultat', notes: `Ref: ${data.complementary.previousReceiptNumber || 'Pendent'}` },
-      { model: '100' as const, category: 'Declaració Complementària', boxNumber: '0611', title: 'Import ingressat / retornat prèviament', legalBasis: 'Art. 122 LGT', computedValue: data.complementary.previousResult || 0, routePath: '/resultat' },
-      { model: '100' as const, category: 'Declaració Complementària', boxNumber: '0612', title: 'Resultat diferencial efectiu a ingressar', legalBasis: 'Art. 122 LGT', computedValue: result.finalAmountDue || (result.result - (data.complementary.previousResult || 0)), routePath: '/resultat' },
-    ] : []),
+    {
+      model: '100',
+      category: 'Quotes Íntegres',
+      boxNumber: '0545',
+      title: 'Quota íntegra estatal',
+      legalBasis: 'Art. 63 LIRPF',
+      computedValue: result.generalTax / 2,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Quotes Íntegres',
+      boxNumber: '0546',
+      title: 'Quota íntegra autonòmica',
+      legalBasis: 'Art. 74 LIRPF',
+      computedValue: result.generalTax / 2,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Quotes Íntegres',
+      boxNumber: '0552',
+      title: 'Suma de quotes íntegres',
+      legalBasis: 'Art. 62 LIRPF',
+      computedValue: result.generalTax + result.savingsTax,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Deduccions',
+      boxNumber: '0588',
+      title: 'Doble imposició internacional',
+      legalBasis: 'Art. 80 LIRPF',
+      computedValue: result.foreignTaxCredit || 0,
+      routePath: '/capital',
+    },
+    {
+      model: '100',
+      category: 'Deduccions',
+      boxNumber: '0595',
+      title: 'Total deduccions generals i autonòmiques',
+      legalBasis: 'Art. 68/77 LIRPF',
+      computedValue: result.totalDeductions,
+      routePath: '/deduccions',
+    },
+    {
+      model: '100',
+      category: 'Liquidació Final',
+      boxNumber: '0599',
+      title: 'Quota líquida total',
+      legalBasis: 'Art. 79 LIRPF',
+      computedValue: result.netTax,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Liquidació Final',
+      boxNumber: '0609',
+      title: 'Pagaments a compte i retencions deduïdes',
+      legalBasis: 'Art. 99 LIRPF',
+      computedValue: result.totalWithholdings,
+      routePath: '/resultat',
+    },
+    {
+      model: '100',
+      category: 'Liquidació Final',
+      boxNumber: '0610',
+      title: 'Resultat de la declaració (A ingressar / A tornar)',
+      legalBasis: 'Art. 97 LIRPF',
+      computedValue: result.result,
+      routePath: '/resultat',
+      notes: 'Casella clau de liquidació final',
+    },
+    ...(data.complementary?.isComplementary
+      ? [
+          {
+            model: '100' as const,
+            category: 'Declaració Complementària',
+            boxNumber: '0120',
+            title: 'Justificant declaració originària',
+            legalBasis: 'Art. 122 LGT',
+            computedValue: 1,
+            routePath: '/resultat',
+            notes: `Ref: ${data.complementary.previousReceiptNumber || 'Pendent'}`,
+          },
+          {
+            model: '100' as const,
+            category: 'Declaració Complementària',
+            boxNumber: '0611',
+            title: 'Import ingressat / retornat prèviament',
+            legalBasis: 'Art. 122 LGT',
+            computedValue: data.complementary.previousResult || 0,
+            routePath: '/resultat',
+          },
+          {
+            model: '100' as const,
+            category: 'Declaració Complementària',
+            boxNumber: '0612',
+            title: 'Resultat diferencial efectiu a ingressar',
+            legalBasis: 'Art. 122 LGT',
+            computedValue: result.finalAmountDue || result.result - (data.complementary.previousResult || 0),
+            routePath: '/resultat',
+          },
+        ]
+      : []),
 
     // ── Model 303: Gestió d'IVA Trimestral ───────────────────────
-    { model: '303', category: 'IVA Devengat', boxNumber: '01', title: 'Base imposable al 21% (Règim General)', legalBasis: 'Art. 90 LIVA', computedValue: ivaSummary.totalGeneralRegimeBase || 0, routePath: '/iva' },
-    { model: '303', category: 'IVA Devengat', boxNumber: '03', title: 'Quota meritada al 21%', legalBasis: 'Art. 90 LIVA', computedValue: ivaSummary.totalDevengado || 0, routePath: '/iva' },
-    { model: '303', category: 'IVA Devengat', boxNumber: '27', title: 'Total quota meritada d\'IVA', legalBasis: 'Art. 91 LIVA', computedValue: ivaSummary.totalDevengado || 0, routePath: '/iva' },
-    { model: '303', category: 'IVA Deduïble', boxNumber: '28', title: 'Base d\'operacions interiors corrents', legalBasis: 'Art. 92 LIVA', computedValue: ivaSummary.totalVolumeOperations || 0, routePath: '/iva' },
-    { model: '303', category: 'IVA Deduïble', boxNumber: '29', title: 'Quota deduïble en operacions interiors', legalBasis: 'Art. 92 LIVA', computedValue: ivaSummary.totalDeducible || 0, routePath: '/iva' },
-    { model: '303', category: 'IVA Deduïble', boxNumber: '45', title: 'Total quotes suportades deduïbles', legalBasis: 'Art. 99 LIVA', computedValue: ivaSummary.totalDeducible || 0, routePath: '/iva' },
-    { model: '303', category: 'Liquidació IVA', boxNumber: '46', title: 'Resultat del règim general (Meritat - Deduïble)', legalBasis: 'Art. 100 LIVA', computedValue: (ivaSummary.totalDevengado || 0) - (ivaSummary.totalDeducible || 0), routePath: '/iva' },
-    { model: '303', category: 'Liquidació IVA', boxNumber: '70', title: 'A deduir: Ingrés efectuat en autoliquidacions complementàries anteriors', legalBasis: 'Art. 70 M303', computedValue: (data.iva?.quarters ? Object.values(data.iva.quarters).reduce((s: number, q: Model303QuarterResult) => s + (q.previousResultIngressat || 0), 0) : 0), routePath: '/iva' },
-    { model: '303', category: 'Liquidació IVA', boxNumber: '71', title: 'Resultat final liquidació Model 303 / 390', legalBasis: 'Art. 167 LIVA', computedValue: ivaSummary.totalAnnualResult || 0, routePath: '/iva' },
+    {
+      model: '303',
+      category: 'IVA Devengat',
+      boxNumber: '01',
+      title: 'Base imposable al 21% (Règim General)',
+      legalBasis: 'Art. 90 LIVA',
+      computedValue: ivaSummary.totalGeneralRegimeBase || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'IVA Devengat',
+      boxNumber: '03',
+      title: 'Quota meritada al 21%',
+      legalBasis: 'Art. 90 LIVA',
+      computedValue: ivaSummary.totalDevengado || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'IVA Devengat',
+      boxNumber: '27',
+      title: "Total quota meritada d'IVA",
+      legalBasis: 'Art. 91 LIVA',
+      computedValue: ivaSummary.totalDevengado || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'IVA Deduïble',
+      boxNumber: '28',
+      title: "Base d'operacions interiors corrents",
+      legalBasis: 'Art. 92 LIVA',
+      computedValue: ivaSummary.totalVolumeOperations || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'IVA Deduïble',
+      boxNumber: '29',
+      title: 'Quota deduïble en operacions interiors',
+      legalBasis: 'Art. 92 LIVA',
+      computedValue: ivaSummary.totalDeducible || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'IVA Deduïble',
+      boxNumber: '45',
+      title: 'Total quotes suportades deduïbles',
+      legalBasis: 'Art. 99 LIVA',
+      computedValue: ivaSummary.totalDeducible || 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'Liquidació IVA',
+      boxNumber: '46',
+      title: 'Resultat del règim general (Meritat - Deduïble)',
+      legalBasis: 'Art. 100 LIVA',
+      computedValue: (ivaSummary.totalDevengado || 0) - (ivaSummary.totalDeducible || 0),
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'Liquidació IVA',
+      boxNumber: '70',
+      title: 'A deduir: Ingrés efectuat en autoliquidacions complementàries anteriors',
+      legalBasis: 'Art. 70 M303',
+      computedValue: data.iva?.quarters
+        ? Object.values(data.iva.quarters).reduce(
+            (s: number, q: Model303QuarterResult) => s + (q.previousResultIngressat || 0),
+            0,
+          )
+        : 0,
+      routePath: '/iva',
+    },
+    {
+      model: '303',
+      category: 'Liquidació IVA',
+      boxNumber: '71',
+      title: 'Resultat final liquidació Model 303 / 390',
+      legalBasis: 'Art. 167 LIVA',
+      computedValue: ivaSummary.totalAnnualResult || 0,
+      routePath: '/iva',
+    },
 
     // ── Model 714: Impost sobre el Patrimoni ────────────────────
-    { model: '714', category: 'Patrimoni Net', boxNumber: 'PN01', title: 'Valor total dels béns i drets', legalBasis: 'Art. 9 LIP', computedValue: (data.wealth?.assets || []).reduce((s: number, a) => s + (a.grossValue || 0), 0), routePath: '/patrimoni' },
-    { model: '714', category: 'Patrimoni Net', boxNumber: 'PN02', title: 'Deutes deduïbles de la base imposable', legalBasis: 'Art. 13 LIP', computedValue: (data.wealth?.debts || []).reduce((s: number, d) => s + (d.amount || 0), 0), routePath: '/patrimoni' },
+    {
+      model: '714',
+      category: 'Patrimoni Net',
+      boxNumber: 'PN01',
+      title: 'Valor total dels béns i drets',
+      legalBasis: 'Art. 9 LIP',
+      computedValue: (data.wealth?.assets || []).reduce((s: number, a) => s + (a.grossValue || 0), 0),
+      routePath: '/patrimoni',
+    },
+    {
+      model: '714',
+      category: 'Patrimoni Net',
+      boxNumber: 'PN02',
+      title: 'Deutes deduïbles de la base imposable',
+      legalBasis: 'Art. 13 LIP',
+      computedValue: (data.wealth?.debts || []).reduce((s: number, d) => s + (d.amount || 0), 0),
+      routePath: '/patrimoni',
+    },
   ];
 }
 

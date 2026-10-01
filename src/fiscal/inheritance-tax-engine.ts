@@ -7,22 +7,22 @@ export class InheritanceTaxEngine {
   public static calculate(data: InheritanceDonationData): InheritanceDonationData {
     // 1. Masa Hereditaria / Base Imposable
     const masa = data.realEstateValue + data.financialAssetsValue + data.lifeInsuranceValue;
-    
+
     // Ajuar domèstic (normalment 3% del cabal relicte en successions)
     const ajuar = data.type === 'inheritance' ? masa * 0.03 : 0;
-    
+
     // Base imposable prèvia
     const basePrevia = masa + ajuar - data.deductibleDebts - data.deductibleExpenses;
     const taxableBase = Math.max(0, basePrevia);
 
     // 2. Reduccions estatals / autonòmiques
     let reductions = data.reductionPrimaryResidence + data.reductionFamilyBusiness;
-    
+
     // Reduccions per parentiu (Estatals per defecte)
     if (data.kinshipGroup === 'I') reductions += 15956.87;
     else if (data.kinshipGroup === 'II') reductions += 15956.87;
     else if (data.kinshipGroup === 'III') reductions += 7993.46;
-    
+
     // Discapacitat
     if (data.disabilityDegree >= 33 && data.disabilityDegree < 65) reductions += 47858.59;
     if (data.disabilityDegree >= 65) reductions += 150253.03;
@@ -47,7 +47,7 @@ export class InheritanceTaxEngine {
       autonomicBonus = netTax * 0.99; // 99% a Andalusia
     } else if (data.community === 'CAT' && (data.kinshipGroup === 'I' || data.kinshipGroup === 'II')) {
       // Catalunya té bonificacions per trams, aquí apliquem un fix simulable (ex: 60%)
-      autonomicBonus = netTax * 0.60; 
+      autonomicBonus = netTax * 0.6;
     }
 
     // 8. Quota a ingressar
@@ -62,7 +62,7 @@ export class InheritanceTaxEngine {
       multiplierBase: multiplier,
       netTax,
       autonomicBonus,
-      amountDue
+      amountDue,
     };
   }
 
@@ -70,7 +70,7 @@ export class InheritanceTaxEngine {
     // Escala simplificada (en un entorn real s'usa la taula progressiva de 16 trams)
     if (base <= 0) return 0;
     if (base <= 7993.46) return base * 0.0765;
-    if (base <= 31956) return (7993.46 * 0.0765) + ((base - 7993.46) * 0.085);
+    if (base <= 31956) return 7993.46 * 0.0765 + (base - 7993.46) * 0.085;
     // ... salt simplificat al marginal per bases majors
     return base * 0.15; // Placeholder for demo
   }

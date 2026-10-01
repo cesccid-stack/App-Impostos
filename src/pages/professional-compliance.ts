@@ -41,21 +41,24 @@ export function renderProfessionalCompliance(): HTMLElement {
   function renderData() {
     const data = store.getData();
     const compliance = data.compliance;
-    
+
     if (!compliance) return;
 
     // Verifactu
     let vfHtml = `<h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400 mb-4 border-b pb-2">Registres Veri*Factu</h2>`;
-    
+
     if (compliance.verifactuRecords.length === 0) {
       vfHtml += `<p class="text-gray-500 text-sm">No hi ha factures pendents d'enviament.</p>`;
     } else {
       vfHtml += `<div class="space-y-4">`;
       compliance.verifactuRecords.forEach((record: VerifactuRecord) => {
         let statusBadge = '';
-        if (record.submissionStatus === 'pending') statusBadge = '<span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800">Pendent</span>';
-        if (record.submissionStatus === 'accepted') statusBadge = '<span class="px-2 py-1 text-xs rounded bg-emerald-100 text-emerald-800">Acceptada AEAT</span>';
-        
+        if (record.submissionStatus === 'pending')
+          statusBadge = '<span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800">Pendent</span>';
+        if (record.submissionStatus === 'accepted')
+          statusBadge =
+            '<span class="px-2 py-1 text-xs rounded bg-emerald-100 text-emerald-800">Acceptada AEAT</span>';
+
         vfHtml += `
           <div class="card p-4 border ${record.submissionStatus === 'accepted' ? 'border-emerald-200' : 'border-gray-200'}">
             <div class="flex justify-between items-start mb-2">
@@ -80,15 +83,19 @@ export function renderProfessionalCompliance(): HTMLElement {
 
     // Books
     let booksHtml = `<h2 class="text-xl font-bold text-amber-600 dark:text-amber-400 mb-4 border-b pb-2">Llibres Oficials AEAT</h2>`;
-    
+
     if (compliance.officialBooks.length === 0) {
       booksHtml += `<p class="text-gray-500 text-sm">Cap llibre tancat ni certificat oficialment.</p>`;
     } else {
       booksHtml += `<div class="grid grid-cols-1 gap-4">`;
       compliance.officialBooks.forEach((book: OfficialBook) => {
-        const typeLabel = book.bookType === 'issued_invoices' ? 'Factures Emeses' : 
-                          book.bookType === 'received_invoices' ? 'Factures Rebudes' : book.bookType;
-                          
+        const typeLabel =
+          book.bookType === 'issued_invoices'
+            ? 'Factures Emeses'
+            : book.bookType === 'received_invoices'
+              ? 'Factures Rebudes'
+              : book.bookType;
+
         booksHtml += `
           <div class="card p-4 border border-amber-200 dark:border-amber-900 bg-amber-50/30">
             <div class="flex justify-between items-center mb-2">
@@ -114,7 +121,7 @@ export function renderProfessionalCompliance(): HTMLElement {
     // Sincronitzar automàticament amb les factures emeses reals de l'IVA
     const initData = store.getData();
     const ivaIssued = store.getIVA().issuedInvoices;
-    
+
     if (initData.compliance?.verifactuRecords.length === 0) {
       if (ivaIssued.length > 0) {
         let prevHash = '';
@@ -126,7 +133,7 @@ export function renderProfessionalCompliance(): HTMLElement {
         }
         store.update('compliance', {
           ...initData.compliance,
-          verifactuRecords: records
+          verifactuRecords: records,
         });
       } else {
         const mockInvoice: IVAInvoiceIssued = {
@@ -141,12 +148,12 @@ export function renderProfessionalCompliance(): HTMLElement {
           vatRate: 21,
           vatAmount: 210,
           totalInvoice: 1210,
-          category: 'activity_service'
+          category: 'activity_service',
         };
         const record = ProfessionalComplianceEngine.generateVerifactuRecord(mockInvoice);
         store.update('compliance', {
           ...initData.compliance,
-          verifactuRecords: [record]
+          verifactuRecords: [record],
         });
       }
     }
@@ -159,27 +166,38 @@ export function renderProfessionalCompliance(): HTMLElement {
 
       store.update('compliance', {
         ...data.compliance,
-        verifactuRecords: submitted
+        verifactuRecords: submitted,
       });
-      
+
       renderData();
     });
-    
+
     document.getElementById('lock-books-btn')?.addEventListener('click', () => {
       const data = store.getData();
       if (!data.compliance) return;
 
       const iva = store.getIVA();
-      let newCompliance = ProfessionalComplianceEngine.lockOfficialBook(data.compliance, 'issued_invoices', data.year || 2024);
-      newCompliance = ProfessionalComplianceEngine.lockOfficialBook(newCompliance, 'received_invoices', data.year || 2024);
+      let newCompliance = ProfessionalComplianceEngine.lockOfficialBook(
+        data.compliance,
+        'issued_invoices',
+        data.year || 2024,
+      );
+      newCompliance = ProfessionalComplianceEngine.lockOfficialBook(
+        newCompliance,
+        'received_invoices',
+        data.year || 2024,
+      );
 
-      newCompliance.officialBooks = newCompliance.officialBooks.map(b => ({
+      newCompliance.officialBooks = newCompliance.officialBooks.map((b) => ({
         ...b,
-        totalRecords: b.bookType === 'issued_invoices' ? Math.max(1, iva.issuedInvoices.length) : Math.max(1, iva.receivedInvoices.length)
+        totalRecords:
+          b.bookType === 'issued_invoices'
+            ? Math.max(1, iva.issuedInvoices.length)
+            : Math.max(1, iva.receivedInvoices.length),
       }));
 
       store.update('compliance', newCompliance);
-      
+
       renderData();
     });
 

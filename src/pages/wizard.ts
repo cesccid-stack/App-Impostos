@@ -55,15 +55,19 @@ export function renderWizard(): HTMLElement {
           ⬅️ Anterior
         </button>
         <div style="display:flex; gap:var(--space-sm);">
-          ${currentStep === totalSteps ? `
+          ${
+            currentStep === totalSteps
+              ? `
             <button class="btn btn--primary" id="wiz-finish-btn">
               🎉 Anar al Resultat Completa
             </button>
-          ` : `
+          `
+              : `
             <button class="btn btn--primary" id="wiz-next-btn">
               Següent ➡️
             </button>
-          `}
+          `
+          }
         </div>
       </div>
     `;
@@ -94,7 +98,11 @@ export function renderWizard(): HTMLElement {
   return page;
 }
 
-function getStepHtml(step: number, data: ReturnType<typeof store.getData>, result: ReturnType<typeof calculateIRPF>): string {
+function getStepHtml(
+  step: number,
+  data: ReturnType<typeof store.getData>,
+  result: ReturnType<typeof calculateIRPF>,
+): string {
   switch (step) {
     case 1:
       return `
@@ -223,7 +231,18 @@ function attachStepEvents(step: number, page: HTMLElement): void {
       const val = parseFloat((e.target as HTMLInputElement).value) || 0;
       const emps = [...(store.getData().workIncome.employers || [])];
       if (emps.length === 0) {
-        emps.push({ id: crypto.randomUUID(), name: 'Empresa', grossSalary: val, inKind: 0, withholdings: val * 0.15, socialSecurity: val * 0.0635, dietsIncome: 0, dietsDays: 0, mileageIncome: 0, mileageKm: 0 });
+        emps.push({
+          id: crypto.randomUUID(),
+          name: 'Empresa',
+          grossSalary: val,
+          inKind: 0,
+          withholdings: val * 0.15,
+          socialSecurity: val * 0.0635,
+          dietsIncome: 0,
+          dietsDays: 0,
+          mileageIncome: 0,
+          mileageKm: 0,
+        });
       } else {
         emps[0].grossSalary = val;
       }
@@ -240,14 +259,20 @@ function attachStepEvents(step: number, page: HTMLElement): void {
       store.update('capitalIncome', { dividends: parseFloat((e.target as HTMLInputElement).value) || 0 });
     });
     page.querySelector('#wiz-foreign-div')?.addEventListener('change', (e) => {
-      store.update('capitalIncome', { foreignDividends: parseFloat((e.target as HTMLInputElement).value) || 0 });
+      store.update('capitalIncome', {
+        foreignDividends: parseFloat((e.target as HTMLInputElement).value) || 0,
+      });
     });
     page.querySelector('#wiz-foreign-tax')?.addEventListener('change', (e) => {
-      store.update('capitalIncome', { foreignTaxWithheld: parseFloat((e.target as HTMLInputElement).value) || 0 });
+      store.update('capitalIncome', {
+        foreignTaxWithheld: parseFloat((e.target as HTMLInputElement).value) || 0,
+      });
     });
   } else if (step === 5) {
     page.querySelector('#wiz-pension')?.addEventListener('change', (e) => {
-      store.update('deductions', { pensionPlanContributions: parseFloat((e.target as HTMLInputElement).value) || 0 });
+      store.update('deductions', {
+        pensionPlanContributions: parseFloat((e.target as HTMLInputElement).value) || 0,
+      });
     });
     page.querySelector('#wiz-cat-rent')?.addEventListener('change', (e) => {
       const val = parseFloat((e.target as HTMLInputElement).value) || 0;

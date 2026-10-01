@@ -17,7 +17,7 @@ export interface AuditRiskAlert {
 }
 
 export interface AuditRiskReport {
-  overallRiskScore: number;     // 0 (Molt Segur) a 100 (Risc Elevat d'Inspecció)
+  overallRiskScore: number; // 0 (Molt Segur) a 100 (Risc Elevat d'Inspecció)
   riskLevel: 'low' | 'medium' | 'high';
   alerts: AuditRiskAlert[];
   documentaryChecklist: { documentName: string; section: string; status: 'required' | 'recommended' }[];
@@ -47,8 +47,16 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
   // 1. Auditoria d'Immobles en Lloguer (Art. 23 LIRPF)
   const properties = data.properties || [];
   for (const p of properties) {
-    checklist.push({ documentName: `Contracte d'arrendament i NIF llogater (${p.name || p.address})`, section: 'Immobles', status: 'required' });
-    checklist.push({ documentName: `Factures de reparació i rebut IBI (${p.name || p.address})`, section: 'Immobles', status: 'required' });
+    checklist.push({
+      documentName: `Contracte d'arrendament i NIF llogater (${p.name || p.address})`,
+      section: 'Immobles',
+      status: 'required',
+    });
+    checklist.push({
+      documentName: `Factures de reparació i rebut IBI (${p.name || p.address})`,
+      section: 'Immobles',
+      status: 'required',
+    });
 
     if (p.grossRentalIncome > 0) {
       const repairs = (p.repairExpenses || 0) + (p.mortgageInterests || 0);
@@ -61,8 +69,10 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
           severity: 'high',
           title: `Despeses de reparació molt elevades a ${p.name || 'Immoble'} (${Math.round(ratio * 100)}% dels ingressos)`,
           description: `Les despeses de conservació i finançament (${repairs.toFixed(2)} €) superen el 85% dels ingressos bruts facturats (${p.grossRentalIncome.toFixed(2)} €).`,
-          aeatTriggerReason: 'L\'algorisme de l\'AEAT creua despeses vs ingressos i dispara requeriments automàtics quan la ràtio supera el 80%.',
-          recommendedProof: 'Conserva totes les factures oficials detallades amb NIF del constructor/proveïdor que justifiquin que no són obres de millora sinó conservació.',
+          aeatTriggerReason:
+            "L'algorisme de l'AEAT creua despeses vs ingressos i dispara requeriments automàtics quan la ràtio supera el 80%.",
+          recommendedProof:
+            'Conserva totes les factures oficials detallades amb NIF del constructor/proveïdor que justifiquin que no són obres de millora sinó conservació.',
         });
       }
     }
@@ -75,7 +85,7 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
         severity: 'medium',
         title: `Referència cadastral incompleta a ${p.name || 'Immoble'}`,
         description: 'La referència cadastral no té exactament 20 caràcters alfanumèrics.',
-        aeatTriggerReason: 'L\'AEAT no pot creuar automàticament l\'immoble amb la base de dades del Cadastre.',
+        aeatTriggerReason: "L'AEAT no pot creuar automàticament l'immoble amb la base de dades del Cadastre.",
         recommendedProof: 'Utilitza el botó "🔍 Consultar Cadastre" per validar la referència oficial.',
       });
     }
@@ -87,9 +97,12 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
         category: 'real_estate',
         severity: 'high',
         title: `Falta el NIF del llogater a ${p.name || 'Immoble'}`,
-        description: 'S\'ha aplicat la reducció d\'arrendament d\'habitatge habitual sense especificar el NIF/NIE dels llogaters.',
-        aeatTriggerReason: 'La Casella 0065 és de creuament obligatori per validar la reducció de la Llei 12/2023.',
-        recommendedProof: 'Introdueix el NIF/NIE del contracte de lloguer i justificant de la fiança a l\'INCASÒL.',
+        description:
+          "S'ha aplicat la reducció d'arrendament d'habitatge habitual sense especificar el NIF/NIE dels llogaters.",
+        aeatTriggerReason:
+          'La Casella 0065 és de creuament obligatori per validar la reducció de la Llei 12/2023.',
+        recommendedProof:
+          "Introdueix el NIF/NIE del contracte de lloguer i justificant de la fiança a l'INCASÒL.",
       });
     }
   }
@@ -98,27 +111,38 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
   const employers = data.workIncome?.employers || [];
   let totalGross = 0;
   let totalDiets = 0;
-  employers.forEach(e => {
+  employers.forEach((e) => {
     totalGross += e.grossSalary || 0;
     totalDiets += e.dietsIncome || 0;
-    checklist.push({ documentName: `Certificat de retencions IRPF (${e.name})`, section: 'Treball', status: 'required' });
+    checklist.push({
+      documentName: `Certificat de retencions IRPF (${e.name})`,
+      section: 'Treball',
+      status: 'required',
+    });
   });
 
   if (data.workIncome?.foreignWorkExemption7p && data.workIncome.foreignWorkExemption7p > 0) {
     riskPoints += 15;
-    checklist.push({ documentName: 'Certificat de desplaçament a l\'estranger, bitllets d\'avió i contracte de serveis no resident (Art. 7.p)', section: 'Treball', status: 'required' });
+    checklist.push({
+      documentName:
+        "Certificat de desplaçament a l'estranger, bitllets d'avió i contracte de serveis no resident (Art. 7.p)",
+      section: 'Treball',
+      status: 'required',
+    });
     alerts.push({
       id: 'work-7p',
       category: 'work',
       severity: 'medium',
       title: `Aplicació de l'Exempció 7.p per treballs a l'estranger (${data.workIncome.foreignWorkExemption7p.toFixed(2)} €)`,
-      description: 'L\'Art. 7.p és una de les caselles més inspeccionades de l\'IRPF.',
-      aeatTriggerReason: 'L\'AEAT sol·licita sistemàticament prova dels dies efectius a l\'estranger i que l\'empresa beneficiària no és resident a Espanya.',
-      recommendedProof: 'Fulls de vol, reserves d\'hotel, passaport segellat i certificat de l\'empresa estrangera.',
+      description: "L'Art. 7.p és una de les caselles més inspeccionades de l'IRPF.",
+      aeatTriggerReason:
+        "L'AEAT sol·licita sistemàticament prova dels dies efectius a l'estranger i que l'empresa beneficiària no és resident a Espanya.",
+      recommendedProof:
+        "Fulls de vol, reserves d'hotel, passaport segellat i certificat de l'empresa estrangera.",
     });
   }
 
-  if (totalGross > 0 && (totalDiets / totalGross) > 0.25) {
+  if (totalGross > 0 && totalDiets / totalGross > 0.25) {
     riskPoints += 15;
     alerts.push({
       id: 'work-diets',
@@ -126,20 +150,30 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
       severity: 'medium',
       title: 'Volum de dietes exemptes elevat respecte al sou brut',
       description: `Les dietes representen el ${Math.round((totalDiets / totalGross) * 100)}% del salari brut.`,
-      aeatTriggerReason: 'L\'AEAT requereix que l\'empresa certifiqui el motiu laboral i el lloc del desplaçament.',
-      recommendedProof: 'Fulls de liquidació de despeses signats per l\'empresa amb tiquets de peatge i allotjament.',
+      aeatTriggerReason:
+        "L'AEAT requereix que l'empresa certifiqui el motiu laboral i el lloc del desplaçament.",
+      recommendedProof:
+        "Fulls de liquidació de despeses signats per l'empresa amb tiquets de peatge i allotjament.",
     });
   }
 
   // 3. Auditoria de Guanys Patrimonials (Accions & Cripto)
   const gains = data.gains?.items || [];
   if (gains.length > 0) {
-    checklist.push({ documentName: 'Extracte d\'operacions del Broker / Exchange amb dates i comissions (FIFO)', section: 'Guanys', status: 'required' });
+    checklist.push({
+      documentName: "Extracte d'operacions del Broker / Exchange amb dates i comissions (FIFO)",
+      section: 'Guanys',
+      status: 'required',
+    });
   }
 
   // 4. Deduccions Autonòmiques de Catalunya
   if (data.deductions?.catalanRentalDeduction) {
-    checklist.push({ documentName: 'Rebuts bancaris de pagament del lloguer i justificant de fiança a l\'INCASÒL', section: 'Deduccions', status: 'required' });
+    checklist.push({
+      documentName: "Rebuts bancaris de pagament del lloguer i justificant de fiança a l'INCASÒL",
+      section: 'Deduccions',
+      status: 'required',
+    });
     if (result.generalBase > 20000) {
       riskPoints += 15;
       alerts.push({
@@ -147,15 +181,18 @@ function computeAuditRiskInternal(data: DeclaracionData, result: FiscalResult): 
         category: 'deductions',
         severity: 'medium',
         title: 'Deducció de lloguer català propera al límit de renda (20.000 €)',
-        description: 'La base imposable total s\'apropa al llindar màxim d\'ingressos per tenir dret a la deducció.',
+        description:
+          "La base imposable total s'apropa al llindar màxim d'ingressos per tenir dret a la deducció.",
         aeatTriggerReason: 'Creuament automàtic de base imposable amb la quota autonòmica de Catalunya.',
-        recommendedProof: 'Comprova que la suma de base general i estalvi menys el mínim personal no superi 20.000 €.',
+        recommendedProof:
+          'Comprova que la suma de base general i estalvi menys el mínim personal no superi 20.000 €.',
       });
     }
   }
 
   const overallRiskScore = Math.max(5, Math.min(95, riskPoints));
-  const riskLevel: AuditRiskReport['riskLevel'] = overallRiskScore >= 50 ? 'high' : overallRiskScore >= 25 ? 'medium' : 'low';
+  const riskLevel: AuditRiskReport['riskLevel'] =
+    overallRiskScore >= 50 ? 'high' : overallRiskScore >= 25 ? 'medium' : 'low';
 
   return {
     overallRiskScore,

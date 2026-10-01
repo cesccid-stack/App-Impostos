@@ -28,7 +28,8 @@ export function renderCryptoTaxes(): HTMLElement {
   contentGrid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-6';
 
   const summaryContainer = document.createElement('div');
-  summaryContainer.className = 'col-span-1 lg:col-span-2 card p-6 border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-900/10';
+  summaryContainer.className =
+    'col-span-1 lg:col-span-2 card p-6 border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-900/10';
   summaryContainer.id = 'crypto-summary';
   contentGrid.appendChild(summaryContainer);
 
@@ -45,7 +46,7 @@ export function renderCryptoTaxes(): HTMLElement {
   function renderData() {
     const data = store.getData();
     const crypto = data.crypto;
-    
+
     if (!crypto) return;
 
     // Summary
@@ -85,7 +86,7 @@ export function renderCryptoTaxes(): HTMLElement {
         if (tx.type === 'buy') icon = '🟢';
         if (tx.type === 'sell') icon = '🔴';
         if (tx.type === 'staking_reward' || tx.type === 'airdrop') icon = '🎁';
-        
+
         txHtml += `
           <li class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded flex justify-between items-center text-sm">
             <div>
@@ -135,19 +136,63 @@ export function renderCryptoTaxes(): HTMLElement {
     document.getElementById('calc-crypto-btn')?.addEventListener('click', () => {
       // MOCK DATA: Simulem unes quantes transaccions
       const mockTxs: CryptoTransaction[] = [
-        { id: '1', date: '2023-01-15T10:00:00Z', type: 'buy', assetIn: 'BTC', amountIn: 0.5, fiatValueInEUR: 10000, walletOrExchange: 'Kraken' },
-        { id: '2', date: '2023-03-10T12:00:00Z', type: 'buy', assetIn: 'BTC', amountIn: 0.2, fiatValueInEUR: 5000, walletOrExchange: 'Kraken' },
-        { id: '3', date: '2023-06-05T14:00:00Z', type: 'staking_reward', assetIn: 'ETH', amountIn: 1.5, fiatValueInEUR: 2500, walletOrExchange: 'Binance' },
-        { id: '4', date: '2024-02-20T09:00:00Z', type: 'sell', assetIn: 'BTC', amountIn: 0.4, assetOut: 'EUR', amountOut: 20000, fiatValueInEUR: 20000, walletOrExchange: 'Kraken' },
-        { id: '5', date: '2024-04-15T16:00:00Z', type: 'exchange', assetIn: 'BTC', amountIn: 0.2, assetOut: 'ETH', amountOut: 3, fiatValueInEUR: 12000, walletOrExchange: 'Kraken' }
+        {
+          id: '1',
+          date: '2023-01-15T10:00:00Z',
+          type: 'buy',
+          assetIn: 'BTC',
+          amountIn: 0.5,
+          fiatValueInEUR: 10000,
+          walletOrExchange: 'Kraken',
+        },
+        {
+          id: '2',
+          date: '2023-03-10T12:00:00Z',
+          type: 'buy',
+          assetIn: 'BTC',
+          amountIn: 0.2,
+          fiatValueInEUR: 5000,
+          walletOrExchange: 'Kraken',
+        },
+        {
+          id: '3',
+          date: '2023-06-05T14:00:00Z',
+          type: 'staking_reward',
+          assetIn: 'ETH',
+          amountIn: 1.5,
+          fiatValueInEUR: 2500,
+          walletOrExchange: 'Binance',
+        },
+        {
+          id: '4',
+          date: '2024-02-20T09:00:00Z',
+          type: 'sell',
+          assetIn: 'BTC',
+          amountIn: 0.4,
+          assetOut: 'EUR',
+          amountOut: 20000,
+          fiatValueInEUR: 20000,
+          walletOrExchange: 'Kraken',
+        },
+        {
+          id: '5',
+          date: '2024-04-15T16:00:00Z',
+          type: 'exchange',
+          assetIn: 'BTC',
+          amountIn: 0.2,
+          assetOut: 'ETH',
+          amountOut: 3,
+          fiatValueInEUR: 12000,
+          walletOrExchange: 'Kraken',
+        },
       ];
 
       const processed = DefiTaxEngine.processTransactions(mockTxs);
-      const mod721 = DefiTaxEngine.calculateModel721(new Date().getFullYear());
+      const mod721 = DefiTaxEngine.calculateModel721(store.getYear(), mockTxs);
 
       store.update('crypto', {
         ...processed,
-        model721: mod721
+        model721: mod721,
       });
 
       renderData();
@@ -158,9 +203,9 @@ export function renderCryptoTaxes(): HTMLElement {
       const cryptoGains = data.crypto?.capitalGains || [];
       if (cryptoGains.length === 0) return;
 
-      const currentGains = (data.gains?.items || []).filter(g => !g.id.startsWith('crypto_gain_'));
-      
-      const newGainItems = cryptoGains.map(cg => ({
+      const currentGains = (data.gains?.items || []).filter((g) => !g.id.startsWith('crypto_gain_'));
+
+      const newGainItems = cryptoGains.map((cg) => ({
         id: `crypto_gain_${cg.id}`,
         type: 'crypto' as const,
         description: `Criptomoneda: Venda ${cg.asset} (${cg.sellAmount.toFixed(4)} u.)`,
@@ -174,18 +219,18 @@ export function renderCryptoTaxes(): HTMLElement {
 
       store.update('gains', {
         ...data.gains,
-        items: [...currentGains, ...newGainItems]
+        items: [...currentGains, ...newGainItems],
       });
 
       // També si hi ha ingressos de staking/airdrops, afegir-los a altres rendiments del capital
       if (data.crypto?.defiIncome && data.crypto.defiIncome > 0) {
         store.update('capitalIncome', {
           ...data.capitalIncome,
-          otherMobiliary: (data.capitalIncome.otherMobiliary || 0) + data.crypto.defiIncome
+          otherMobiliary: (data.capitalIncome.otherMobiliary || 0) + data.crypto.defiIncome,
         });
       }
 
-      alert('Guanys i rendiments cripto sincronitzats amb èxit a la base de l\'estalvi de l\'IRPF!');
+      alert("Guanys i rendiments cripto sincronitzats amb èxit a la base de l'estalvi de l'IRPF!");
     });
 
     renderData();

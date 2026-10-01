@@ -4,11 +4,19 @@
  * Permet visualitzar la rendibilitat global de la cartera i fer zoom detallat a cada immoble individual.
  */
 
-import { analyzePortfolioFinances, analyzePropertyFinances, type PortfolioAnalyticsReport, type PropertyAnalyticsReport } from '../fiscal/real-estate-analytics-engine.ts';
+import {
+  analyzePortfolioFinances,
+  analyzePropertyFinances,
+  type PortfolioAnalyticsReport,
+  type PropertyAnalyticsReport,
+} from '../fiscal/real-estate-analytics-engine.ts';
 import { formatCurrency } from '../utils/currency.ts';
 import type { RentalProperty } from '../types-properties.ts';
 
-export function createRealEstateDashboard(properties: RentalProperty[], fiscalYear: number = 2024): HTMLElement {
+export function createRealEstateDashboard(
+  properties: RentalProperty[],
+  fiscalYear: number = 2024,
+): HTMLElement {
   const container = document.createElement('div');
   container.className = 'real-estate-dashboard-container';
   container.style.marginBottom = 'var(--space-xl)';
@@ -18,8 +26,10 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
 
   function renderContent() {
     const portfolioReport: PortfolioAnalyticsReport = analyzePortfolioFinances(properties, fiscalYear);
-    const selectedProp = properties.find(p => p.id === selectedPropertyId) || properties[0];
-    const propertyReport: PropertyAnalyticsReport | null = selectedProp ? analyzePropertyFinances(selectedProp, fiscalYear) : null;
+    const selectedProp = properties.find((p) => p.id === selectedPropertyId) || properties[0];
+    const propertyReport: PropertyAnalyticsReport | null = selectedProp
+      ? analyzePropertyFinances(selectedProp, fiscalYear)
+      : null;
 
     container.innerHTML = `
       <div class="card" style="border:1px solid var(--border-accent); background:linear-gradient(145deg, rgba(99, 102, 241, 0.04), var(--bg-surface-elevated)); box-shadow:var(--shadow-md); padding:var(--space-lg);">
@@ -59,10 +69,10 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
     `;
 
     // Event listeners per alternar de mode
-    container.querySelectorAll('.mode-btn').forEach(btn => {
+    container.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const target = e.currentTarget as HTMLElement;
-        activeMode = (target.dataset.mode === 'property' ? 'property' : 'portfolio');
+        activeMode = target.dataset.mode === 'property' ? 'property' : 'portfolio';
         renderContent();
       });
     });
@@ -158,7 +168,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                 </tr>
               </thead>
               <tbody>
-                ${report.propertiesRanked.map((m, idx) => `
+                ${report.propertiesRanked
+                  .map(
+                    (m, idx) => `
                   <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                     <td style="padding:8px 10px;">
                       <div style="display:flex; align-items:center; gap:8px;">
@@ -183,7 +195,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                       ${formatCurrency(m.cashFlowMonthly)}/m
                     </td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>
@@ -218,7 +232,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                 </tr>
               </thead>
               <tbody>
-                ${report.portfolioFiveYearProjection.map((yr) => `
+                ${report.portfolioFiveYearProjection
+                  .map(
+                    (yr) => `
                   <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                     <td style="padding:6px 8px; font-weight:800; color:var(--text-primary);">
                       Any ${yr.yearNumber} (${yr.calendarYear})
@@ -233,7 +249,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                       +${formatCurrency(yr.totalEstimatedReturn)}
                     </td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>
@@ -263,17 +281,21 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
               📍 Selecciona Explotació:
             </label>
             <select id="select-property-analytics" class="form-select" style="font-size:0.8rem; padding:4px 8px; background:var(--bg-base); border:1px solid var(--border-default); border-radius:var(--radius-sm); color:var(--text-primary);">
-              ${props.map(p => `
+              ${props
+                .map(
+                  (p) => `
                 <option value="${p.id}" ${p.id === m.propertyId ? 'selected' : ''}>
                   ${p.name || p.address} (${p.usageType})
                 </option>
-              `).join('')}
+              `,
+                )
+                .join('')}
             </select>
           </div>
 
           <div style="display:flex; align-items:center; gap:6px;">
             <span class="badge badge--primary">${m.usageType.toUpperCase()}</span>
-            <span class="badge ${m.riskRating === 'low' ? 'badge--success' : (m.riskRating === 'medium' ? 'badge--warning' : 'badge--error')}">
+            <span class="badge ${m.riskRating === 'low' ? 'badge--success' : m.riskRating === 'medium' ? 'badge--warning' : 'badge--error'}">
               Risc ${m.riskRating.toUpperCase()}
             </span>
           </div>
@@ -380,7 +402,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                 </tr>
               </thead>
               <tbody>
-                ${report.fiveYearProjection.map(yr => `
+                ${report.fiveYearProjection
+                  .map(
+                    (yr) => `
                   <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                     <td style="padding:6px 8px; font-weight:700;">Any ${yr.yearNumber} (${yr.calendarYear})</td>
                     <td style="padding:6px 8px; text-align:right; font-family:var(--font-mono); color:var(--color-primary);">${formatCurrency(yr.projectedGrossIncome)}</td>
@@ -390,7 +414,9 @@ export function createRealEstateDashboard(properties: RentalProperty[], fiscalYe
                     <td style="padding:6px 8px; text-align:right; font-family:var(--font-mono); font-weight:800;">${formatCurrency(yr.cumulativeCashFlow)}</td>
                     <td style="padding:6px 8px; text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--color-primary);">${formatCurrency(yr.projectedPropertyValue)}</td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join('')}
               </tbody>
             </table>
           </div>

@@ -4,10 +4,29 @@
  * Supports multiple fiscal years, multi-profile/multi-declarant and Dark/Light theme.
  */
 
-import type { DeclaracionData, UserProfile, UserType, StoreListener, AppTheme, ComplementaryIRPFData } from './types.ts';
-import type { IVAData, IVAInvoiceIssued, IVAInvoiceReceived, IVABienInversion, FiscalQuarter, Model303QuarterResult } from './types-iva.ts';
+import type {
+  DeclaracionData,
+  UserProfile,
+  UserType,
+  StoreListener,
+  AppTheme,
+  ComplementaryIRPFData,
+} from './types.ts';
+import type {
+  IVAData,
+  IVAInvoiceIssued,
+  IVAInvoiceReceived,
+  IVABienInversion,
+  FiscalQuarter,
+  Model303QuarterResult,
+} from './types-iva.ts';
 import { FISCAL_YEARS, type FiscalYear } from './fiscal/constants.ts';
-import { initializeEmptyIVAData, syncActivitiesToIVA, syncIVAToActivities, syncPropertiesToIVA } from './fiscal/iva-integration.ts';
+import {
+  initializeEmptyIVAData,
+  syncActivitiesToIVA,
+  syncIVAToActivities,
+  syncPropertiesToIVA,
+} from './fiscal/iva-integration.ts';
 import { calculateAllQuarters } from './fiscal/iva-engine.ts';
 import { getDemoProfilesData } from './fiscal/user-presets.ts';
 import { ALL_APP_MODULES, MODULE_PRESETS, getActiveModuleIdsForProfile } from './fiscal/modules-catalog.ts';
@@ -28,7 +47,7 @@ const DEFAULT_PROFILES: UserProfile[] = [
     avatarColor: '#6366f1',
     avatarIcon: '👤',
     tags: ['Principal'],
-    enabledModules: ALL_APP_MODULES.map(m => m.id),
+    enabledModules: ALL_APP_MODULES.map((m) => m.id),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -46,6 +65,38 @@ function deepFreeze<T>(value: T): T {
     }
   }
   return value;
+}
+
+/**
+ * Assigna el color i icona per defecte segons el tipus de perfil (declarant).
+ */
+export function getDefaultAvatarForType(type: UserType): { color: string; icon: string } {
+  const colorMap: Record<UserType, string> = {
+    freelance: '#10b981',
+    investor: '#a855f7',
+    landlord: '#f59e0b',
+    retiree: '#ec4899',
+    beckham: '#eab308',
+    family_member: '#f43f5e',
+    advisor_client: '#6366f1',
+    corporate_partner: '#0ea5e9',
+    employee: '#3b82f6',
+  };
+  const iconMap: Record<UserType, string> = {
+    freelance: '🏢',
+    investor: '📈',
+    landlord: '🏠',
+    retiree: '🏖️',
+    beckham: '🌍',
+    family_member: '👨‍👩‍👧‍👦',
+    advisor_client: '📁',
+    corporate_partner: '🏛️',
+    employee: '💼',
+  };
+  return {
+    color: colorMap[type] || '#3b82f6',
+    icon: iconMap[type] || '💼',
+  };
 }
 
 /**
@@ -71,9 +122,15 @@ class Store {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', () => this.flush());
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            this.flush();
+          }
+        });
+      }
     }
   }
-
 
   /**
    * Get the current declaration data.
@@ -119,7 +176,7 @@ class Store {
   }
 
   getProfile(profileId: string): UserProfile | undefined {
-    return this.profiles.find(p => p.id === profileId);
+    return this.profiles.find((p) => p.id === profileId);
   }
 
   getActiveProfileId(): string {
@@ -127,7 +184,7 @@ class Store {
   }
 
   getActiveProfile(): UserProfile {
-    return this.profiles.find(p => p.id === this.activeProfileId) || this.profiles[0];
+    return this.profiles.find((p) => p.id === this.activeProfileId) || this.profiles[0];
   }
 
   setActiveProfile(profileId: string): void {
@@ -144,31 +201,12 @@ class Store {
     relation: UserProfile['relation'] = 'other',
   ): UserProfile {
     const opts: Partial<UserProfile> & { name: string } =
-      typeof nameOrOptions === 'string'
-        ? { name: nameOrOptions, relation }
-        : nameOrOptions;
+      typeof nameOrOptions === 'string' ? { name: nameOrOptions, relation } : nameOrOptions;
 
     const profileType: UserType = opts.type || (opts.relation === 'spouse' ? 'family_member' : 'employee');
-
-    const defaultColor = opts.avatarColor || (
-      profileType === 'freelance' ? '#10b981' :
-      profileType === 'investor' ? '#a855f7' :
-      profileType === 'landlord' ? '#f59e0b' :
-      profileType === 'retiree' ? '#ec4899' :
-      profileType === 'beckham' ? '#eab308' :
-      profileType === 'family_member' ? '#f43f5e' :
-      profileType === 'advisor_client' ? '#6366f1' : '#3b82f6'
-    );
-
-    const defaultIcon = opts.avatarIcon || (
-      profileType === 'freelance' ? '🏢' :
-      profileType === 'investor' ? '📈' :
-      profileType === 'landlord' ? '🏠' :
-      profileType === 'retiree' ? '🏖️' :
-      profileType === 'beckham' ? '🌍' :
-      profileType === 'family_member' ? '👨‍👩‍👧‍👦' :
-      profileType === 'advisor_client' ? '📁' : '💼'
-    );
+    const defaultAvatar = getDefaultAvatarForType(profileType);
+    const defaultColor = opts.avatarColor || defaultAvatar.color;
+    const defaultIcon = opts.avatarIcon || defaultAvatar.icon;
 
     const newProfile: UserProfile = {
       id: `profile_${crypto.randomUUID().substring(0, 8)}`,
@@ -187,9 +225,10 @@ class Store {
       tags: Array.isArray(opts.tags) ? opts.tags : [],
       iban: opts.iban?.trim() || '',
       activityIAE: opts.activityIAE?.trim() || '',
-      enabledModules: Array.isArray(opts.enabledModules) && opts.enabledModules.length > 0
-        ? opts.enabledModules
-        : ALL_APP_MODULES.map(m => m.id),
+      enabledModules:
+        Array.isArray(opts.enabledModules) && opts.enabledModules.length > 0
+          ? opts.enabledModules
+          : ALL_APP_MODULES.map((m) => m.id),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -211,7 +250,7 @@ class Store {
   }
 
   updateProfile(profileId: string, updates: Partial<UserProfile>): UserProfile | undefined {
-    const idx = this.profiles.findIndex(p => p.id === profileId);
+    const idx = this.profiles.findIndex((p) => p.id === profileId);
     if (idx === -1) return undefined;
 
     const current = this.profiles[idx];
@@ -259,7 +298,7 @@ class Store {
     for (const year of FISCAL_YEARS) {
       const origData = this.load(profileId, year);
       const clonedData: DeclaracionData = {
-        ...JSON.parse(JSON.stringify(origData)),
+        ...structuredClone(origData),
         profileId: clonedProfile.id,
       };
       clonedData.personal.name = clonedProfile.name;
@@ -278,7 +317,7 @@ class Store {
       localStorage.removeItem(`${STORAGE_PREFIX}data_${profileId}_${year}`);
     }
 
-    this.profiles = this.profiles.filter(p => p.id !== profileId);
+    this.profiles = this.profiles.filter((p) => p.id !== profileId);
     this.saveProfiles();
 
     if (this.activeProfileId === profileId) {
@@ -301,12 +340,16 @@ class Store {
       profileData[year] = this.load(profileId, year);
     }
 
-    return JSON.stringify({
-      version: '2.0',
-      exportedAt: new Date().toISOString(),
-      profile,
-      declarations: profileData,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        version: '2.0',
+        exportedAt: new Date().toISOString(),
+        profile,
+        declarations: profileData,
+      },
+      null,
+      2,
+    );
   }
 
   importSingleProfile(jsonStr: string): UserProfile {
@@ -330,11 +373,16 @@ class Store {
         for (const [yearStr, dData] of Object.entries(parsed.declarations)) {
           const year = parseInt(yearStr, 10) as FiscalYear;
           if (FISCAL_YEARS.includes(year)) {
-            const dataToSave = {
-              ...(dData as DeclaracionData),
-              profileId: importedProfile.id,
-            };
-            localStorage.setItem(`${STORAGE_PREFIX}data_${importedProfile.id}_${year}`, JSON.stringify(dataToSave));
+            const dataToSave = this.mergeWithDefaults(
+              dData as Partial<DeclaracionData>,
+              year,
+              importedProfile.id,
+            );
+            dataToSave.profileId = importedProfile.id;
+            localStorage.setItem(
+              `${STORAGE_PREFIX}data_${importedProfile.id}_${year}`,
+              JSON.stringify(dataToSave),
+            );
           }
         }
       }
@@ -343,7 +391,7 @@ class Store {
       return importedProfile;
     } catch (e) {
       console.error('Error importing single profile:', e);
-      throw new Error('No s\'ha pogut importar el perfil: format incorrecte');
+      throw new Error("No s'ha pogut importar el perfil: format incorrecte");
     }
   }
 
@@ -386,7 +434,7 @@ class Store {
 
     if (currentModules.includes(moduleId)) {
       if (currentModules.length <= 1) return true; // Mantenir almenys 1 mòdul
-      newModules = currentModules.filter(m => m !== moduleId);
+      newModules = currentModules.filter((m) => m !== moduleId);
     } else {
       newModules = [...currentModules, moduleId];
     }
@@ -403,13 +451,13 @@ class Store {
   /** Activa el 100% de les eines per al perfil */
   enableAllModules(profileId?: string): void {
     const targetId = profileId || this.activeProfileId;
-    this.updateProfile(targetId, { enabledModules: ALL_APP_MODULES.map(m => m.id) });
+    this.updateProfile(targetId, { enabledModules: ALL_APP_MODULES.map((m) => m.id) });
   }
 
   /** Aplica una plantilla de configuració d'eines (Preset) */
   applyModulePreset(presetId: string, profileId?: string): void {
     const targetId = profileId || this.activeProfileId;
-    const preset = MODULE_PRESETS.find(p => p.id === presetId);
+    const preset = MODULE_PRESETS.find((p) => p.id === presetId);
     if (preset) {
       this.updateProfile(targetId, { enabledModules: [...preset.moduleIds] });
     }
@@ -452,16 +500,14 @@ class Store {
     return 'dark';
   }
 
-
   /* ── Data Updates ────────────────────────────────────────── */
 
   /** Update declaration data (partial merge or array replacement). */
-  update<K extends keyof DeclaracionData>(
-    section: K,
-    value: Partial<DeclaracionData[K]>,
-  ): void {
+  update<K extends keyof DeclaracionData>(section: K, value: Partial<DeclaracionData[K]>): void {
     if (Array.isArray(value) || Array.isArray(this.data[section])) {
-      (this.data as unknown as Record<string, unknown>)[section as string] = Array.isArray(value) ? [...value] : value;
+      (this.data as unknown as Record<string, unknown>)[section as string] = Array.isArray(value)
+        ? [...value]
+        : value;
     } else {
       (this.data as unknown as Record<string, unknown>)[section as string] = {
         ...(this.data[section] as unknown as Record<string, unknown>),
@@ -474,10 +520,7 @@ class Store {
   }
 
   /** Replace an entire section. */
-  setSection<K extends keyof DeclaracionData>(
-    section: K,
-    value: DeclaracionData[K],
-  ): void {
+  setSection<K extends keyof DeclaracionData>(section: K, value: DeclaracionData[K]): void {
     (this.data as unknown as Record<string, unknown>)[section as string] = value;
     this.data = { ...this.data };
     this.save();
@@ -528,7 +571,7 @@ class Store {
           keysToRemove.push(key);
         }
       }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
     }
 
     this.profiles = structuredClone(DEFAULT_PROFILES);
@@ -569,14 +612,28 @@ class Store {
         this.saveProfiles();
         if (parsed.data) {
           for (const [k, d] of Object.entries(parsed.data)) {
-            localStorage.setItem(`${STORAGE_PREFIX}data_${k}`, JSON.stringify(d));
+            const parts = k.split('_');
+            const year = parseInt(parts[parts.length - 1], 10);
+            const profId = parts.slice(0, -1).join('_');
+            const sanitized = this.mergeWithDefaults(
+              d as Partial<DeclaracionData>,
+              isNaN(year) ? this.currentYear : year,
+              profId || this.activeProfileId,
+            );
+            localStorage.setItem(`${STORAGE_PREFIX}data_${k}`, JSON.stringify(sanitized));
           }
         }
       } else {
         // Legacy single-profile format
         for (const [yearStr, yearData] of Object.entries(parsed)) {
+          const year = parseInt(yearStr, 10);
+          const sanitized = this.mergeWithDefaults(
+            yearData as Partial<DeclaracionData>,
+            isNaN(year) ? this.currentYear : year,
+            this.activeProfileId,
+          );
           const key = `${STORAGE_PREFIX}data_${this.activeProfileId}_${yearStr}`;
-          localStorage.setItem(key, JSON.stringify(yearData));
+          localStorage.setItem(key, JSON.stringify(sanitized));
         }
       }
       this.data = this.load(this.activeProfileId, this.currentYear);
@@ -661,8 +718,9 @@ class Store {
         try {
           const arr = JSON.parse(raw);
           if (Array.isArray(arr) && arr.length > 0) {
-            return arr.map(p => {
+            return arr.map((p) => {
               const pType: UserType = p.type || (p.relation === 'spouse' ? 'family_member' : 'employee');
+              const defaultAvatar = getDefaultAvatarForType(pType);
               return {
                 id: p.id || `profile_${crypto.randomUUID().substring(0, 8)}`,
                 name: p.name || 'Declarant',
@@ -675,30 +733,15 @@ class Store {
                 community: p.community || 'CAT',
                 status: p.status || 'draft',
                 notes: p.notes || '',
-                avatarColor: p.avatarColor || (
-                  pType === 'freelance' ? '#10b981' :
-                  pType === 'investor' ? '#a855f7' :
-                  pType === 'landlord' ? '#f59e0b' :
-                  pType === 'retiree' ? '#ec4899' :
-                  pType === 'beckham' ? '#eab308' :
-                  pType === 'family_member' ? '#f43f5e' :
-                  pType === 'advisor_client' ? '#6366f1' : '#3b82f6'
-                ),
-                avatarIcon: p.avatarIcon || (
-                  pType === 'freelance' ? '🏢' :
-                  pType === 'investor' ? '📈' :
-                  pType === 'landlord' ? '🏠' :
-                  pType === 'retiree' ? '🏖️' :
-                  pType === 'beckham' ? '🌍' :
-                  pType === 'family_member' ? '👨‍👩‍👧‍👦' :
-                  pType === 'advisor_client' ? '📁' : '💼'
-                ),
+                avatarColor: p.avatarColor || defaultAvatar.color,
+                avatarIcon: p.avatarIcon || defaultAvatar.icon,
                 tags: Array.isArray(p.tags) ? p.tags : [],
                 iban: p.iban || '',
                 activityIAE: p.activityIAE || '',
-                enabledModules: Array.isArray(p.enabledModules) && p.enabledModules.length > 0
-                  ? p.enabledModules
-                  : ALL_APP_MODULES.map(m => m.id),
+                enabledModules:
+                  Array.isArray(p.enabledModules) && p.enabledModules.length > 0
+                    ? p.enabledModules
+                    : ALL_APP_MODULES.map((m) => m.id),
                 createdAt: p.createdAt || new Date().toISOString(),
                 updatedAt: p.updatedAt || new Date().toISOString(),
               };
@@ -718,7 +761,7 @@ class Store {
   private loadActiveProfileId(): string {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(`${STORAGE_PREFIX}active_profile_id`);
-      if (stored && this.profiles.some(p => p.id === stored)) return stored;
+      if (stored && this.profiles.some((p) => p.id === stored)) return stored;
     }
     return this.profiles[0]?.id || 'profile_main';
   }
@@ -769,7 +812,7 @@ class Store {
 
   updateIssuedInvoice(inv: IVAInvoiceIssued): void {
     const iva = this.getIVA();
-    const idx = iva.issuedInvoices.findIndex(i => i.id === inv.id);
+    const idx = iva.issuedInvoices.findIndex((i) => i.id === inv.id);
     if (idx >= 0) {
       iva.issuedInvoices[idx] = inv;
       this.recalculateIVA();
@@ -780,7 +823,7 @@ class Store {
 
   deleteIssuedInvoice(id: string): void {
     const iva = this.getIVA();
-    iva.issuedInvoices = iva.issuedInvoices.filter(i => i.id !== id);
+    iva.issuedInvoices = iva.issuedInvoices.filter((i) => i.id !== id);
     this.recalculateIVA();
     this.save();
     this.notify();
@@ -796,7 +839,7 @@ class Store {
 
   updateReceivedInvoice(inv: IVAInvoiceReceived): void {
     const iva = this.getIVA();
-    const idx = iva.receivedInvoices.findIndex(i => i.id === inv.id);
+    const idx = iva.receivedInvoices.findIndex((i) => i.id === inv.id);
     if (idx >= 0) {
       iva.receivedInvoices[idx] = inv;
       this.recalculateIVA();
@@ -807,7 +850,7 @@ class Store {
 
   deleteReceivedInvoice(id: string): void {
     const iva = this.getIVA();
-    iva.receivedInvoices = iva.receivedInvoices.filter(i => i.id !== id);
+    iva.receivedInvoices = iva.receivedInvoices.filter((i) => i.id !== id);
     this.recalculateIVA();
     this.save();
     this.notify();
@@ -823,7 +866,7 @@ class Store {
 
   updateInvestmentAsset(asset: IVABienInversion): void {
     const iva = this.getIVA();
-    const idx = iva.investmentAssets.findIndex(a => a.id === asset.id);
+    const idx = iva.investmentAssets.findIndex((a) => a.id === asset.id);
     if (idx >= 0) {
       iva.investmentAssets[idx] = asset;
       this.recalculateIVA();
@@ -834,7 +877,7 @@ class Store {
 
   deleteInvestmentAsset(id: string): void {
     const iva = this.getIVA();
-    iva.investmentAssets = iva.investmentAssets.filter(a => a.id !== id);
+    iva.investmentAssets = iva.investmentAssets.filter((a) => a.id !== id);
     this.recalculateIVA();
     this.save();
     this.notify();
@@ -889,7 +932,12 @@ class Store {
     this.notify();
   }
 
-  syncIVAFromProperties(): { addedCommercialRentals: number; addedTouristRentals: number; addedExemptRentals: number; addedInvestmentAssets: number } {
+  syncIVAFromProperties(): {
+    addedCommercialRentals: number;
+    addedTouristRentals: number;
+    addedExemptRentals: number;
+    addedInvestmentAssets: number;
+  } {
     const result = syncPropertiesToIVA(this.data);
     this.data.iva = result.updatedIVA;
     this.save();

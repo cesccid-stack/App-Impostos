@@ -26,10 +26,10 @@ export function renderImport(): HTMLElement {
   const configCard = document.createElement('div');
   configCard.className = 'card';
   configCard.innerHTML = `<div class="card__header"><div class="card__title">1. Selecció de Bròker</div></div>`;
-  
+
   let selectedBroker: TradeRecord['broker'] = 'degiro';
   let parsedTrades: TradeRecord[] = [];
-  let fifoResult: { matches: FIFOMatch[], summaries: AssetSummary[] } | null = null;
+  let fifoResult: { matches: FIFOMatch[]; summaries: AssetSummary[] } | null = null;
 
   const brokerSelect = createField({
     id: 'broker-select',
@@ -44,7 +44,9 @@ export function renderImport(): HTMLElement {
       { value: 'quantfury', label: 'Quantfury (CSV)' },
       { value: 'generic', label: 'Genèric (Auto-detecció bàsica)' },
     ],
-    onChange: (val) => { selectedBroker = val as TradeRecord['broker']; },
+    onChange: (val) => {
+      selectedBroker = val as TradeRecord['broker'];
+    },
   });
   configCard.appendChild(brokerSelect);
 
@@ -83,11 +85,11 @@ export function renderImport(): HTMLElement {
       try {
         const text = await file.text();
         parsedTrades = await processCSV(text, selectedBroker);
-        
+
         if (parsedTrades.length === 0) {
-           showToast('No s\'han trobat operacions vàlides al CSV', 'error');
-           resetDropZone(dropZone);
-           return;
+          showToast("No s'han trobat operacions vàlides al CSV", 'error');
+          resetDropZone(dropZone);
+          return;
         }
 
         showToast(`Processades ${parsedTrades.length} operacions`, 'success');
@@ -95,7 +97,6 @@ export function renderImport(): HTMLElement {
         renderPreview(previewCard, fifoResult);
         previewCard.style.display = 'block';
         resetDropZone(dropZone, file.name);
-
       } catch (err) {
         console.error(err);
         showToast('Error en processar el fitxer', 'error');
@@ -109,9 +110,9 @@ export function renderImport(): HTMLElement {
 
 function resetDropZone(zone: HTMLElement, filename?: string) {
   if (filename) {
-     zone.innerHTML = `<div style="font-size:2rem; margin-bottom:var(--space-sm);">✅</div><div class="text-success">${filename} carregat</div>`;
+    zone.innerHTML = `<div style="font-size:2rem; margin-bottom:var(--space-sm);">✅</div><div class="text-success">${filename} carregat</div>`;
   } else {
-     zone.innerHTML = `<div style="font-size:2rem; margin-bottom:var(--space-sm);">📄</div><div>Fes clic per seleccionar el teu CSV</div>`;
+    zone.innerHTML = `<div style="font-size:2rem; margin-bottom:var(--space-sm);">📄</div><div>Fes clic per seleccionar el teu CSV</div>`;
   }
 }
 
@@ -129,7 +130,7 @@ async function processCSV(csv: string, broker: TradeRecord['broker']): Promise<T
   return parseGeneric(csv, undefined, broker);
 }
 
-function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], summaries: AssetSummary[] }) {
+function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[]; summaries: AssetSummary[] }) {
   container.innerHTML = `
     <div class="card__header">
       <div class="card__title">2. Resultat del Mètode FIFO</div>
@@ -140,9 +141,9 @@ function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], s
   // Summary Table
   const tableWrapper = document.createElement('div');
   tableWrapper.className = 'table-wrapper';
-  
+
   let totalRealized = 0;
-  
+
   let html = `
     <table class="table" style="margin-bottom:var(--space-lg);">
       <thead>
@@ -192,17 +193,17 @@ function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], s
   // Detail list of matches
   const details = document.createElement('div');
   details.innerHTML = `<h4>Detall d'operacions subjectes a tributació (Vendes)</h4>`;
-  
+
   const list = document.createElement('div');
   list.className = 'item-list';
   list.style.marginTop = 'var(--space-md)';
-  
+
   for (const match of result.matches) {
     const isAnti = match.antiApplicationRuleApplied;
     const row = document.createElement('div');
     row.className = 'item-row';
     if (isAnti) row.style.opacity = '0.7';
-    
+
     row.innerHTML = `
       <div class="item-row__content">
         <div class="item-row__field">
@@ -238,19 +239,19 @@ function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], s
   actions.style.marginTop = 'var(--space-xl)';
   actions.style.display = 'flex';
   actions.style.justifyContent = 'flex-end';
-  
+
   const saveBtn = document.createElement('button');
   saveBtn.className = 'btn btn--primary';
   saveBtn.textContent = 'Integrar a la Declaració Actual';
   saveBtn.addEventListener('click', () => {
     // Determine the active year to only include trades from that year
     const activeYear = store.getYear().toString();
-    
+
     const gainItems = matchesToGainItems(result.matches);
-    
+
     // Filter by year
-    const yearItems = gainItems.filter(item => item.transferDate.startsWith(activeYear));
-    
+    const yearItems = gainItems.filter((item) => item.transferDate.startsWith(activeYear));
+
     if (yearItems.length === 0) {
       showToast(`No hi ha operacions de l'any ${activeYear} per integrar.`, 'warning');
       return;
@@ -263,7 +264,7 @@ function renderPreview(container: HTMLElement, result: { matches: FIFOMatch[], s
     });
 
     showToast(`S'han afegit ${yearItems.length} operacions al patrimoni`, 'success');
-    
+
     // Redirect to gains
     window.location.hash = '#/guanys';
   });

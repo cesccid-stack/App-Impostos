@@ -17,15 +17,15 @@ import type { ComplianceData } from './types-compliance.ts';
 
 /** Tipus de contribuent / perfil fiscal */
 export type UserType =
-  | 'employee'          // Assalariat / Compte d'altri
-  | 'freelance'         // Autònom / Professional independent
-  | 'investor'          // Inversor Financer / Trader / Cripto
-  | 'landlord'          // Propietari / Arrendador Immobiliari
-  | 'retiree'           // Jubilat / Pensionista
+  | 'employee' // Assalariat / Compte d'altri
+  | 'freelance' // Autònom / Professional independent
+  | 'investor' // Inversor Financer / Trader / Cripto
+  | 'landlord' // Propietari / Arrendador Immobiliari
+  | 'retiree' // Jubilat / Pensionista
   | 'corporate_partner' // Soci / Administrador de Societats
-  | 'beckham'           // Impatriat / Llei Beckham
-  | 'family_member'     // Cònjuge / Familiar dependent
-  | 'advisor_client';   // Client d'assessoria fiscal
+  | 'beckham' // Impatriat / Llei Beckham
+  | 'family_member' // Cònjuge / Familiar dependent
+  | 'advisor_client'; // Client d'assessoria fiscal
 
 /** Estat de la tramitació de la declaració */
 export type ProfileStatus = 'draft' | 'in_review' | 'ready' | 'filed';
@@ -55,25 +55,25 @@ export interface UserProfile {
 
 /** Pèrdua pendent de compensar d'exercicis anteriors */
 export interface PriorLossItem {
-  year: number;   // Ex: 2020, 2021, 2022, 2023
+  year: number; // Ex: 2020, 2021, 2022, 2023
   amount: number; // Import pendent (€)
 }
 
 /** Motius oficials de Declaració Complementària o Rectificativa d'IRPF (Caselles 0120 - 0127 AEAT) */
-export type IRPFComplementaryReason = 
-  | 'arrears_work'        // Atrasos de rendiments del treball meritats en anys previs (Art. 14.2.b LIRPF)
-  | 'loss_deductions'     // Pèrdua del dret a deduccions aplicades en anys anteriors (Art. 14.2.d LIRPF)
-  | 'change_residence'    // Pèrdua de la condició de contribuent per canvi de residència (Art. 14.3 LIRPF)
-  | 'other_higher_tax'    // Altres motius (Ingrés superior o menor devolució a l'anterior)
-  | 'rectification';      // Autoliquidació Rectificativa (Sol·licitud d'ingrés indegut o major devolució)
+export type IRPFComplementaryReason =
+  | 'arrears_work' // Atrasos de rendiments del treball meritats en anys previs (Art. 14.2.b LIRPF)
+  | 'loss_deductions' // Pèrdua del dret a deduccions aplicades en anys anteriors (Art. 14.2.d LIRPF)
+  | 'change_residence' // Pèrdua de la condició de contribuent per canvi de residència (Art. 14.3 LIRPF)
+  | 'other_higher_tax' // Altres motius (Ingrés superior o menor devolució a l'anterior)
+  | 'rectification'; // Autoliquidació Rectificativa (Sol·licitud d'ingrés indegut o major devolució)
 
 export interface ComplementaryIRPFData {
   isComplementary: boolean;
   reason: IRPFComplementaryReason;
   previousReceiptNumber: string; // Núm. de justificant de la declaració anterior (13 caràcters)
-  previousResult: number;        // Import ingressat (+) o tornat (-) en la declaració anterior (€)
-  monthsLate?: number;           // Mesos de retard respecte al termini voluntari (per recàrrecs Art. 27 LGT)
-  hasTaxOfficeNotice?: boolean;  // Si hi ha requeriment previ de l'AEAT
+  previousResult: number; // Import ingressat (+) o tornat (-) en la declaració anterior (€)
+  monthsLate?: number; // Mesos de retard respecte al termini voluntari (per recàrrecs Art. 27 LGT)
+  hasTaxOfficeNotice?: boolean; // Si hi ha requeriment previ de l'AEAT
   notes?: string;
 }
 
@@ -103,9 +103,9 @@ export interface DeclaracionData {
 
 /** Bossa de pèrdues pendents de compensar dels 4 exercicis anteriors */
 export interface LossCarryoversData {
-  pendingGeneralLosses: PriorLossItem[];   // Caselles 0420 a 0427
+  pendingGeneralLosses: PriorLossItem[]; // Caselles 0420 a 0427
   pendingMobiliaryLosses: PriorLossItem[]; // Caselles 0440 a 0447
-  pendingCapitalLosses: PriorLossItem[];   // Caselles 0450 a 0457
+  pendingCapitalLosses: PriorLossItem[]; // Caselles 0450 a 0457
 }
 
 /** Personal & family situation */
@@ -143,7 +143,7 @@ export interface Ascendant {
   age: number;
   disability: number;
   liveTogether?: boolean; // Convivència durant almenys la meitat de l'any (Art. 59 LIRPF)
-  annualIncome?: number;  // Rendes anuals de l'ascendent (màx 8.000 €)
+  annualIncome?: number; // Rendes anuals de l'ascendent (màx 8.000 €)
   /** Movilitat reduïda o necessitat d'ajuda de terceres persones (mínim de 12.000 € si discapacitat ≥ 65%) */
   reducedMobility?: boolean;
   /**
@@ -164,6 +164,8 @@ export interface EmployerItem {
   // Dietes i quilometratge (a la nòmina però amb exempcions)
   dietsIncome: number;
   dietsDays: number;
+  dietsWithPernoctation?: boolean; // Pernoctació (53,34 €/dia nacional, 91,35 € estranger)
+  dietsAbroad?: boolean; // Desplaçament a l'estranger (48,08 € sense pernoctació, 91,35 € amb pernoctació)
   mileageIncome: number;
   mileageKm: number;
 }
@@ -183,7 +185,7 @@ export interface WorkIncomeData {
 
   // Despeses deduïbles específiques del treball (Art. 19.2 LIRPF)
   professionalCollegeFees?: number; // Cuotes col·legis professionals obligatoris (màx 500 € - Art. 19.2.d LIRPF)
-  legalDefenseFees?: number;        // Despeses de defensa jurídica laboral vs ocupador (màx 300 € - Art. 19.2.e LIRPF)
+  legalDefenseFees?: number; // Despeses de defensa jurídica laboral vs ocupador (màx 300 € - Art. 19.2.e LIRPF)
 
   // Indemnitzacions per acomiadament laboral (Art. 7.e LIRPF - Exempció màx. 180.000 €)
   severancePay?: number;
@@ -211,15 +213,15 @@ export interface CapitalIncomeData {
   /** Immobiliari */
   rentalIncome: number;
   rentalExpenses: number;
-  rentalIBI?: number;               // IBI (Casella 0073)
-  rentalWasteTax?: number;          // Taxa d'escombraries / brosses (Casella 0073)
-  rentalOtherTaxes?: number;        // Altres taxes municipals (Casella 0073)
-  rentalInsurance?: number;         // Assegurances (llar, RC, impagament) (Casella 0075)
-  rentalCommunityFees?: number;     // Comunitat de propietaris (Casella 0074)
+  rentalIBI?: number; // IBI (Casella 0073)
+  rentalWasteTax?: number; // Taxa d'escombraries / brosses (Casella 0073)
+  rentalOtherTaxes?: number; // Altres taxes municipals (Casella 0073)
+  rentalInsurance?: number; // Assegurances (llar, RC, impagament) (Casella 0075)
+  rentalCommunityFees?: number; // Comunitat de propietaris (Casella 0074)
   rentalMortgageInterests?: number; // Interessos finançament (Casella 0069)
-  rentalRepairs?: number;           // Reparació i conservació (Casella 0070)
-  rentalAmortization?: number;      // Amortització immoble + mobles (Casella 0081)
-  imputedIncome: number;            // Imputació de rendes immobiliàries
+  rentalRepairs?: number; // Reparació i conservació (Casella 0070)
+  rentalAmortization?: number; // Amortització immoble + mobles (Casella 0081)
+  imputedIncome: number; // Imputació de rendes immobiliàries
   realEstateWithholdings: number;
   /**
    * Règim de reducció del rendiment immobiliari (Llei 12/2023) per a la via simplificada
@@ -253,24 +255,24 @@ export interface GainItem {
   acquisitionDate: string;
   transferDate: string;
   acquisitionValue: number; // Casella 0330 AEAT
-  transferValue: number;    // Casella 0328 AEAT
-  expenses: number;         // Despeses deduïbles
+  transferValue: number; // Casella 0328 AEAT
+  expenses: number; // Despeses deduïbles
   isNonComputableLoss?: boolean; // Regla antiaplicació (2 mesos / 1 any)
   nonComputableLossAmount?: number; // Import exacte de la pèrdua suspesa (Casella 0335/0336 AEAT)
 
   // Exempcions tributàries
   isPrimaryResidenceExemptOver65?: boolean; // Exempció habitatge habitual > 65 anys (Art. 33.4.b)
   isPrimaryResidenceReinvestment?: boolean; // Exempció per reinversió en nou habitatge (Art. 38.1)
-  reinvestmentAmount?: number;              // Import efectivament reinvertit en 2 anys (€)
-  isLifeAnnuityExemptOver65?: boolean;     // Exempció reinversió en renda vitalícia > 65 anys (Art. 38.3)
-  lifeAnnuityAmount?: number;              // Import reinvertit en renda vitalícia (màx 240.000 €)
+  reinvestmentAmount?: number; // Import efectivament reinvertit en 2 anys (€)
+  isLifeAnnuityExemptOver65?: boolean; // Exempció reinversió en renda vitalícia > 65 anys (Art. 38.3)
+  lifeAnnuityAmount?: number; // Import reinvertit en renda vitalícia (màx 240.000 €)
 
   // Metadades de Diari de Trading & Optimització Operativa
-  setup?: string;                          // Setup tècnic (ex: Breakout, Mean Reversion, Trend Following, DCA, Dip Buying)
-  emotionTag?: string;                     // Emoció / Biaix (ex: Planned, FOMO, Chasing, Panic Exit, Over-Leveraged)
+  setup?: string; // Setup tècnic (ex: Breakout, Mean Reversion, Trend Following, DCA, Dip Buying)
+  emotionTag?: string; // Emoció / Biaix (ex: Planned, FOMO, Chasing, Panic Exit, Over-Leveraged)
   executionGrade?: 'A+' | 'A' | 'B' | 'C' | 'F' | 'Unrated'; // Qualificació d'execució segons pla
-  riskAmountEUR?: number;                  // Risc inicial planificat 1R (€)
-  notes?: string;                          // Diari de reflexió i lliçons apreses
+  riskAmountEUR?: number; // Risc inicial planificat 1R (€)
+  notes?: string; // Diari de reflexió i lliçons apreses
 }
 
 /** Deduccions */
@@ -297,11 +299,12 @@ export interface DeductionsData {
 
   /** Altres deduccions autonòmiques */
   otherDeductions: number;
-  
+
   /** Deduccions autonòmiques Catalunya */
   catalanRentalDeduction: boolean;
   catalanRentalAmount: number;
-  catalanRentalSituation: 'under32' | 'unemployed' | 'disabled65' | 'widow65' | 'large_family' | 'single_parent' | 'none';
+  catalanRentalSituation:
+    'under32' | 'unemployed' | 'disabled65' | 'widow65' | 'large_family' | 'single_parent' | 'none';
   catalanBirthAdoption: number; // nombre de fills nascuts/adoptats
   catalanStartupInvestment: number;
   catalanStartupIsResearchOrUniversity?: boolean; // Spin-off universitària (50% fins a 12.000€)
@@ -348,9 +351,9 @@ export interface FiscalResult {
   irregularWorkReduction?: number; // Reducció 30% Art. 18.2
   foreignWorkExemptionApplied?: number; // Exempció 7.p
   professionalCollegeDeduction?: number; // Despesa deduïble col·legis (Art. 19.2.d - màx 500 €)
-  legalDefenseDeduction?: number;        // Despesa defensa jurídica (Art. 19.2.e - màx 300 €)
-  exemptSeverancePay?: number;           // Indemnització acomiadament exempta (Art. 7.e)
-  taxableSeverancePay?: number;          // Excess indemnització tributable
+  legalDefenseDeduction?: number; // Despesa defensa jurídica (Art. 19.2.e - màx 300 €)
+  exemptSeverancePay?: number; // Indemnització acomiadament exempta (Art. 7.e)
+  taxableSeverancePay?: number; // Excess indemnització tributable
   pensionReduction: number;
   jointTaxationReduction?: number; // Reducció per tributació conjunta (3.400€ o 2.150€)
   totalReductions: number;
@@ -385,7 +388,7 @@ export interface FiscalResult {
   netMobiliaryBalance?: number;
   netGainsBalance?: number;
   crossCompensationAmount?: number; // Compensació creuada 25% (Art. 49)
-  priorLossesCompensated?: number;  // Pèrdues d'exercicis anteriors compensades aquest any
+  priorLossesCompensated?: number; // Pèrdues d'exercicis anteriors compensades aquest any
 
   /** Deduccions */
   housingDeductionAmount: number;
@@ -406,9 +409,9 @@ export interface FiscalResult {
   complementaryReason?: IRPFComplementaryReason;
   previousReceiptNumber?: string;
   previousResult?: number;
-  differentialResult?: number;       // Diferència respecte a la declaració anterior (€)
-  surchargeExtemporaneous?: number;  // Recàrrec Art. 27 LGT (€)
-  finalAmountDue?: number;           // Import final efectiu a ingressar o sol·licitar (€)
+  differentialResult?: number; // Diferència respecte a la declaració anterior (€)
+  surchargeExtemporaneous?: number; // Recàrrec Art. 27 LGT (€)
+  finalAmountDue?: number; // Import final efectiu a ingressar o sol·licitar (€)
 }
 
 /** Navigation route */
@@ -426,4 +429,3 @@ export type AppTheme = 'dark' | 'light' | 'emerald' | 'nord';
 
 /** Store event */
 export type StoreListener = () => void;
-
